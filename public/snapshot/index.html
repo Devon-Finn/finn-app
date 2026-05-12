@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finn — Your Financial Picture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #faf8f4;
+  --white: #ffffff;
+  --dark: #1c1c1a;
+  --mid: #5a5a56;
+  --light: #9a9a94;
+  --rule: #e8e4dc;
+  --accent: #2a4a3a;
+  --accent-light: #f0f4f1;
+  --warm: #c4956a;
+  --warm-light: #fdf6ee;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Jost', sans-serif; background: var(--bg); color: var(--dark); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; background: rgba(250,248,244,0.95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--rule); }
+.nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 400; color: var(--dark); letter-spacing: 0.04em; text-decoration: none; }
+.nav-back { font-size: 12px; font-weight: 400; letter-spacing: 0.1em; text-transform: uppercase; color: var(--light); text-decoration: none; transition: color 0.2s; }
+.nav-back:hover { color: var(--dark); }
+
+.progress-wrap { position: fixed; top: 61px; left: 0; right: 0; z-index: 99; height: 2px; background: var(--rule); }
+.progress-bar { height: 2px; background: var(--accent); transition: width 0.5s ease; width: 0%; }
+
+main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
+
+/* INTRO */
+.intro-screen { text-align: center; padding: 60px 0; animation: fadeUp 0.8s ease forwards; }
+.intro-eyebrow { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm); margin-bottom: 24px; font-weight: 500; }
+.intro-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(36px, 5vw, 56px); font-weight: 300; line-height: 1.15; color: var(--dark); letter-spacing: -0.01em; margin-bottom: 24px; }
+.intro-title em { font-style: italic; color: var(--accent); }
+.intro-body { font-size: 16px; font-weight: 300; line-height: 1.8; color: var(--mid); max-width: 480px; margin: 0 auto 48px; }
+.intro-meta { display: flex; justify-content: center; gap: 32px; margin-bottom: 48px; flex-wrap: wrap; }
+.meta-item { text-align: center; }
+.meta-val { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 300; color: var(--dark); display: block; line-height: 1; margin-bottom: 4px; }
+.meta-label { font-size: 11px; color: var(--light); text-transform: uppercase; letter-spacing: 0.1em; }
+.btn-start { display: inline-block; padding: 16px 48px; background: var(--dark); color: var(--white); font-family: 'Jost', sans-serif; font-size: 13px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; border: none; cursor: pointer; transition: background 0.2s; border-radius: 2px; }
+.btn-start:hover { background: var(--accent); }
+.intro-disclaimer { font-size: 11px; color: var(--light); margin-top: 20px; letter-spacing: 0.03em; line-height: 1.6; }
+
+/* QUESTIONS */
+.question-screen { display: none; animation: fadeUp 0.5s ease forwards; }
+.q-step { font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--light); margin-bottom: 12px; }
+.q-text { font-family: 'Cormorant Garamond', serif; font-size: clamp(24px, 3.5vw, 36px); font-weight: 300; line-height: 1.25; color: var(--dark); letter-spacing: -0.01em; margin-bottom: 12px; }
+.q-context { font-size: 14px; font-weight: 300; color: var(--mid); line-height: 1.7; margin-bottom: 20px; padding: 12px 16px; background: var(--warm-light); border-left: 2px solid var(--warm); }
+.q-multi-hint { font-size: 12px; color: var(--accent); margin-bottom: 16px; font-weight: 400; letter-spacing: 0.04em; }
+
+.options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px; }
+.option { padding: 14px 18px; border: 1px solid var(--rule); background: var(--white); font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 300; color: var(--mid); cursor: pointer; text-align: left; transition: all 0.15s; line-height: 1.5; border-radius: 2px; position: relative; }
+.option:hover { border-color: var(--accent); color: var(--dark); background: var(--accent-light); }
+.option.selected { border-color: var(--accent); background: var(--accent-light); color: var(--accent); font-weight: 400; }
+.option.selected::after { content: '✓'; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: var(--accent); font-size: 14px; }
+
+.q-nav { display: flex; gap: 12px; align-items: center; }
+.btn-next { padding: 14px 36px; background: var(--dark); color: var(--white); font-family: 'Jost', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; border: none; cursor: pointer; transition: background 0.2s; border-radius: 2px; }
+.btn-next:hover { background: var(--accent); }
+.btn-next:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn-back { padding: 14px 24px; background: transparent; color: var(--light); font-family: 'Jost', sans-serif; font-size: 12px; font-weight: 400; letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid var(--rule); cursor: pointer; transition: all 0.2s; border-radius: 2px; }
+.btn-back:hover { color: var(--dark); border-color: var(--dark); }
+
+/* LOADING */
+.loading-screen { display: none; text-align: center; padding: 80px 0; }
+.loading-title { font-family: 'Cormorant Garamond', serif; font-size: 32px; font-weight: 300; color: var(--dark); margin-bottom: 16px; }
+.loading-sub { font-size: 14px; font-weight: 300; color: var(--light); margin-bottom: 48px; }
+.loading-dots { display: flex; justify-content: center; gap: 8px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: dotPulse 1.4s ease infinite; }
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* OUTPUT */
+.output-screen { display: none; }
+.output-header { margin-bottom: 48px; padding-bottom: 32px; border-bottom: 1px solid var(--rule); }
+.output-eyebrow { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm); margin-bottom: 16px; font-weight: 500; }
+.output-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(28px, 4vw, 40px); font-weight: 300; line-height: 1.2; color: var(--dark); letter-spacing: -0.01em; }
+
+.output-section { margin-bottom: 40px; }
+.output-section-title { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 500; color: var(--accent); margin-bottom: 16px; letter-spacing: -0.01em; }
+.output-section-body { font-size: 15px; font-weight: 300; line-height: 1.9; color: var(--mid); }
+.output-section-body p { margin-bottom: 16px; }
+.output-section-body p:last-child { margin-bottom: 0; }
+.output-section-body strong { color: var(--dark); font-weight: 500; }
+
+.gap-item { padding: 20px 24px; border-left: 3px solid var(--warm); background: var(--warm-light); margin-bottom: 16px; border-radius: 0 4px 4px 0; }
+.gap-item p { font-size: 14px; font-weight: 300; line-height: 1.8; color: var(--mid); margin-bottom: 8px; }
+.gap-item p:last-child { margin-bottom: 0; }
+.gap-item strong { color: var(--dark); font-weight: 500; }
+.gap-fixable { font-size: 13px; color: var(--accent); font-weight: 400; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(42,74,58,0.15); }
+
+.output-divider { height: 1px; background: var(--rule); margin: 40px 0; }
+
+.cta-box { padding: 40px; background: var(--dark); margin-top: 48px; border-radius: 2px; }
+.cta-eyebrow { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm); margin-bottom: 16px; font-weight: 500; }
+.cta-title { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 300; color: var(--white); margin-bottom: 16px; line-height: 1.3; }
+.cta-body { font-size: 14px; font-weight: 300; color: rgba(255,255,255,0.6); line-height: 1.8; margin-bottom: 32px; }
+.btn-cta { display: inline-block; padding: 18px 48px; background: var(--warm); color: var(--dark); font-family: 'Jost', sans-serif; font-size: 13px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; border: none; cursor: pointer; transition: opacity 0.2s; text-decoration: none; border-radius: 2px; }
+.btn-cta:hover { opacity: 0.85; }
+
+.subscription-note { margin-top: 32px; padding: 28px 32px; background: var(--accent-light); border-left: 3px solid var(--accent); border-radius: 0 4px 4px 0; }
+.sub-title { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 400; color: var(--accent); margin-bottom: 10px; }
+.sub-body { font-size: 14px; font-weight: 300; color: var(--mid); line-height: 1.8; }
+
+.legal { margin-top: 40px; font-size: 11px; color: var(--light); line-height: 1.7; padding-top: 24px; border-top: 1px solid var(--rule); }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes dotPulse { 0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
+
+@media (max-width: 600px) {
+  nav { padding: 16px 20px; }
+  main { padding: 100px 16px 60px; }
+  .cta-box { padding: 24px 20px; }
+  .intro-meta { gap: 20px; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">Finn</a>
+  <a href="/" class="nav-back">← Back to Finn</a>
+</nav>
+<div class="progress-wrap">
+  <div class="progress-bar" id="progress"></div>
+</div>
+
+<main>
+
+  <!-- INTRO -->
+  <div class="intro-screen" id="intro">
+    <div class="intro-eyebrow">Free financial snapshot</div>
+    <h1 class="intro-title">Your finances,<br><em>honestly</em> assessed.</h1>
+    <p class="intro-body">Eight minutes. Nineteen questions. A plain English picture of where your household actually stands — and what it might be costing you to stay where you are.</p>
+    <div class="intro-meta">
+      <div class="meta-item"><span class="meta-val">19</span><span class="meta-label">Questions</span></div>
+      <div class="meta-item"><span class="meta-val">8</span><span class="meta-label">Minutes</span></div>
+      <div class="meta-item"><span class="meta-val">$0</span><span class="meta-label">Cost</span></div>
+    </div>
+    <button class="btn-start" onclick="startSession()">Begin my snapshot →</button>
+    <p class="intro-disclaimer">Not advice. Not a sales pitch dressed up as education.<br>Just clarity — before you talk to anyone else.</p>
+  </div>
+
+  <!-- QUESTIONS -->
+  <div class="question-screen" id="questions">
+    <div class="q-step" id="q-step">Question 1 of 19</div>
+    <div class="q-text" id="q-text"></div>
+    <div class="q-context" id="q-context" style="display:none"></div>
+    <div class="q-multi-hint" id="q-multi-hint" style="display:none">Select all that apply</div>
+    <div class="options" id="options"></div>
+    <div class="q-nav">
+      <button class="btn-back" id="btn-back" onclick="prevQuestion()" style="display:none">← Back</button>
+      <button class="btn-next" id="btn-next" onclick="nextQuestion()" disabled>Continue →</button>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading-screen" id="loading">
+    <div class="loading-title">Putting your picture together.</div>
+    <div class="loading-sub">Finn is reading your answers carefully. This takes about 20 seconds.</div>
+    <div class="loading-dots">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
+  </div>
+
+  <!-- OUTPUT -->
+  <div class="output-screen" id="output">
+    <div class="output-header">
+      <div class="output-eyebrow">Your financial snapshot</div>
+      <div class="output-title">Here's what Finn sees.</div>
+    </div>
+    <div id="output-sections"></div>
+    <div class="output-divider"></div>
+    <div class="cta-box">
+      <div class="cta-eyebrow">The full picture</div>
+      <div class="cta-title" id="cta-title">See your complete financial picture.</div>
+      <div class="cta-body">The full Finn session fills in every gap with your real numbers — not estimates. Your actual monthly position. Your actual loan structure and what it's costing you. Your actual position compared to others your age. In plain English, in one sitting, with no agenda beyond helping you see clearly.</div>
+      <a href="/ready" class="btn-cta">Join the waitlist — $97 at launch →</a>
+    </div>
+    <div class="subscription-note">
+      <div class="sub-title">And once you have your picture — Finn keeps it current.</div>
+      <div class="sub-body">On the days you're feeling anxious, making a big decision, or just want to know where you stand — your picture is there. Updated. Clear. Ready. That's what the Finn subscription is. Not a product. A financial home base.</div>
+    </div>
+    <div class="legal">This session is for general financial education and organisational purposes only. It does not constitute personal financial advice. Any cost estimates are based on general patterns observed in Australian households and do not reflect your specific circumstances. Finn is not a licensed financial advisor, mortgage broker, or financial planner. Before making any financial decisions, please seek advice from a qualified professional. meetfinn.com.au</div>
+  </div>
+
+</main>
+
+<script>
+const questions = [
+  {
+    id: 'age', multi: false,
+    text: 'Which age bracket are you in?',
+    context: null,
+    options: ['Under 30','30 to 35','36 to 40','41 to 45','46 to 50','51 to 55','Over 55']
+  },
+  {
+    id: 'gender', multi: false,
+    text: 'How do you identify?',
+    context: 'This helps Finn give you a more accurate picture of where you stand — particularly around retirement savings, where there are real differences between men and women in Australia.',
+    options: ['Male','Female','Non-binary','Prefer not to say']
+  },
+  {
+    id: 'household', multi: false,
+    text: 'Which best describes your household right now?',
+    context: null,
+    options: ['Couple — with kids','Couple — no kids','Single parent','Single — no dependants','One of us works, one doesn\'t or earns irregularly']
+  },
+  {
+    id: 'income_type', multi: false,
+    text: 'How does your household earn its income?',
+    context: null,
+    options: ['Employed — regular salary or wages','Self employed or running a business','A mix — employed plus a business or side income','One employed, one self employed']
+  },
+  {
+    id: 'social_media', multi: true,
+    text: 'When it comes to financial content online — which of these applies to you?',
+    context: 'Think Instagram, TikTok, YouTube, podcasts — anything you\'ve come across trying to get on top of your money.',
+    options: [
+      'I follow finance people but end up more confused than when I started',
+      'I\'ve done a lot of research but can\'t figure out what actually applies to me',
+      'I\'ve seriously considered engaging someone I found online — a broker, advisor, or property person',
+      'I avoid financial content — it makes me feel worse not better',
+      'I don\'t really follow financial content at all'
+    ]
+  },
+  {
+    id: 'feeling', multi: true,
+    text: 'When you think about your finances right now — which of these feel true for you?',
+    context: null,
+    options: [
+      'I feel like I should be further ahead than I am',
+      'I know I should do more but I don\'t know where to start',
+      'There\'s so much information out there I can\'t tell what applies to me',
+      'I avoid thinking about it because it stresses me out',
+      'I feel OK but want to make sure I\'m not missing something'
+    ]
+  },
+  {
+    id: 'ownership', multi: false,
+    text: 'Do you own your home or are you renting?',
+    context: 'If you have a home loan — roughly how much do you think is still owed? A ballpark is completely fine.',
+    options: [
+      'Renting — not a homeowner yet',
+      'Own with a home loan — honestly not sure what we owe or how it all works',
+      'Own with a home loan — roughly under $400,000 still owed',
+      'Own with a home loan — roughly $400,000 to $700,000 still owed',
+      'Own with a home loan — roughly over $700,000 still owed',
+      'Own outright — fully paid off'
+    ]
+  },
+  {
+    id: 'other_debts', multi: true,
+    text: 'Outside of a home loan — do you have any other money owing?',
+    context: 'Select everything that applies. No need for exact amounts.',
+    options: [
+      'No — the home loan is our only debt',
+      'Credit card balances we carry from month to month',
+      'Car loan or car finance',
+      'Personal loan',
+      'Study debt — sometimes called HECS — still being paid off',
+      'No home loan but I have some of the above'
+    ]
+  },
+  {
+    id: 'savings', multi: false,
+    text: 'Do you have savings or other money set aside — outside of your retirement fund?',
+    context: 'Think money in a bank account, shares, or anything else you\'d consider a financial asset. A rough range is completely fine.',
+    options: [
+      'Not much — little to no savings right now',
+      'Some savings — roughly under $30,000',
+      'Savings between $30,000 and $100,000 sitting in a bank account',
+      'Savings over $100,000 sitting in a bank account',
+      'Savings in a dedicated account linked directly to our home loan',
+      'We also invest in shares or managed funds',
+      'I have savings but I\'m not sure if they\'re set up in the best way'
+    ]
+  },
+  {
+    id: 'investments', multi: true,
+    text: 'Do you have any investments or assets outside of your home and retirement fund?',
+    context: null,
+    options: [
+      'No — the home is our only major asset',
+      'Shares or managed funds',
+      'An investment property',
+      'Business ownership or equity in a business',
+      'Some investments but not sure they\'re set up correctly',
+      'No idea — never really looked at this properly'
+    ]
+  },
+  {
+    id: 'income', multi: false,
+    text: 'Roughly what does your household bring in each month after tax?',
+    context: 'What actually lands in your bank account across all income — just a ballpark.',
+    options: [
+      'Under $5,000 per month',
+      '$5,000 to $8,000 per month',
+      '$8,000 to $12,000 per month',
+      '$12,000 to $18,000 per month',
+      'Over $18,000 per month'
+    ]
+  },
+  {
+    id: 'cashflow', multi: false,
+    text: 'At the end of a typical month — what best describes where your money goes?',
+    context: null,
+    options: [
+      'It disappears — we\'re genuinely not sure where it all goes',
+      'We cover everything but there\'s not much left over',
+      'We usually have something left but it just sits there',
+      'We have money left over and are actively putting it somewhere useful',
+      'Our income varies a lot so it\'s hard to say'
+    ]
+  },
+  {
+    id: 'super', multi: false,
+    text: 'How on top of your retirement savings would you say you are?',
+    context: 'In Australia, your employer puts money aside for your retirement throughout your working life — most people have this but very few actively manage it.',
+    options: [
+      'On top of it — I know my balance and review it regularly',
+      'I know roughly what I have but haven\'t looked properly in a while',
+      'I think I might have more than one account from different jobs but haven\'t checked',
+      'I honestly don\'t know much about it at all',
+      'I\'m not really sure what this means or how it works',
+      'My partner manages ours — I\'m not across the detail'
+    ]
+  },
+  {
+    id: 'insurance', multi: false,
+    text: 'Do you know what cover you have if you got seriously ill or injured and couldn\'t work?',
+    context: 'Think about whether you have any income protection or life cover — either through your employer, your retirement fund, or a separate policy.',
+    options: [
+      'Yes — I know exactly what I have and I\'m comfortable with it',
+      'I think I have some cover through my retirement fund but I\'m not sure how much',
+      'I honestly have no idea what cover I have',
+      'I know I\'m probably underprotected but haven\'t done anything about it',
+      'I have a financial advisor who manages this for me'
+    ]
+  },
+  {
+    id: 'professionals', multi: true,
+    text: 'Do you currently work with any financial professionals?',
+    context: null,
+    options: [
+      'No — never engaged anyone formally',
+      'We use an accountant for tax',
+      'We have a mortgage broker we\'ve used',
+      'We have a financial advisor or planner',
+      'We\'ve seen someone before but nothing really came of it',
+      'I\'m not sure what professionals we actually need'
+    ]
+  },
+  {
+    id: 'protection', multi: false,
+    text: 'If your household income stopped tomorrow — how long could you keep going on what you have accessible right now?',
+    context: 'Think about money you could get to quickly — savings, anything in the bank.',
+    options: [
+      'Less than a month — we\'d be in real trouble quickly',
+      'A couple of months — it would be very stressful',
+      'Around six months — we\'d manage but it would hurt',
+      'Over a year — we\'re reasonably well covered',
+      'Honestly I\'ve never thought about it this way before'
+    ]
+  },
+  {
+    id: 'wills', multi: false,
+    text: 'Have you set out legally what should happen to your money, your home, and your family if something happened to you?',
+    context: 'This means having a current legal document — a will — that makes sure your wishes are carried out and your family is looked after.',
+    options: [
+      'Yes — both of us have current, up to date ones',
+      'We have something but it\'s old and probably needs updating',
+      'One of us has one — the other doesn\'t',
+      'No — we know we need to but haven\'t got around to it',
+      'Not applicable — no partner or dependants to consider'
+    ]
+  },
+  {
+    id: 'goals', multi: true,
+    text: 'When you think about the next five to ten years — what matters most to you financially?',
+    context: 'Select everything that resonates.',
+    options: [
+      'Pay off the home faster',
+      'Buy an investment property',
+      'Build a share portfolio or grow our investments',
+      'Retire earlier than expected',
+      'Set our kids up financially',
+      'Just build a bigger buffer — feel more secure',
+      'Honestly I\'m not sure — I just want to feel like we\'re on the right track'
+    ]
+  },
+  {
+    id: 'aspiration', multi: false,
+    text: 'Last one. What would actually getting on top of your finances feel like for you?',
+    context: null,
+    options: [
+      'Peace of mind — knowing we\'re not missing something obvious',
+      'Getting ahead — feeling like we\'re actually moving forward',
+      'Confidence — making money decisions without second-guessing everything',
+      'Security — knowing my family is protected if something goes wrong',
+      'Being in control — understanding what we have and what it\'s doing for us',
+      'Just knowing where to start'
+    ]
+  }
+];
+
+const SYSTEM_PROMPT = `You are Finn — a financial clarity guide for everyday Australians. You are warm, plain-spoken, and genuinely helpful. You are not a financial advisor and never give personal financial advice.
+
+You will receive answers to 19 questions about someone's financial situation. Produce a structured output with exactly THREE SECTIONS using these markers.
+
+CRITICAL WRITING RULES:
+- Write in plain, conversational English. No jargon. If you must use a financial term, explain it immediately in plain words.
+- Do NOT use the words: surplus, equity, net position, LVR, offset account, concessional, gearing. Instead say: money left over each month, what your home is worth above what you owe, the gap between assets and debts, savings account linked to your home loan.
+- Do NOT just list their answers back to them. Synthesise them into a genuine narrative.
+- Write in flowing paragraphs — not bullet points, not lists.
+- Sound like a knowledgeable friend who just listened carefully and is reflecting back what they heard.
+- Every gap section must end with a fixable note — make clear this is solvable.
+
+===SECTION ONE===
+Heading: You're not alone.
+Write 2-3 short paragraphs that:
+1. Validate how they're feeling using their 'feeling' answer — name the feeling back to them naturally
+2. Normalise it with genuine peer context — most Australian households earning well are in the same position
+3. If their social_media answer shows they've been consuming conflicted content, acknowledge briefly that the online financial content world is genuinely hard to navigate — lots of it is education dressed up as a sales funnel
+Remove shame. Warm. Human. Direct.
+
+===SECTION TWO===
+Heading: Your picture right now.
+Write 1-2 paragraphs that paint a genuine picture of their financial life based on their answers. Do NOT list their answers. Instead, weave them into a narrative that sounds like a thoughtful friend describing what they heard.
+
+Use plain language: instead of "mortgage" say "home loan", instead of "equity" say "what your home is worth above what you owe on it", instead of "surplus" say "what's left at the end of the month."
+
+End with: "That's the picture right now. It's more common than most people realise — and it has more room to improve than most people know."
+
+===SECTION THREE===
+Heading: What's worth looking at — and what it's costing you.
+Intro sentence: "Based on what you've shared, here are the areas that typically matter most for a household like yours."
+
+Then include ONLY the gaps that genuinely apply to their answers. For each gap write 3-4 sentences as flowing prose — what the gap is in plain English, why it matters, what it typically costs, and end with a fixable note. Use warm, honest language — not alarming.
+
+CHECK EACH GAP:
+
+MONEY DISAPPEARING (if cashflow is "disappears" or "not much left over"):
+Write about not knowing where money goes each month. Plain English — not knowing what's left at the end of the month means you can't put it to work deliberately. Households in their income range who get clear on this typically find $800-$2,000 per month going nowhere useful. End with: "This is one of the most common and most fixable things we see."
+
+SAVINGS NOT WORKING HARD ENOUGH (if savings mentions "bank account" AND ownership mentions home loan):
+Write about having money sitting in a regular bank account while paying a home loan — earning a lower rate than the loan costs. Do NOT say "offset account". Say "a savings account linked directly to your home loan can reduce the interest you pay — most people haven't had this explained to them." Typical cost: $2,000-$6,000 per year depending on their savings level. End with: "This is straightforward to fix and is one of the highest-impact changes a household in your position can make."
+
+HOME LOAN UNCLEAR (if ownership is "not sure what we owe or how it all works"):
+Write about not knowing your home loan — what it costs, how it's structured. Your home loan is likely the biggest financial commitment you have. Even being slightly above the going rate costs real money every year — around $2,500 per year for every 0.5% above market rate on a $500,000 loan. End with: "Getting clear on your home loan is one of the first things worth doing — and it's simpler than most people think."
+
+RETIREMENT SAVINGS NOT REVIEWED (if super is not reviewed, multiple accounts suspected, or unclear):
+Write about retirement savings being most people's second largest asset — and the most neglected. Not knowing what's there, or having multiple accounts from old jobs, typically means paying fees on accounts you've forgotten about. Typical cost: $1,000-$3,000 per year. End with: "This is completely fixable — and knowing where you stand takes less than 20 minutes once you know where to look."
+
+INSURANCE GAP (if insurance is "no idea", "probably underprotected", or "not sure"):
+Write about not knowing what cover you have if income stopped. For a household with dependants and a home loan, this gap matters. Not knowing means not knowing whether you're exposed. End with: "This is worth understanding clearly — and once you do, it's straightforward to assess whether you need to do anything."
+
+PROTECTION GAP (if protection is "less than a month" or "couple of months" or "never thought about it"):
+Write about what would happen if income stopped tomorrow. Having less than three months of accessible money as a buffer is something most financial advisors would flag immediately. End with: "Building this buffer is one of the most grounding things a household can do — and it starts with knowing the number."
+
+ESTATE PLANNING (if wills is "no" or "old" or "one of us", AND household includes partner or kids):
+Write about not having current legal documents in place. For a couple with children and a home, this means there's nothing legally recorded about what happens to your home, your money, or who looks after your children if something happened. End with: "This is one of the most straightforward things to sort — and it gives enormous peace of mind once it's done."
+
+After all applicable gaps, close with:
+"These aren't small things — but they're not unusual either. Every single one of them is fixable. And the first step is knowing exactly where you stand."
+
+===CONVERSION===
+Using their exact 'aspiration' answer, write a warm, direct 2-3 sentence conversion statement. Not a question — a statement. Connect it to what they said matters to them. Do not say "no one trying to sell you anything." Instead say something like "with no agenda beyond helping you see clearly."
+
+Examples:
+- Peace of mind: "You told us peace of mind is what you're looking for. The full Finn session gives you exactly that — your complete picture, in plain English, in one sitting, with no agenda beyond helping you see clearly."
+- Getting ahead: "You told us getting ahead is what matters. The full Finn session shows you exactly where the opportunities are in your picture — real numbers, real clarity."
+- Confidence: "You told us confidence is what you want — making decisions without second-guessing. The full Finn session gives you the complete picture you need to do exactly that."
+- Security: "You told us security matters most. The full Finn session covers your protection picture in detail — so you know exactly where you stand and what, if anything, needs attention."
+- Control: "You told us you want to feel in control. The full Finn session gives you your complete financial picture — what you have, what it's doing, and what to look at first."
+- Where to start: "You told us you'd just like to know where to start. That's exactly what the full Finn session gives you — a clear starting point, in plain English, with no agenda beyond helping you see clearly."
+
+LEGAL: Never give personal financial advice. Never recommend specific products. Always frame costs as general estimates based on household patterns, not calculations of their specific situation.`;
+
+let currentQ = 0;
+let answers = {};
+
+function startSession() {
+  document.getElementById('intro').style.display = 'none';
+  document.getElementById('questions').style.display = 'block';
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = questions[currentQ];
+  const total = questions.length;
+  document.getElementById('progress').style.width = ((currentQ / total) * 100) + '%';
+  document.getElementById('q-step').textContent = `Question ${currentQ + 1} of ${total}`;
+  document.getElementById('q-text').textContent = q.text;
+
+  const ctx = document.getElementById('q-context');
+  if (q.context) { ctx.textContent = q.context; ctx.style.display = 'block'; }
+  else { ctx.style.display = 'none'; }
+
+  const multiHint = document.getElementById('q-multi-hint');
+  multiHint.style.display = q.multi ? 'block' : 'none';
+
+  const optionsEl = document.getElementById('options');
+  optionsEl.innerHTML = '';
+
+  const currentAnswers = answers[q.id] || (q.multi ? [] : null);
+
+  q.options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'option';
+    btn.textContent = opt;
+    const isSelected = q.multi ? (currentAnswers.includes(opt)) : (currentAnswers === opt);
+    if (isSelected) btn.classList.add('selected');
+    btn.addEventListener('click', () => selectOption(opt, btn, q));
+    optionsEl.appendChild(btn);
+  });
+
+  const hasAnswer = q.multi ? (answers[q.id] && answers[q.id].length > 0) : !!answers[q.id];
+  document.getElementById('btn-next').disabled = !hasAnswer;
+  document.getElementById('btn-back').style.display = currentQ > 0 ? 'block' : 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function selectOption(value, btn, q) {
+  if (q.multi) {
+    if (!answers[q.id]) answers[q.id] = [];
+    const idx = answers[q.id].indexOf(value);
+    if (idx > -1) {
+      answers[q.id].splice(idx, 1);
+      btn.classList.remove('selected');
+    } else {
+      answers[q.id].push(value);
+      btn.classList.add('selected');
+    }
+    document.getElementById('btn-next').disabled = answers[q.id].length === 0;
+  } else {
+    answers[q.id] = value;
+    document.querySelectorAll('.option').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    document.getElementById('btn-next').disabled = false;
+  }
+}
+
+function nextQuestion() {
+  const q = questions[currentQ];
+  const hasAnswer = q.multi ? (answers[q.id] && answers[q.id].length > 0) : !!answers[q.id];
+  if (!hasAnswer) return;
+  if (currentQ < questions.length - 1) { currentQ++; renderQuestion(); }
+  else { generateOutput(); }
+}
+
+function prevQuestion() {
+  if (currentQ > 0) { currentQ--; renderQuestion(); }
+}
+
+async function generateOutput() {
+  document.getElementById('questions').style.display = 'none';
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('progress').style.width = '100%';
+
+  const answersText = questions.map(q => {
+    const ans = answers[q.id];
+    const ansStr = Array.isArray(ans) ? ans.join(', ') : (ans || 'Not answered');
+    return `${q.id}: ${ansStr}`;
+  }).join('\n');
+
+  const userMessage = `Here are the answers from someone completing the Finn financial snapshot:\n\n${answersText}\n\nPlease produce the structured output following your instructions exactly.`;
+
+  try {
+    const response = await fetch('/api/ask-finn', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system: SYSTEM_PROMPT,
+        max_tokens: 2500,
+        messages: [{ role: 'user', content: userMessage }]
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`API error ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+    const text = data.content[0].text;
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('output').style.display = 'block';
+    renderOutput(text);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  } catch (err) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('output').style.display = 'block';
+    document.getElementById('output-sections').innerHTML = '<p style="color:#c0392b;padding:20px;background:#fdf0f0;border-radius:4px;">Something went wrong. Please refresh and try again. Error: ' + err.message + '</p>';
+    console.error('Finn error:', err);
+  }
+}
+
+function renderOutput(text) {
+  const sectionsEl = document.getElementById('output-sections');
+  sectionsEl.innerHTML = '';
+
+  const s1Match = text.match(/===SECTION ONE===([\s\S]*?)(?====SECTION TWO===|$)/);
+  const s2Match = text.match(/===SECTION TWO===([\s\S]*?)(?====SECTION THREE===|$)/);
+  const s3Match = text.match(/===SECTION THREE===([\s\S]*?)(?====CONVERSION===|$)/);
+  const convMatch = text.match(/===CONVERSION===([\s\S]*?)$/);
+
+  function renderSection(content, titleOverride) {
+    if (!content) return;
+    const lines = content.trim().split('\n').filter(l => l.trim());
+    let title = titleOverride;
+    let body = lines;
+
+    if (lines[0] && (lines[0].startsWith('Heading:') || lines[0].startsWith('#'))) {
+      title = lines[0].replace(/^Heading:\s*|^#+\s*/, '').trim();
+      body = lines.slice(1);
+    }
+
+    const section = document.createElement('div');
+    section.className = 'output-section';
+
+    if (title) {
+      const h = document.createElement('div');
+      h.className = 'output-section-title';
+      h.textContent = title;
+      section.appendChild(h);
+    }
+
+    const bodyDiv = document.createElement('div');
+    bodyDiv.className = 'output-section-body';
+
+    const paragraphs = body.join('\n').split(/\n\n+/).filter(p => p.trim());
+    paragraphs.forEach(p => {
+      const el = document.createElement('p');
+      el.textContent = p.trim();
+      bodyDiv.appendChild(el);
+    });
+
+    section.appendChild(bodyDiv);
+    sectionsEl.appendChild(section);
+  }
+
+  renderSection(s1Match ? s1Match[1] : null, 'You\'re not alone.');
+  renderSection(s2Match ? s2Match[1] : null, 'Your picture right now.');
+  renderSection(s3Match ? s3Match[1] : null, 'What\'s worth looking at.');
+
+  if (convMatch) {
+    const convText = convMatch[1].trim().split('\n').filter(l => l.trim()).join(' ');
+    const ctaBody = document.querySelector('.cta-body');
+    if (ctaBody && convText) {
+      ctaBody.textContent = convText + ' ' + ctaBody.textContent;
+    }
+  }
+
+  if (!s1Match && !s2Match && !s3Match) {
+    const div = document.createElement('div');
+    div.className = 'output-section';
+    const body = document.createElement('div');
+    body.className = 'output-section-body';
+    text.split(/\n\n+/).filter(p => p.trim()).forEach(p => {
+      const el = document.createElement('p');
+      el.textContent = p.trim();
+      body.appendChild(el);
+    });
+    div.appendChild(body);
+    sectionsEl.appendChild(div);
+  }
+
+  const asp = answers['aspiration'] || '';
+  let ctaTitle = 'See your complete financial picture.';
+  if (asp.includes('Peace of mind') || asp.includes('peace')) ctaTitle = 'Your peace of mind starts with knowing exactly where you stand.';
+  else if (asp.includes('ahead') || asp.includes('Getting ahead')) ctaTitle = 'Getting ahead starts with a clear picture of where you actually are.';
+  else if (asp.includes('Confidence') || asp.includes('confidence')) ctaTitle = 'Confidence comes from understanding your complete picture.';
+  else if (asp.includes('Security') || asp.includes('security')) ctaTitle = 'Security starts with knowing exactly what you have — and what you don\'t.';
+  else if (asp.includes('control') || asp.includes('Control')) ctaTitle = 'Being in control starts with seeing your complete financial picture clearly.';
+  else if (asp.includes('start')) ctaTitle = 'The best starting point is knowing exactly where you stand.';
+  document.getElementById('cta-title').textContent = ctaTitle;
+}
+</script>
+</body>
+</html>

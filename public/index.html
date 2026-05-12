@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finn — Understand your finances before you talk to anyone</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #faf8f4;
+  --white: #ffffff;
+  --dark: #1c1c1a;
+  --mid: #5a5a56;
+  --light: #9a9a94;
+  --rule: #e8e4dc;
+  --accent: #2a4a3a;
+  --accent-light: #f0f4f1;
+  --warm: #c4956a;
+  --warm-light: #fdf6ee;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Jost', sans-serif; background: var(--bg); color: var(--dark); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+
+/* NAV */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  padding: 24px 60px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: rgba(250,248,244,0.92); backdrop-filter: blur(10px);
+}
+.nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 400; color: var(--dark); letter-spacing: 0.04em; text-decoration: none; }
+.nav-cta { font-size: 12px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--white); background: var(--dark); padding: 12px 28px; text-decoration: none; transition: background 0.2s; border-radius: 2px; }
+.nav-cta:hover { background: var(--accent); }
+
+/* HERO */
+.hero {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding-top: 80px;
+  background: var(--white);
+}
+.hero-left {
+  padding: 100px 60px 80px;
+  display: flex; flex-direction: column; justify-content: center;
+  border-right: 1px solid var(--rule);
+}
+.hero-eyebrow { font-size: 11px; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--warm); margin-bottom: 32px; }
+.hero h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(44px, 4.5vw, 72px);
+  font-weight: 300; line-height: 1.1;
+  color: var(--dark); letter-spacing: -0.01em; margin-bottom: 32px;
+}
+.hero h1 em { font-style: italic; color: var(--accent); }
+.hero-sub { font-size: 16px; font-weight: 300; line-height: 1.85; color: var(--mid); max-width: 420px; margin-bottom: 48px; }
+
+.hero-actions { display: flex; flex-direction: column; gap: 16px; max-width: 380px; }
+.btn-primary {
+  display: block; padding: 18px 32px; background: var(--dark); color: var(--white);
+  font-family: 'Jost', sans-serif; font-size: 13px; font-weight: 500;
+  letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none;
+  text-align: center; transition: background 0.2s; border-radius: 2px;
+}
+.btn-primary:hover { background: var(--accent); }
+.btn-secondary {
+  display: block; padding: 18px 32px; background: transparent; color: var(--mid);
+  font-family: 'Jost', sans-serif; font-size: 13px; font-weight: 400;
+  letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none;
+  text-align: center; border: 1px solid var(--rule); transition: all 0.2s; border-radius: 2px;
+}
+.btn-secondary:hover { border-color: var(--dark); color: var(--dark); }
+.hero-disclaimer { font-size: 11px; color: var(--light); margin-top: 16px; line-height: 1.6; }
+
+.hero-right {
+  background: var(--bg); padding: 100px 60px 80px;
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.hero-stats { display: flex; flex-direction: column; gap: 0; }
+.hero-stat { padding: 32px 0; border-bottom: 1px solid var(--rule); }
+.hero-stat:last-child { border-bottom: none; }
+.stat-num { font-family: 'Cormorant Garamond', serif; font-size: 52px; font-weight: 300; color: var(--dark); line-height: 1; margin-bottom: 8px; }
+.stat-label { font-size: 13px; font-weight: 300; color: var(--mid); line-height: 1.6; max-width: 280px; }
+
+/* STATEMENT */
+.section-statement { padding: 100px 60px; background: var(--dark); text-align: center; }
+.statement-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(26px, 3vw, 46px); font-weight: 300;
+  line-height: 1.4; color: var(--white); max-width: 820px; margin: 0 auto;
+  letter-spacing: -0.01em;
+}
+.statement-text em { font-style: italic; color: rgba(255,255,255,0.45); }
+
+/* SECTION SHARED */
+.section-inner { max-width: 1100px; margin: 0 auto; }
+.section-eyebrow { font-size: 11px; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--warm); display: block; margin-bottom: 20px; }
+.section-header { display: grid; grid-template-columns: 1fr 2fr; gap: 80px; margin-bottom: 72px; padding-bottom: 72px; border-bottom: 1px solid var(--rule); align-items: end; }
+.section-header h2 { font-family: 'Cormorant Garamond', serif; font-size: clamp(26px, 3vw, 42px); font-weight: 300; line-height: 1.25; color: var(--dark); letter-spacing: -0.01em; }
+.section-header p { font-size: 16px; font-weight: 300; line-height: 1.85; color: var(--mid); }
+
+/* JOURNEY */
+.section-journey { padding: 100px 60px; background: var(--bg); }
+.journey-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
+.journey-step { padding: 0 40px 0 0; border-right: 1px solid var(--rule); margin-right: 40px; }
+.journey-step:last-child { border-right: none; margin-right: 0; padding-right: 0; }
+.step-num { font-family: 'Cormorant Garamond', serif; font-size: 52px; font-weight: 300; color: var(--rule); line-height: 1; margin-bottom: 20px; }
+.step-tag { font-size: 10px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: var(--warm); margin-bottom: 10px; display: block; }
+.step-title { font-size: 15px; font-weight: 500; color: var(--dark); margin-bottom: 10px; }
+.step-body { font-size: 13px; font-weight: 300; line-height: 1.75; color: var(--mid); }
+.step-price { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 400; color: var(--accent); margin-top: 12px; }
+
+/* PROBLEM */
+.section-problem { padding: 100px 60px; background: var(--white); border-top: 1px solid var(--rule); }
+.problem-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: start; }
+.problem-left h2 { font-family: 'Cormorant Garamond', serif; font-size: clamp(26px, 3vw, 42px); font-weight: 300; line-height: 1.25; color: var(--dark); letter-spacing: -0.01em; margin-bottom: 24px; }
+.problem-left p { font-size: 16px; font-weight: 300; line-height: 1.85; color: var(--mid); margin-bottom: 16px; }
+.problem-right { display: flex; flex-direction: column; gap: 20px; padding-top: 8px; }
+.problem-item { padding: 20px 24px; border: 1px solid var(--rule); background: var(--bg); border-radius: 2px; }
+.problem-item-title { font-size: 14px; font-weight: 500; color: var(--dark); margin-bottom: 6px; }
+.problem-item-body { font-size: 13px; font-weight: 300; color: var(--mid); line-height: 1.65; }
+
+/* HOW IT WORKS */
+.section-how { padding: 100px 60px; background: var(--bg); border-top: 1px solid var(--rule); }
+.how-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
+.how-step { padding: 0 48px 0 0; border-right: 1px solid var(--rule); margin-right: 48px; }
+.how-step:last-child { border-right: none; margin-right: 0; padding-right: 0; }
+.how-num { font-family: 'Cormorant Garamond', serif; font-size: 48px; font-weight: 300; color: var(--rule); line-height: 1; margin-bottom: 20px; }
+.how-title { font-size: 13px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dark); margin-bottom: 12px; }
+.how-body { font-size: 14px; font-weight: 300; line-height: 1.8; color: var(--mid); }
+
+/* INDEPENDENCE */
+.section-independence { padding: 100px 60px; background: var(--dark); border-top: 1px solid rgba(255,255,255,0.08); }
+.section-independence .section-eyebrow { color: rgba(196,149,106,0.8); }
+.independence-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+.ind-item { padding: 0 48px 0 0; border-right: 1px solid rgba(255,255,255,0.08); margin-right: 48px; }
+.ind-item:last-child { border-right: none; margin-right: 0; padding-right: 0; }
+.ind-title { font-size: 13px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 14px; }
+.ind-body { font-family: 'Cormorant Garamond', serif; font-size: 19px; font-weight: 300; line-height: 1.55; color: var(--white); }
+
+/* SUBSCRIPTION */
+.section-subscription { padding: 100px 60px; background: var(--accent-light); border-top: 1px solid var(--rule); }
+.sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
+.sub-left h2 { font-family: 'Cormorant Garamond', serif; font-size: clamp(28px, 3vw, 44px); font-weight: 300; line-height: 1.2; color: var(--dark); letter-spacing: -0.01em; margin-bottom: 24px; }
+.sub-left p { font-size: 16px; font-weight: 300; line-height: 1.85; color: var(--mid); margin-bottom: 16px; }
+.sub-right { display: flex; flex-direction: column; gap: 16px; }
+.sub-moment { padding: 18px 22px; background: var(--white); border-left: 3px solid var(--accent); border-radius: 0 4px 4px 0; }
+.sub-moment-title { font-size: 13px; font-weight: 500; color: var(--accent); margin-bottom: 4px; }
+.sub-moment-body { font-size: 13px; font-weight: 300; color: var(--mid); line-height: 1.6; }
+
+/* CTA SECTION */
+.section-cta { padding: 120px 60px; background: var(--white); border-top: 1px solid var(--rule); }
+.cta-inner { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 120px; align-items: center; }
+.cta-left h2 { font-family: 'Cormorant Garamond', serif; font-size: clamp(30px, 3.5vw, 50px); font-weight: 300; line-height: 1.2; color: var(--dark); letter-spacing: -0.01em; margin-bottom: 20px; }
+.cta-left p { font-size: 16px; font-weight: 300; line-height: 1.85; color: var(--mid); margin-bottom: 32px; }
+.cta-right { display: flex; flex-direction: column; gap: 16px; }
+
+/* WAITLIST FORM */
+.form-label { font-size: 11px; font-weight: 400; letter-spacing: 0.14em; text-transform: uppercase; color: var(--light); margin-bottom: 10px; display: block; }
+.form-row { display: flex; border: 1px solid var(--rule); background: var(--white); }
+.form-row input { flex: 1; padding: 16px 20px; background: transparent; border: none; outline: none; font-family: 'Jost', sans-serif; font-size: 14px; color: var(--dark); font-weight: 300; }
+.form-row input::placeholder { color: var(--light); }
+.form-row button { padding: 16px 28px; background: var(--dark); border: none; color: var(--white); font-family: 'Jost', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
+.form-row button:hover { background: var(--accent); }
+.form-note { font-size: 11px; color: var(--light); margin-top: 12px; letter-spacing: 0.03em; }
+.thankyou { display: none; flex-direction: column; gap: 8px; padding: 24px; background: var(--accent-light); border: 1px solid var(--rule); border-radius: 2px; }
+.thankyou.show { display: flex; }
+.thankyou-title { font-family: 'Cormorant Garamond', serif; font-size: 22px; color: var(--dark); }
+.thankyou-text { font-size: 14px; font-weight: 300; color: var(--mid); line-height: 1.7; }
+
+/* FOOTER */
+footer { padding: 48px 60px; background: var(--dark); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+.footer-brand { font-family: 'Cormorant Garamond', serif; font-size: 22px; color: var(--white); letter-spacing: 0.04em; }
+.footer-text { font-size: 12px; color: rgba(255,255,255,0.25); line-height: 1.7; text-align: right; }
+
+/* RESPONSIVE */
+@media (max-width: 900px) {
+  nav { padding: 18px 24px; }
+  .hero { grid-template-columns: 1fr; }
+  .hero-right { display: none; }
+  .hero-left { padding: 80px 24px 60px; }
+  .section-statement, .section-problem, .section-how, .section-journey, .section-independence, .section-subscription, .section-cta { padding: 72px 24px; }
+  .problem-cols, .sub-grid, .cta-inner { grid-template-columns: 1fr; gap: 48px; }
+  .section-header { grid-template-columns: 1fr; gap: 20px; }
+  .journey-steps, .how-steps, .independence-grid { grid-template-columns: 1fr; gap: 40px; }
+  .journey-step, .how-step, .ind-item { padding-right: 0; border-right: none; margin-right: 0; padding-bottom: 40px; border-bottom: 1px solid var(--rule); }
+  .journey-step:last-child, .how-step:last-child, .ind-item:last-child { border-bottom: none; padding-bottom: 0; }
+  footer { flex-direction: column; text-align: center; }
+  .footer-text { text-align: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="nav-logo">Finn</a>
+  <a href="/snapshot" class="nav-cta">Get your free snapshot</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-left">
+    <div class="hero-eyebrow">Meet Finn — Free financial snapshot</div>
+    <h1>Your finances.<br><em>Finally</em><br>clear.</h1>
+    <p class="hero-sub">Before you talk to a broker, an advisor, or anyone else about your money — understand exactly where you stand. No advice. No agenda beyond helping you see clearly.</p>
+    <div class="hero-actions">
+      <a href="/snapshot" class="btn-primary">Start your free snapshot →</a>
+      <a href="#how" class="btn-secondary">See how it works</a>
+    </div>
+    <p class="hero-disclaimer">Not advice. Not a sales pitch dressed up as education.<br>Just clarity — before you talk to anyone else.</p>
+  </div>
+  <div class="hero-right">
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="stat-num">3.3M</div>
+        <div class="stat-label">Australians with unmet financial clarity needs who would use the right digital tool if it existed.</div>
+      </div>
+      <div class="hero-stat">
+        <div class="stat-num">$0</div>
+        <div class="stat-label">The amount most people have spent understanding their own financial position before talking to a professional.</div>
+      </div>
+      <div class="hero-stat">
+        <div class="stat-num">8 min</div>
+        <div class="stat-label">How long the free snapshot takes. No account needed. No card required.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATEMENT -->
+<section class="section-statement">
+  <p class="statement-text">There's more financial content online than ever. <em>And Australians are more confused than ever.</em> That's not a coincidence — most of it is designed to convert you, not to help you understand your own situation.</p>
+</section>
+
+<!-- PROBLEM -->
+<section class="section-problem">
+  <div class="section-inner">
+    <div class="problem-cols">
+      <div class="problem-left">
+        <span class="section-eyebrow">The problem</span>
+        <h2>Good income. Aware something should be happening. Not sure what.</h2>
+        <p>You watch the content. You follow the gurus. You nearly called that broker three times. But you can't tell who's genuinely trying to help and who's running a funnel toward something they want to sell you.</p>
+        <p>So you do nothing. And doing nothing — for most Australian households — is the most expensive decision they never made.</p>
+      </div>
+      <div class="problem-right">
+        <div class="problem-item">
+          <div class="problem-item-title">The noise is overwhelming</div>
+          <div class="problem-item-body">Property gurus. Debt destruction content. Financial planners with polished reels. All of it funnelling you toward paying for something before you even understand what you have.</div>
+        </div>
+        <div class="problem-item">
+          <div class="problem-item-title">You can't tell who to trust</div>
+          <div class="problem-item-body">Every expert has an agenda. Every recommendation has something behind it. It's genuinely hard to figure out who is actually on your side.</div>
+        </div>
+        <div class="problem-item">
+          <div class="problem-item-title">Doing nothing has a real cost</div>
+          <div class="problem-item-body">Wrong loan structure. Retirement savings not reviewed. Money sitting in the wrong place. Every year of inaction costs more than most households realise — and that cost is invisible until someone shows you.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- JOURNEY -->
+<section class="section-journey" id="how">
+  <div class="section-inner">
+    <div class="section-header">
+      <div>
+        <span class="section-eyebrow">The Finn journey</span>
+        <h2>Four steps. At your own pace.</h2>
+      </div>
+      <p>Finn meets you where you are — from the first free snapshot through to a complete financial picture and the professionals who can help you act on it. No pressure. No agenda. You decide what's next at every step.</p>
+    </div>
+    <div class="journey-steps">
+      <div class="journey-step">
+        <div class="step-num">01</div>
+        <span class="step-tag">Free</span>
+        <div class="step-title">Your free snapshot</div>
+        <div class="step-body">Eight minutes. Nineteen questions. Finn gives you an honest picture of where your household stands — and what the gaps in your knowledge are likely costing you.</div>
+        <div class="step-price">Free →</div>
+      </div>
+      <div class="journey-step">
+        <div class="step-num">02</div>
+        <span class="step-tag">$97 one-off</span>
+        <div class="step-title">Your complete picture</div>
+        <div class="step-body">Real numbers. Your actual monthly position. Your loan structure. Your retirement savings compared to others your age. A plain English picture of your complete financial life — in one sitting.</div>
+        <div class="step-price">$97</div>
+      </div>
+      <div class="journey-step">
+        <div class="step-num">03</div>
+        <span class="step-tag">When you're ready</span>
+        <div class="step-title">The right professional</div>
+        <div class="step-body">When you're ready to act — Finn connects you with independently vetted professionals. Brokers, advisors, accountants, and planners who have no interest in selling you anything you don't need. Referral fees disclosed transparently.</div>
+        <div class="step-price">Your choice</div>
+      </div>
+      <div class="journey-step">
+        <div class="step-num">04</div>
+        <span class="step-tag">$19–25/month</span>
+        <div class="step-title">Your financial home base</div>
+        <div class="step-body">The place you go on any day — good or bad — and know exactly where you stand. Upload documents as they arrive. Finn keeps your picture current. Available any time you need it.</div>
+        <div class="step-price">$19–25/mo</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section-how">
+  <div class="section-inner">
+    <div class="section-header">
+      <div>
+        <span class="section-eyebrow">How Finn works</span>
+        <h2>A conversation. Not a form.</h2>
+      </div>
+      <p>Finn doesn't ask you to fill in a spreadsheet or know your numbers off the top of your head. It asks you questions in plain English — and when you don't know something, it tells you exactly where to find it.</p>
+    </div>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="how-num">01</div>
+        <div class="how-title">Finn asks the questions</div>
+        <div class="how-body">A warm, guided conversation — one question at a time. No jargon. No judgment. When you don't know a number, Finn tells you exactly where to find it — step by step, bank by bank.</div>
+      </div>
+      <div class="how-step">
+        <div class="how-num">02</div>
+        <div class="how-title">You see exactly where you stand</div>
+        <div class="how-body">Your real picture. What you have, what you owe, what's coming in and going out, where your retirement savings sit — laid out clearly, in plain English, probably for the first time.</div>
+      </div>
+      <div class="how-step">
+        <div class="how-num">03</div>
+        <div class="how-title">You decide what's next</div>
+        <div class="how-body">No pressure. No agenda. Just clarity — so when you do talk to someone, you walk in prepared, confident, and clear on exactly what you need from them.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INDEPENDENCE -->
+<section class="section-independence">
+  <div class="section-inner">
+    <span class="section-eyebrow" style="margin-bottom:48px;display:block;">What Finn is</span>
+    <div class="independence-grid">
+      <div class="ind-item">
+        <div class="ind-title">Not advice</div>
+        <div class="ind-body">Finn organises and clarifies. It never tells you what to do with your money. That decision stays with you — and the professionals you choose.</div>
+      </div>
+      <div class="ind-item">
+        <div class="ind-title">Not a funnel</div>
+        <div class="ind-body">Your clarity is the product. Nothing is waiting at the end of this conversation except a clear picture of where you stand.</div>
+      </div>
+      <div class="ind-item">
+        <div class="ind-title">Not a bank</div>
+        <div class="ind-body">No products. No hidden agenda. No reason to steer you anywhere. Finn's only job is to help you see your own picture clearly.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SUBSCRIPTION -->
+<section class="section-subscription">
+  <div class="section-inner">
+    <div class="sub-grid">
+      <div class="sub-left">
+        <span class="section-eyebrow">The Finn subscription</span>
+        <h2>Not a product. A financial home base.</h2>
+        <p>Once you have your picture — Finn keeps it current. Documents roll in — bank statements, retirement fund statements, loan notices, insurance renewals. Upload them and Finn updates your picture automatically.</p>
+        <p>But the deepest value is simpler than that. It's the place you go on any day — good or bad — and know where you stand.</p>
+      </div>
+      <div class="sub-right">
+        <div class="sub-moment">
+          <div class="sub-moment-title">The 2am anxiety moment</div>
+          <div class="sub-moment-body">Something financial is worrying you. You open Finn. You see your picture. The anxiety settles.</div>
+        </div>
+        <div class="sub-moment">
+          <div class="sub-moment-title">The news trigger moment</div>
+          <div class="sub-moment-body">Interest rates move. You open Finn to see what it means for your specific situation — not households in general.</div>
+        </div>
+        <div class="sub-moment">
+          <div class="sub-moment-title">The decision moment</div>
+          <div class="sub-moment-body">You're about to make a financial decision. You open Finn to make sure you're working from an accurate picture.</div>
+        </div>
+        <div class="sub-moment">
+          <div class="sub-moment-title">The professional meeting</div>
+          <div class="sub-moment-body">You're seeing your accountant next week. You open Finn to check your picture is current and you know what to ask.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FREE SNAPSHOT CTA -->
+<section class="section-cta" id="snapshot">
+  <div class="cta-inner">
+    <div class="cta-left">
+      <span class="section-eyebrow">Start here — it's free</span>
+      <h2>Get your free financial snapshot.</h2>
+      <p>Eight minutes. Nineteen questions. A plain English picture of where your household actually stands — and what the gaps in your knowledge are likely costing you. No account required. No card needed. Just clarity.</p>
+      <a href="/snapshot" class="btn-primary" style="display:inline-block;max-width:320px;">Begin my free snapshot →</a>
+    </div>
+    <div class="cta-right">
+      <span class="section-eyebrow" style="margin-bottom:20px;">Or join the waitlist for early access to the full session</span>
+      <span class="form-label">Join the waitlist — $97 clarity session</span>
+      <div class="form-row" id="cta-form-row">
+        <input type="email" id="cta-email" placeholder="Your email address">
+        <button onclick="submitForm()">I'm in</button>
+      </div>
+      <div class="thankyou" id="cta-thanks">
+        <div class="thankyou-title">You're in.</div>
+        <div class="thankyou-text">We'll be in touch when the full Finn session launches. Founding members get first access and a special rate.</div>
+      </div>
+      <p class="form-note">Founding members get first access and a special rate. No spam.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-brand">Finn</div>
+  <div class="footer-text">
+    meetfinn.com.au &nbsp;·&nbsp; Not financial advice &nbsp;·&nbsp; Not a financial service &nbsp;·&nbsp; Just clarity<br>
+    © 2026 Finn. All rights reserved.
+  </div>
+</footer>
+
+<script>
+function submitForm() {
+  const email = document.getElementById('cta-email').value;
+  if (!email || !email.includes('@')) { alert('Please enter a valid email address.'); return; }
+  document.getElementById('cta-form-row').style.display = 'none';
+  document.getElementById('cta-thanks').classList.add('show');
+  fetch('https://formspree.io/f/mgodedzl', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email })
+  }).catch(() => {});
+}
+</script>
+</body>
+</html>

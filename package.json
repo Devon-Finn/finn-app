@@ -1,0 +1,9 @@
+{
+  "name": "finn",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Finn — financial clarity for everyday Australians",
+  "engines": {
+    "node": ">=18"
+  }
+}

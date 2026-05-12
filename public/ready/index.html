@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Join the waitlist — Finn</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #faf8f4;
+      --dark: #1c1c1a;
+      --accent: #2a4a3a;
+      --warm: #c4956a;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--dark);
+      font-family: "Jost", sans-serif;
+      font-weight: 300;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.25rem;
+      text-align: center;
+    }
+
+    .wordmark {
+      font-family: "Cormorant Garamond", serif;
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--accent);
+      margin-bottom: 3rem;
+    }
+
+    h1 {
+      font-family: "Cormorant Garamond", serif;
+      font-size: clamp(2.2rem, 6vw, 3.5rem);
+      font-weight: 600;
+      line-height: 1.15;
+      color: var(--dark);
+      max-width: 22ch;
+      margin-bottom: 1.25rem;
+    }
+
+    p {
+      font-size: 1rem;
+      line-height: 1.65;
+      color: #5a5a58;
+      max-width: 38ch;
+      margin-bottom: 2.5rem;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    input[type="email"] {
+      width: 100%;
+      padding: 0.85rem 1.1rem;
+      border: 1.5px solid #d9d5ce;
+      border-radius: 6px;
+      background: #fff;
+      font-family: "Jost", sans-serif;
+      font-size: 1rem;
+      font-weight: 300;
+      color: var(--dark);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input[type="email"]::placeholder { color: #b0ada8; }
+    input[type="email"]:focus { border-color: var(--accent); }
+
+    button[type="submit"] {
+      width: 100%;
+      padding: 0.9rem 1.5rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-family: "Jost", sans-serif;
+      font-size: 1rem;
+      font-weight: 500;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    button[type="submit"]:hover { background: #1f3829; }
+    button[type="submit"]:active { transform: scale(0.98); }
+
+    .note {
+      margin-top: 1rem;
+      font-size: 0.8rem;
+      color: #a0a09e;
+    }
+
+    @media (min-width: 480px) {
+      form {
+        flex-direction: row;
+      }
+      button[type="submit"] {
+        width: auto;
+        white-space: nowrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wordmark">Finn</div>
+
+  <h1>Financial clarity is coming.</h1>
+
+  <p>Be the first to know when Finn launches for everyday Australians.</p>
+
+  <form action="https://formspree.io/f/mgodedzl" method="POST">
+    <input type="email" name="email" placeholder="your@email.com" required autocomplete="email" />
+    <button type="submit">Join waitlist</button>
+  </form>
+
+  <p class="note">No spam. Unsubscribe any time.</p>
+</body>
+</html>
