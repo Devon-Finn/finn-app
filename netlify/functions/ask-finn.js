@@ -55,7 +55,7 @@ exports.handler = async (event) => {
 
   const requestBody = JSON.stringify({
     model: MODEL,
-    max_tokens: payload.max_tokens ?? 2500,
+    max_tokens: payload.max_tokens ?? 1500,
     ...(payload.system ? { system: payload.system } : {}),
     messages: payload.messages,
   });
