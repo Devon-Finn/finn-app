@@ -1,133 +1,146 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Join the waitlist — Finn</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Join the waitlist — Finn</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #faf8f4;
+  --white: #ffffff;
+  --dark: #1c1c1a;
+  --mid: #5a5a56;
+  --light: #9a9a94;
+  --rule: #e8e4dc;
+  --accent: #2a4a3a;
+  --warm: #c4956a;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Jost', sans-serif; background: var(--bg); color: var(--dark); min-height: 100vh; -webkit-font-smoothing: antialiased; }
 
-    :root {
-      --bg: #faf8f4;
-      --dark: #1c1c1a;
-      --accent: #2a4a3a;
-      --warm: #c4956a;
-    }
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  padding: 24px 60px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: rgba(250,248,244,0.92); backdrop-filter: blur(10px);
+}
+.nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 400; color: var(--dark); letter-spacing: 0.04em; text-decoration: none; }
+.nav-link { font-size: 12px; font-weight: 400; letter-spacing: 0.1em; text-transform: uppercase; color: var(--light); text-decoration: none; transition: color 0.2s; }
+.nav-link:hover { color: var(--dark); }
 
-    body {
-      background: var(--bg);
-      color: var(--dark);
-      font-family: "Jost", sans-serif;
-      font-weight: 300;
-      min-height: 100dvh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 2rem 1.25rem;
-      text-align: center;
-    }
+main {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120px 24px 80px;
+  text-align: center;
+}
 
-    .wordmark {
-      font-family: "Cormorant Garamond", serif;
-      font-size: 1.5rem;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      color: var(--accent);
-      margin-bottom: 3rem;
-    }
+.eyebrow {
+  font-size: 11px; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--warm); margin-bottom: 24px;
+}
 
-    h1 {
-      font-family: "Cormorant Garamond", serif;
-      font-size: clamp(2.2rem, 6vw, 3.5rem);
-      font-weight: 600;
-      line-height: 1.15;
-      color: var(--dark);
-      max-width: 22ch;
-      margin-bottom: 1.25rem;
-    }
+h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(36px, 5vw, 58px);
+  font-weight: 300; line-height: 1.15;
+  color: var(--dark); letter-spacing: -0.01em;
+  max-width: 18ch; margin-bottom: 20px;
+}
 
-    p {
-      font-size: 1rem;
-      line-height: 1.65;
-      color: #5a5a58;
-      max-width: 38ch;
-      margin-bottom: 2.5rem;
-    }
+h1 em { font-style: italic; color: var(--accent); }
 
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      width: 100%;
-      max-width: 420px;
-    }
+.sub {
+  font-size: 16px; font-weight: 300; line-height: 1.8;
+  color: var(--mid); max-width: 38ch; margin-bottom: 48px;
+}
 
-    input[type="email"] {
-      width: 100%;
-      padding: 0.85rem 1.1rem;
-      border: 1.5px solid #d9d5ce;
-      border-radius: 6px;
-      background: #fff;
-      font-family: "Jost", sans-serif;
-      font-size: 1rem;
-      font-weight: 300;
-      color: var(--dark);
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    input[type="email"]::placeholder { color: #b0ada8; }
-    input[type="email"]:focus { border-color: var(--accent); }
+.form-row {
+  display: flex;
+  border: 1px solid var(--rule);
+  background: var(--white);
+  width: 100%; max-width: 480px;
+}
+.form-row input {
+  flex: 1; padding: 16px 20px;
+  background: transparent; border: none; outline: none;
+  font-family: 'Jost', sans-serif; font-size: 14px;
+  color: var(--dark); font-weight: 300;
+}
+.form-row input::placeholder { color: var(--light); }
+.form-row input:focus { box-shadow: inset 0 0 0 1px var(--accent); }
+.form-row button {
+  padding: 16px 28px;
+  background: var(--dark); border: none;
+  color: var(--white);
+  font-family: 'Jost', sans-serif; font-size: 12px; font-weight: 500;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  cursor: pointer; transition: background 0.2s; white-space: nowrap;
+}
+.form-row button:hover { background: var(--accent); }
 
-    button[type="submit"] {
-      width: 100%;
-      padding: 0.9rem 1.5rem;
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      font-family: "Jost", sans-serif;
-      font-size: 1rem;
-      font-weight: 500;
-      letter-spacing: 0.03em;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
-    }
-    button[type="submit"]:hover { background: #1f3829; }
-    button[type="submit"]:active { transform: scale(0.98); }
+.note { font-size: 11px; color: var(--light); margin-top: 16px; letter-spacing: 0.03em; }
 
-    .note {
-      margin-top: 1rem;
-      font-size: 0.8rem;
-      color: #a0a09e;
-    }
+.thankyou {
+  display: none; flex-direction: column; gap: 8px;
+  padding: 24px 32px; background: #f0f4f1;
+  border: 1px solid var(--rule); max-width: 480px; width: 100%;
+}
+.thankyou.show { display: flex; }
+.thankyou-title { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 300; color: var(--dark); }
+.thankyou-text { font-size: 14px; font-weight: 300; color: var(--mid); line-height: 1.7; }
 
-    @media (min-width: 480px) {
-      form {
-        flex-direction: row;
-      }
-      button[type="submit"] {
-        width: auto;
-        white-space: nowrap;
-      }
-    }
-  </style>
+@media (max-width: 600px) {
+  nav { padding: 18px 24px; }
+  .form-row { flex-direction: column; border: none; gap: 8px; }
+  .form-row input { border: 1px solid var(--rule); padding: 14px 16px; }
+  .form-row button { padding: 14px 16px; }
+}
+</style>
 </head>
 <body>
-  <div class="wordmark">Finn</div>
 
-  <h1>Financial clarity is coming.</h1>
+<nav>
+  <a href="/" class="nav-logo">Finn</a>
+  <a href="/snapshot" class="nav-link">Get your free snapshot</a>
+</nav>
 
-  <p>Be the first to know when Finn launches for everyday Australians.</p>
+<main>
+  <div class="eyebrow">Early access</div>
 
-  <form action="https://formspree.io/f/mgodedzl" method="POST">
-    <input type="email" name="email" placeholder="your@email.com" required autocomplete="email" />
-    <button type="submit">Join waitlist</button>
-  </form>
+  <h1>Financial clarity is <em>coming.</em></h1>
 
+  <p class="sub">Be the first to know when Finn launches for everyday Australians. Founding members get first access and a special rate.</p>
+
+  <div class="form-row" id="form-row">
+    <input type="email" id="email" placeholder="your@email.com" autocomplete="email" />
+    <button onclick="submitForm()">Join waitlist</button>
+  </div>
+  <div class="thankyou" id="thankyou">
+    <div class="thankyou-title">You're in.</div>
+    <div class="thankyou-text">We'll be in touch when Finn launches. Founding members get first access and a special rate.</div>
+  </div>
   <p class="note">No spam. Unsubscribe any time.</p>
+</main>
+
+<script>
+function submitForm() {
+  const email = document.getElementById('email').value;
+  if (!email || !email.includes('@')) { alert('Please enter a valid email address.'); return; }
+  document.getElementById('form-row').style.display = 'none';
+  document.getElementById('thankyou').classList.add('show');
+  fetch('https://formspree.io/f/mgodedzl', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email })
+  }).catch(() => {});
+}
+</script>
 </body>
 </html>
