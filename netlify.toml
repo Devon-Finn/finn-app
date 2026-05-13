@@ -1,9 +1,5 @@
 [build]
   publish = "public"
-  functions = "netlify/functions"
-
-[functions]
-  timeout = 30
 
 [[edge_functions]]
   path = "/api/ask-finn"
