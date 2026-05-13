@@ -83,22 +83,32 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
 .output-eyebrow { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm); margin-bottom: 16px; font-weight: 500; }
 .output-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(28px, 4vw, 40px); font-weight: 300; line-height: 1.2; color: var(--dark); letter-spacing: -0.01em; }
 
-.output-section { margin-bottom: 40px; }
-.output-section-title { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 500; color: var(--accent); margin-bottom: 16px; letter-spacing: -0.01em; }
+/* OUTPUT SECTIONS */
+.output-section { margin-bottom: 0; }
+.output-section-label { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--warm); font-weight: 500; display: block; margin-bottom: 10px; }
+.output-section-heading { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 300; line-height: 1.2; color: var(--dark); letter-spacing: -0.01em; margin-bottom: 20px; }
 .output-section-body { font-size: 15px; font-weight: 300; line-height: 1.9; color: var(--mid); }
 .output-section-body p { margin-bottom: 16px; }
 .output-section-body p:last-child { margin-bottom: 0; }
 .output-section-body strong { color: var(--dark); font-weight: 500; }
-
-.gap-item { padding: 20px 24px; border-left: 3px solid var(--warm); background: var(--warm-light); margin-bottom: 16px; border-radius: 0 4px 4px 0; }
-.gap-item p { font-size: 14px; font-weight: 300; line-height: 1.8; color: var(--mid); margin-bottom: 8px; }
-.gap-item p:last-child { margin-bottom: 0; }
-.gap-item strong { color: var(--dark); font-weight: 500; }
-.gap-fixable { font-size: 13px; color: var(--accent); font-weight: 400; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(42,74,58,0.15); }
+.gap-card { padding: 18px 22px; border-left: 3px solid var(--warm); background: var(--warm-light); margin-bottom: 12px; border-radius: 0 4px 4px 0; font-size: 15px; font-weight: 300; line-height: 1.85; color: var(--mid); }
+.section-intro { font-size: 15px; font-weight: 300; line-height: 1.9; color: var(--mid); margin-bottom: 20px; }
+.section-closing { font-size: 15px; font-weight: 300; line-height: 1.9; color: var(--mid); margin-top: 20px; }
 
 .output-divider { height: 1px; background: var(--rule); margin: 40px 0; }
 
-.cta-box { padding: 40px; background: var(--dark); margin-top: 48px; border-radius: 2px; }
+/* CLARITY SESSION */
+.clarity-section { margin-top: 0; padding: 40px; background: var(--accent-light); border-radius: 2px; }
+.clarity-eyebrow { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--warm); font-weight: 500; display: block; margin-bottom: 12px; }
+.clarity-heading { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 300; line-height: 1.2; color: var(--dark); letter-spacing: -0.01em; margin-bottom: 28px; }
+.clarity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.clarity-item { background: var(--white); border: 1px solid var(--rule); padding: 20px 22px; border-radius: 2px; }
+.clarity-label { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--warm); font-weight: 500; display: block; margin-bottom: 8px; }
+.clarity-title { font-size: 14px; font-weight: 500; color: var(--dark); margin-bottom: 8px; line-height: 1.4; }
+.clarity-body { font-size: 13px; font-weight: 300; color: var(--mid); line-height: 1.75; }
+
+/* CTA */
+.cta-box { padding: 40px; background: var(--dark); margin-top: 0; border-radius: 2px; }
 .cta-eyebrow { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm); margin-bottom: 16px; font-weight: 500; }
 .cta-title { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 300; color: var(--white); margin-bottom: 16px; line-height: 1.3; }
 .cta-body { font-size: 14px; font-weight: 300; color: rgba(255,255,255,0.6); line-height: 1.8; margin-bottom: 32px; }
@@ -118,6 +128,8 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
   nav { padding: 16px 20px; }
   main { padding: 100px 16px 60px; }
   .cta-box { padding: 24px 20px; }
+  .clarity-section { padding: 24px 20px; }
+  .clarity-grid { grid-template-columns: 1fr; }
   .intro-meta { gap: 20px; }
 }
 </style>
@@ -177,6 +189,49 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
       <div class="output-title">Here's what Finn sees.</div>
     </div>
     <div id="output-sections"></div>
+
+    <div class="clarity-section">
+      <span class="clarity-eyebrow">The full session</span>
+      <div class="clarity-heading">What the Finn Clarity Session gives you</div>
+      <div class="clarity-grid">
+        <div class="clarity-item">
+          <span class="clarity-label">YOUR NUMBERS</span>
+          <div class="clarity-title">Your real numbers. Not estimates.</div>
+          <div class="clarity-body">The free snapshot gives you a picture. The Clarity Session fills it in with actual figures. Your exact monthly position — what's coming in, what's going out, and what's genuinely left over. Most people are surprised by this number.</div>
+        </div>
+        <div class="clarity-item">
+          <span class="clarity-label">YOUR BUDGET</span>
+          <div class="clarity-title">Where your money actually goes.</div>
+          <div class="clarity-body">Using your actual bank statements, Finn breaks down your spending by category — groceries, subscriptions, bills, dining, kids activities, everything. Most households have never seen this laid out clearly. Most are surprised by what they find.</div>
+        </div>
+        <div class="clarity-item">
+          <span class="clarity-label">YOUR HOME LOAN</span>
+          <div class="clarity-title">Your home loan. Properly understood.</div>
+          <div class="clarity-body">Finn walks you through your loan structure step by step — your actual rate, how it compares to the market, and how your savings are positioned relative to your loan. If there's money being lost here — and there usually is — you'll see exactly how much and why.</div>
+        </div>
+        <div class="clarity-item">
+          <span class="clarity-label">YOUR RETIREMENT SAVINGS</span>
+          <div class="clarity-title">Your retirement savings. Benchmarked honestly.</div>
+          <div class="clarity-body">How much you actually have. What it's costing you in fees. How it compares to other Australians your age and gender. And what the gap looks like between where you are now and a comfortable retirement.</div>
+        </div>
+        <div class="clarity-item">
+          <span class="clarity-label">YOUR PROTECTION</span>
+          <div class="clarity-title">Your protection picture. Clearly laid out.</div>
+          <div class="clarity-body">What cover you actually have if income stopped. Whether your family is legally protected. And your emergency fund runway in months — a number most households have never calculated.</div>
+        </div>
+        <div class="clarity-item">
+          <span class="clarity-label">YOUR TAX POSITION</span>
+          <div class="clarity-title">Tax considerations worth knowing.</div>
+          <div class="clarity-body">For many households there are straightforward tax opportunities that are consistently overlooked — particularly around retirement savings contributions and income structure. Finn flags what's worth exploring with an accountant or advisor. Not advice — just clarity on what questions to ask.</div>
+        </div>
+        <div class="clarity-item">
+          <span class="clarity-label">WHAT COMES NEXT</span>
+          <div class="clarity-title">What people in your situation typically look at first.</div>
+          <div class="clarity-body">Not advice. A plain English summary of what households with your profile typically focus on — and which professional is usually most useful for each area. So when you do talk to someone, you know exactly what to ask.</div>
+        </div>
+      </div>
+    </div>
+
     <div class="output-divider"></div>
     <div class="cta-box">
       <div class="cta-eyebrow">The full picture</div>
@@ -641,53 +696,110 @@ function renderOutput(text) {
   const s3Match = text.match(/===SECTION THREE===([\s\S]*?)(?====CONVERSION===|$)/);
   const convMatch = text.match(/===CONVERSION===([\s\S]*?)$/);
 
-  function renderSection(content, titleOverride) {
-    if (!content) return;
+  function extractParts(content) {
     const lines = content.trim().split('\n').filter(l => l.trim());
-    let title = titleOverride;
-    let body = lines;
-
+    let heading = null;
+    let bodyLines = lines;
     if (lines[0] && (lines[0].startsWith('Heading:') || lines[0].startsWith('#'))) {
-      title = lines[0].replace(/^Heading:\s*|^#+\s*/, '').trim();
-      body = lines.slice(1);
+      heading = lines[0].replace(/^Heading:\s*|^#+\s*/, '').trim();
+      bodyLines = lines.slice(1);
     }
+    const paras = bodyLines.join('\n').split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+    return { heading, paras };
+  }
 
+  function addDivider() {
+    const d = document.createElement('div');
+    d.className = 'output-divider';
+    sectionsEl.appendChild(d);
+  }
+
+  function renderStandard(content, label, fallbackHeading) {
+    if (!content) return;
+    const { heading, paras } = extractParts(content);
     const section = document.createElement('div');
     section.className = 'output-section';
 
-    if (title) {
-      const h = document.createElement('div');
-      h.className = 'output-section-title';
-      h.textContent = title;
-      section.appendChild(h);
-    }
+    const lbl = document.createElement('span');
+    lbl.className = 'output-section-label';
+    lbl.textContent = label;
+    section.appendChild(lbl);
 
-    const bodyDiv = document.createElement('div');
-    bodyDiv.className = 'output-section-body';
+    const h = document.createElement('div');
+    h.className = 'output-section-heading';
+    h.textContent = heading || fallbackHeading;
+    section.appendChild(h);
 
-    const paragraphs = body.join('\n').split(/\n\n+/).filter(p => p.trim());
-    paragraphs.forEach(p => {
+    const body = document.createElement('div');
+    body.className = 'output-section-body';
+    paras.forEach(p => {
       const el = document.createElement('p');
-      el.textContent = p.trim();
-      bodyDiv.appendChild(el);
+      el.textContent = p;
+      body.appendChild(el);
     });
-
-    section.appendChild(bodyDiv);
+    section.appendChild(body);
     sectionsEl.appendChild(section);
   }
 
-  renderSection(s1Match ? s1Match[1] : null, 'You\'re not alone.');
-  renderSection(s2Match ? s2Match[1] : null, 'Your picture right now.');
-  renderSection(s3Match ? s3Match[1] : null, 'What\'s worth looking at.');
+  function renderGaps(content) {
+    if (!content) return;
+    const { heading, paras } = extractParts(content);
+    const section = document.createElement('div');
+    section.className = 'output-section';
 
-  if (convMatch) {
-    const convText = convMatch[1].trim().split('\n').filter(l => l.trim()).join(' ');
-    const ctaBody = document.querySelector('.cta-body');
-    if (ctaBody && convText) {
-      ctaBody.textContent = convText + ' ' + ctaBody.textContent;
+    const lbl = document.createElement('span');
+    lbl.className = 'output-section-label';
+    lbl.textContent = "WHAT’S WORTH LOOKING AT";
+    section.appendChild(lbl);
+
+    const h = document.createElement('div');
+    h.className = 'output-section-heading';
+    h.textContent = heading || "What’s worth looking at.";
+    section.appendChild(h);
+
+    if (paras.length <= 2) {
+      // Not enough paragraphs to split — render as plain body
+      const body = document.createElement('div');
+      body.className = 'output-section-body';
+      paras.forEach(p => {
+        const el = document.createElement('p');
+        el.textContent = p;
+        body.appendChild(el);
+      });
+      section.appendChild(body);
+    } else {
+      // First paragraph = intro prose
+      const intro = document.createElement('p');
+      intro.className = 'section-intro';
+      intro.textContent = paras[0];
+      section.appendChild(intro);
+
+      // Middle paragraphs = gap cards (warm left border)
+      paras.slice(1, -1).forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'gap-card';
+        card.textContent = p;
+        section.appendChild(card);
+      });
+
+      // Last paragraph = closing prose
+      const closing = document.createElement('p');
+      closing.className = 'section-closing';
+      closing.textContent = paras[paras.length - 1];
+      section.appendChild(closing);
     }
+
+    sectionsEl.appendChild(section);
   }
 
+  // Render the three sections with dividers between them
+  if (s1Match) renderStandard(s1Match[1], "YOU’RE NOT ALONE", "You’re not alone.");
+  if (s1Match && s2Match) addDivider();
+  if (s2Match) renderStandard(s2Match[1], "YOUR PICTURE RIGHT NOW", "Your picture right now.");
+  if (s2Match && s3Match) addDivider();
+  if (s3Match) renderGaps(s3Match[1]);
+
+  // Fallback: no markers found — render raw text
   if (!s1Match && !s2Match && !s3Match) {
     const div = document.createElement('div');
     div.className = 'output-section';
@@ -702,6 +814,14 @@ function renderOutput(text) {
     sectionsEl.appendChild(div);
   }
 
+  // Conversion text → prepend to CTA body
+  if (convMatch) {
+    const convText = convMatch[1].trim().split('\n').filter(l => l.trim()).join(' ');
+    const ctaBody = document.querySelector('.cta-body');
+    if (ctaBody && convText) ctaBody.textContent = convText + ' ' + ctaBody.textContent;
+  }
+
+  // Aspiration-matched CTA title
   const asp = answers['aspiration'] || '';
   let ctaTitle = 'See your complete financial picture.';
   if (asp.includes('Peace of mind') || asp.includes('peace')) ctaTitle = 'Your peace of mind starts with knowing exactly where you stand.';
