@@ -5,10 +5,9 @@
 [functions]
   timeout = 30
 
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
+[[edge_functions]]
+  path = "/api/ask-finn"
+  function = "ask-finn"
 
 [[headers]]
   for = "/*"
