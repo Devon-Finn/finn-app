@@ -103,6 +103,7 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
 .clarity-heading { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 300; line-height: 1.2; color: var(--dark); letter-spacing: -0.01em; margin-bottom: 28px; }
 .clarity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .clarity-item { background: var(--white); border: 1px solid var(--rule); padding: 20px 22px; border-radius: 2px; }
+.clarity-item:nth-child(7) { grid-column: 1 / -1; max-width: calc(50% - 7px); margin: 0 auto; }
 .clarity-label { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--warm); font-weight: 500; display: block; margin-bottom: 8px; }
 .clarity-title { font-size: 14px; font-weight: 500; color: var(--dark); margin-bottom: 8px; line-height: 1.4; }
 .clarity-body { font-size: 13px; font-weight: 300; color: var(--mid); line-height: 1.75; }
@@ -191,7 +192,7 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
     <div id="output-sections"></div>
 
     <div class="clarity-section">
-      <span class="clarity-eyebrow">The full session</span>
+      <span class="clarity-eyebrow">The Clarity Session</span>
       <div class="clarity-heading">What the Finn Clarity Session gives you</div>
       <div class="clarity-grid">
         <div class="clarity-item">
@@ -234,9 +235,9 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
 
     <div class="output-divider"></div>
     <div class="cta-box">
-      <div class="cta-eyebrow">The full picture</div>
+      <div class="cta-eyebrow">The Clarity Session</div>
       <div class="cta-title" id="cta-title">See your complete financial picture.</div>
-      <div class="cta-body">The full Finn session fills in every gap with your real numbers — not estimates. Your actual monthly position. Your actual loan structure and what it's costing you. Your actual position compared to others your age. In plain English, in one sitting, with no agenda beyond helping you see clearly.</div>
+      <div class="cta-body">The Clarity Session walks you through your complete financial picture — real numbers, not estimates. Finn guides you step by step, tells you exactly where to find every number you need, and explains what it all means. In one sitting. No agenda beyond helping you see clearly.</div>
       <a href="/ready" class="btn-cta">Join the waitlist — $97 at launch →</a>
     </div>
     <div class="subscription-note">
@@ -530,12 +531,12 @@ After all applicable gaps, close with:
 Using their exact 'aspiration' answer, write a warm, direct 2-3 sentence conversion statement. Not a question — a statement. Connect it to what they said matters to them. Do not say "no one trying to sell you anything." Instead say something like "with no agenda beyond helping you see clearly."
 
 Examples:
-- Peace of mind: "You told us peace of mind is what you're looking for. The full Finn session gives you exactly that — your complete picture, in plain English, in one sitting, with no agenda beyond helping you see clearly."
-- Getting ahead: "You told us getting ahead is what matters. The full Finn session shows you exactly where the opportunities are in your picture — real numbers, real clarity."
-- Confidence: "You told us confidence is what you want — making decisions without second-guessing. The full Finn session gives you the complete picture you need to do exactly that."
-- Security: "You told us security matters most. The full Finn session covers your protection picture in detail — so you know exactly where you stand and what, if anything, needs attention."
-- Control: "You told us you want to feel in control. The full Finn session gives you your complete financial picture — what you have, what it's doing, and what to look at first."
-- Where to start: "You told us you'd just like to know where to start. That's exactly what the full Finn session gives you — a clear starting point, in plain English, with no agenda beyond helping you see clearly."
+- Peace of mind: "You told us peace of mind is what you're looking for. The Clarity Session gives you exactly that — your complete picture, in plain English, in one sitting, with no agenda beyond helping you see clearly."
+- Getting ahead: "You told us getting ahead is what matters. The Clarity Session shows you exactly where the opportunities are in your picture — real numbers, real clarity."
+- Confidence: "You told us confidence is what you want — making decisions without second-guessing. The Clarity Session gives you the complete picture you need to do exactly that."
+- Security: "You told us security matters most. The Clarity Session covers your protection picture in detail — so you know exactly where you stand and what, if anything, needs attention."
+- Control: "You told us you want to feel in control. The Clarity Session gives you your complete financial picture — what you have, what it's doing, and what to look at first."
+- Where to start: "You told us you'd just like to know where to start. That's exactly what the Clarity Session gives you — a clear starting point, in plain English, with no agenda beyond helping you see clearly."
 
 LEGAL: Never give personal financial advice. Never recommend specific products. Always frame costs as general estimates based on household patterns, not calculations of their specific situation.`;
 
@@ -688,53 +689,67 @@ async function generateOutput() {
 }
 
 function renderOutput(text) {
-  const sectionsEl = document.getElementById('output-sections');
-  sectionsEl.innerHTML = '';
+  const sectionsEl = document.getElementById(‘output-sections’);
+  sectionsEl.innerHTML = ‘’;
 
   const s1Match = text.match(/===SECTION ONE===([\s\S]*?)(?====SECTION TWO===|$)/);
   const s2Match = text.match(/===SECTION TWO===([\s\S]*?)(?====SECTION THREE===|$)/);
   const s3Match = text.match(/===SECTION THREE===([\s\S]*?)(?====CONVERSION===|$)/);
   const convMatch = text.match(/===CONVERSION===([\s\S]*?)$/);
 
-  function extractParts(content) {
-    const lines = content.trim().split('\n').filter(l => l.trim());
+  // Convert **bold** and *italic* markdown to HTML (entities escaped first)
+  function toHTML(str) {
+    return str
+      .replace(/&/g, ‘&amp;’).replace(/</g, ‘&lt;’).replace(/>/g, ‘&gt;’)
+      .replace(/\*\*(.+?)\*\*/g, ‘<strong>$1</strong>’)
+      .replace(/\*([^*\n]+?)\*/g, ‘<em>$1</em>’);
+  }
+
+  function extractParts(content, fallbackHeading) {
+    const lines = content.trim().split(‘\n’).filter(l => l.trim());
     let heading = null;
     let bodyLines = lines;
-    if (lines[0] && (lines[0].startsWith('Heading:') || lines[0].startsWith('#'))) {
-      heading = lines[0].replace(/^Heading:\s*|^#+\s*/, '').trim();
+    if (lines[0] && (lines[0].startsWith(‘Heading:’) || lines[0].startsWith(‘#’))) {
+      heading = lines[0].replace(/^Heading:\s*|^#+\s*/, ‘’).trim();
       bodyLines = lines.slice(1);
     }
-    const paras = bodyLines.join('\n').split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+    const paras = bodyLines.join(‘\n’).split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+    // Remove first paragraph if it duplicates the heading
+    const effective = heading || fallbackHeading || ‘’;
+    if (effective && paras.length > 0) {
+      const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, ‘’);
+      if (norm(paras[0]) === norm(effective)) paras.shift();
+    }
     return { heading, paras };
   }
 
   function addDivider() {
-    const d = document.createElement('div');
-    d.className = 'output-divider';
+    const d = document.createElement(‘div’);
+    d.className = ‘output-divider’;
     sectionsEl.appendChild(d);
   }
 
   function renderStandard(content, label, fallbackHeading) {
     if (!content) return;
-    const { heading, paras } = extractParts(content);
-    const section = document.createElement('div');
-    section.className = 'output-section';
+    const { heading, paras } = extractParts(content, fallbackHeading);
+    const section = document.createElement(‘div’);
+    section.className = ‘output-section’;
 
-    const lbl = document.createElement('span');
-    lbl.className = 'output-section-label';
+    const lbl = document.createElement(‘span’);
+    lbl.className = ‘output-section-label’;
     lbl.textContent = label;
     section.appendChild(lbl);
 
-    const h = document.createElement('div');
-    h.className = 'output-section-heading';
+    const h = document.createElement(‘div’);
+    h.className = ‘output-section-heading’;
     h.textContent = heading || fallbackHeading;
     section.appendChild(h);
 
-    const body = document.createElement('div');
-    body.className = 'output-section-body';
+    const body = document.createElement(‘div’);
+    body.className = ‘output-section-body’;
     paras.forEach(p => {
-      const el = document.createElement('p');
-      el.textContent = p;
+      const el = document.createElement(‘p’);
+      el.innerHTML = toHTML(p);
       body.appendChild(el);
     });
     section.appendChild(body);
@@ -743,94 +758,87 @@ function renderOutput(text) {
 
   function renderGaps(content) {
     if (!content) return;
-    const { heading, paras } = extractParts(content);
-    const section = document.createElement('div');
-    section.className = 'output-section';
+    const fallback = "What’s worth looking at.";
+    const { heading, paras } = extractParts(content, fallback);
+    const section = document.createElement(‘div’);
+    section.className = ‘output-section’;
 
-    const lbl = document.createElement('span');
-    lbl.className = 'output-section-label';
+    const lbl = document.createElement(‘span’);
+    lbl.className = ‘output-section-label’;
     lbl.textContent = "WHAT’S WORTH LOOKING AT";
     section.appendChild(lbl);
 
-    const h = document.createElement('div');
-    h.className = 'output-section-heading';
-    h.textContent = heading || "What’s worth looking at.";
+    const h = document.createElement(‘div’);
+    h.className = ‘output-section-heading’;
+    h.textContent = heading || fallback;
     section.appendChild(h);
 
     if (paras.length <= 2) {
-      // Not enough paragraphs to split — render as plain body
-      const body = document.createElement('div');
-      body.className = 'output-section-body';
+      const body = document.createElement(‘div’);
+      body.className = ‘output-section-body’;
       paras.forEach(p => {
-        const el = document.createElement('p');
-        el.textContent = p;
+        const el = document.createElement(‘p’);
+        el.innerHTML = toHTML(p);
         body.appendChild(el);
       });
       section.appendChild(body);
     } else {
-      // First paragraph = intro prose
-      const intro = document.createElement('p');
-      intro.className = 'section-intro';
-      intro.textContent = paras[0];
+      const intro = document.createElement(‘p’);
+      intro.className = ‘section-intro’;
+      intro.innerHTML = toHTML(paras[0]);
       section.appendChild(intro);
 
-      // Middle paragraphs = gap cards (warm left border)
       paras.slice(1, -1).forEach(p => {
-        const card = document.createElement('div');
-        card.className = 'gap-card';
-        card.textContent = p;
+        const card = document.createElement(‘div’);
+        card.className = ‘gap-card’;
+        card.innerHTML = toHTML(p);
         section.appendChild(card);
       });
 
-      // Last paragraph = closing prose
-      const closing = document.createElement('p');
-      closing.className = 'section-closing';
-      closing.textContent = paras[paras.length - 1];
+      const closing = document.createElement(‘p’);
+      closing.className = ‘section-closing’;
+      closing.innerHTML = toHTML(paras[paras.length - 1]);
       section.appendChild(closing);
     }
 
     sectionsEl.appendChild(section);
   }
 
-  // Render the three sections with dividers between them
   if (s1Match) renderStandard(s1Match[1], "YOU’RE NOT ALONE", "You’re not alone.");
   if (s1Match && s2Match) addDivider();
   if (s2Match) renderStandard(s2Match[1], "YOUR PICTURE RIGHT NOW", "Your picture right now.");
   if (s2Match && s3Match) addDivider();
   if (s3Match) renderGaps(s3Match[1]);
 
-  // Fallback: no markers found — render raw text
   if (!s1Match && !s2Match && !s3Match) {
-    const div = document.createElement('div');
-    div.className = 'output-section';
-    const body = document.createElement('div');
-    body.className = 'output-section-body';
+    const div = document.createElement(‘div’);
+    div.className = ‘output-section’;
+    const body = document.createElement(‘div’);
+    body.className = ‘output-section-body’;
     text.split(/\n\n+/).filter(p => p.trim()).forEach(p => {
-      const el = document.createElement('p');
-      el.textContent = p.trim();
+      const el = document.createElement(‘p’);
+      el.innerHTML = toHTML(p.trim());
       body.appendChild(el);
     });
     div.appendChild(body);
     sectionsEl.appendChild(div);
   }
 
-  // Conversion text → prepend to CTA body
   if (convMatch) {
-    const convText = convMatch[1].trim().split('\n').filter(l => l.trim()).join(' ');
-    const ctaBody = document.querySelector('.cta-body');
-    if (ctaBody && convText) ctaBody.textContent = convText + ' ' + ctaBody.textContent;
+    const convText = convMatch[1].trim().split(‘\n’).filter(l => l.trim()).join(‘ ‘);
+    const ctaBody = document.querySelector(‘.cta-body’);
+    if (ctaBody && convText) ctaBody.textContent = convText + ‘ ‘ + ctaBody.textContent;
   }
 
-  // Aspiration-matched CTA title
-  const asp = answers['aspiration'] || '';
-  let ctaTitle = 'See your complete financial picture.';
-  if (asp.includes('Peace of mind') || asp.includes('peace')) ctaTitle = 'Your peace of mind starts with knowing exactly where you stand.';
-  else if (asp.includes('ahead') || asp.includes('Getting ahead')) ctaTitle = 'Getting ahead starts with a clear picture of where you actually are.';
-  else if (asp.includes('Confidence') || asp.includes('confidence')) ctaTitle = 'Confidence comes from understanding your complete picture.';
-  else if (asp.includes('Security') || asp.includes('security')) ctaTitle = 'Security starts with knowing exactly what you have — and what you don\'t.';
-  else if (asp.includes('control') || asp.includes('Control')) ctaTitle = 'Being in control starts with seeing your complete financial picture clearly.';
-  else if (asp.includes('start')) ctaTitle = 'The best starting point is knowing exactly where you stand.';
-  document.getElementById('cta-title').textContent = ctaTitle;
+  const asp = answers[‘aspiration’] || ‘’;
+  let ctaTitle = ‘See your complete financial picture.’;
+  if (asp.includes(‘Peace of mind’) || asp.includes(‘peace’)) ctaTitle = ‘Your peace of mind starts with knowing exactly where you stand.’;
+  else if (asp.includes(‘ahead’) || asp.includes(‘Getting ahead’)) ctaTitle = ‘Getting ahead starts with a clear picture of where you actually are.’;
+  else if (asp.includes(‘Confidence’) || asp.includes(‘confidence’)) ctaTitle = ‘Confidence comes from understanding your complete picture.’;
+  else if (asp.includes(‘Security’) || asp.includes(‘security’)) ctaTitle = ‘Security starts with knowing exactly what you have — and what you don\’t.’;
+  else if (asp.includes(‘control’) || asp.includes(‘Control’)) ctaTitle = ‘Being in control starts with seeing your complete financial picture clearly.’;
+  else if (asp.includes(‘start’)) ctaTitle = ‘The best starting point is knowing exactly where you stand.’;
+  document.getElementById(‘cta-title’).textContent = ctaTitle;
 }
 </script>
 </body>
