@@ -96,11 +96,23 @@ h1 em { font-style: italic; color: var(--accent); }
 .thankyou-title { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 300; color: var(--dark); }
 .thankyou-text { font-size: 14px; font-weight: 300; color: var(--mid); line-height: 1.7; }
 
+/* FOOTER */
+footer { padding: 48px 60px; background: var(--dark); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+.footer-brand { font-family: 'Cormorant Garamond', serif; font-size: 22px; color: var(--white); letter-spacing: 0.04em; }
+.footer-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.footer-text { font-size: 12px; color: rgba(255,255,255,0.25); line-height: 1.7; text-align: right; }
+.footer-links { display: flex; gap: 20px; }
+.footer-link { font-size: 11px; color: rgba(255,255,255,0.35); text-decoration: none; letter-spacing: 0.06em; transition: color 0.2s; }
+.footer-link:hover { color: rgba(255,255,255,0.7); }
+
 @media (max-width: 600px) {
   nav { padding: 18px 24px; }
   .form-row { flex-direction: column; border: none; gap: 8px; }
   .form-row input { border: 1px solid var(--rule); padding: 14px 16px; }
   .form-row button { padding: 14px 16px; }
+  footer { flex-direction: column; align-items: flex-start; padding: 40px 24px; }
+  .footer-right { align-items: flex-start; }
+  .footer-text { text-align: left; }
 }
 </style>
 </head>
@@ -142,5 +154,20 @@ function submitForm() {
   }).catch(() => {});
 }
 </script>
+
+<footer>
+  <div class="footer-brand">Finn</div>
+  <div class="footer-right">
+    <div class="footer-links">
+      <a href="/privacy" class="footer-link">Privacy Policy</a>
+      <a href="/terms" class="footer-link">Terms of Use</a>
+    </div>
+    <div class="footer-text">
+      meetfinn.com.au &nbsp;·&nbsp; Not financial advice &nbsp;·&nbsp; Not a financial service &nbsp;·&nbsp; Just clarity<br>
+      © 2026 Finn. All rights reserved.
+    </div>
+  </div>
+</footer>
+
 </body>
 </html>
