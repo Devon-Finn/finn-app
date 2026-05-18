@@ -91,7 +91,7 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
 .output-section-body p { margin-bottom: 16px; }
 .output-section-body p:last-child { margin-bottom: 0; }
 .output-section-body strong { color: var(--dark); font-weight: 500; }
-.gap-card { padding: 18px 22px; border-left: 3px solid var(--warm); background: var(--warm-light); margin-bottom: 12px; border-radius: 0 4px 4px 0; font-size: 15px; font-weight: 300; line-height: 1.85; color: var(--mid); }
+.gap-card { padding: 16px; border-left: 4px solid var(--warm); background: var(--warm-light); margin-bottom: 12px; border-radius: 6px; font-size: 15px; font-weight: 300; line-height: 1.85; color: var(--mid); }
 .section-intro { font-size: 15px; font-weight: 300; line-height: 1.9; color: var(--mid); margin-bottom: 20px; }
 .section-closing { font-size: 15px; font-weight: 300; line-height: 1.9; color: var(--mid); margin-top: 20px; }
 
@@ -103,7 +103,7 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
 .clarity-heading { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 300; line-height: 1.2; color: var(--dark); letter-spacing: -0.01em; margin-bottom: 28px; }
 .clarity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .clarity-item { background: var(--white); border: 1px solid var(--rule); padding: 20px 22px; border-radius: 2px; }
-.clarity-item:nth-child(7) { grid-column: 1 / -1; max-width: calc(50% - 7px); margin: 0 auto; }
+.clarity-item:nth-child(7) { grid-column: 1 / -1; justify-self: center; width: calc(50% - 7px); }
 .clarity-label { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--warm); font-weight: 500; display: block; margin-bottom: 8px; }
 .clarity-title { font-size: 14px; font-weight: 500; color: var(--dark); margin-bottom: 8px; line-height: 1.4; }
 .clarity-body { font-size: 13px; font-weight: 300; color: var(--mid); line-height: 1.75; }
@@ -706,19 +706,33 @@ function renderOutput(text) {
   }
 
   function extractParts(content, fallbackHeading) {
-    const lines = content.trim().split('\n').filter(l => l.trim());
+    const lines = content.trim().split('\n');
     let heading = null;
-    let bodyLines = lines;
-    if (lines[0] && (lines[0].startsWith('Heading:') || lines[0].startsWith('#'))) {
-      heading = lines[0].replace(/^Heading:\s*|^#+\s*/, '').trim();
-      bodyLines = lines.slice(1);
+    let startIdx = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trim()) {
+        if (lines[i].startsWith('Heading:') || lines[i].startsWith('#')) {
+          heading = lines[i].replace(/^Heading:\s*|^#+\s*/, '').trim();
+          startIdx = i + 1;
+        }
+        break;
+      }
     }
-    const paras = bodyLines.join('\n').split(/\n\n+/).map(p => p.trim()).filter(Boolean);
-    // Remove first paragraph if it duplicates the heading
+    // Preserve paragraph boundaries by not stripping blank lines before splitting
+    const bodyText = lines.slice(startIdx).join('\n');
+    const paras = bodyText.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
     const effective = heading || fallbackHeading || '';
     if (effective && paras.length > 0) {
       const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (norm(paras[0]) === norm(effective)) paras.shift();
+      const normEff = norm(effective);
+      const normPara = norm(paras[0]);
+      if (normPara === normEff) {
+        paras.shift();
+      } else if (normPara.startsWith(normEff)) {
+        // Heading leaked into paragraph start — trim it off
+        paras[0] = paras[0].slice(effective.length).replace(/^[.,!? ]+/, '').trim();
+        if (!paras[0]) paras.shift();
+      }
     }
     return { heading, paras };
   }

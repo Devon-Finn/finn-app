@@ -176,13 +176,28 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
 .footer-brand { font-family: 'Cormorant Garamond', serif; font-size: 22px; color: var(--white); letter-spacing: 0.04em; }
 .footer-text { font-size: 12px; color: rgba(255,255,255,0.25); line-height: 1.7; text-align: right; }
 
+/* FAQ */
+.section-faq { padding: 100px 60px; background: var(--white); border-top: 1px solid var(--rule); }
+.faq-inner { max-width: 1100px; margin: 0 auto; }
+.faq-heading { font-family: 'Cormorant Garamond', serif; font-size: clamp(26px, 3vw, 42px); font-weight: 300; line-height: 1.25; color: var(--dark); letter-spacing: -0.01em; margin-bottom: 56px; max-width: 580px; }
+.faq-list { max-width: 760px; }
+.faq-item { border-bottom: 1px solid var(--rule); }
+.faq-item:first-child { border-top: 1px solid var(--rule); }
+.faq-item summary { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding: 22px 0; cursor: pointer; list-style: none; font-size: 15px; font-weight: 500; color: var(--dark); line-height: 1.55; }
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary::marker { content: ''; }
+.faq-item summary::after { content: '+'; font-family: 'Jost', sans-serif; font-size: 20px; font-weight: 300; color: var(--warm); flex-shrink: 0; line-height: 1.2; }
+.faq-item[open] > summary::after { content: '−'; }
+.faq-a { padding: 0 40px 24px 0; font-size: 14px; font-weight: 300; line-height: 1.85; color: var(--mid); }
+
 /* RESPONSIVE */
 @media (max-width: 900px) {
   nav { padding: 18px 24px; }
   .hero { grid-template-columns: 1fr; }
   .hero-right { display: none; }
   .hero-left { padding: 80px 24px 60px; }
-  .section-statement, .section-problem, .section-how, .section-journey, .section-independence, .section-subscription, .section-cta { padding: 72px 24px; }
+  .section-statement, .section-problem, .section-how, .section-journey, .section-independence, .section-subscription, .section-cta, .section-faq { padding: 72px 24px; }
+  .faq-a { padding-right: 0; }
   .problem-cols, .sub-grid, .cta-inner { grid-template-columns: 1fr; gap: 48px; }
   .section-header { grid-template-columns: 1fr; gap: 20px; }
   .journey-steps, .how-steps, .independence-grid { grid-template-columns: 1fr; gap: 40px; }
@@ -192,6 +207,94 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
   .footer-text { text-align: center; }
 }
 </style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What should I do to prepare before seeing a financial advisor or mortgage broker?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Most people walk in with a rough idea of their income and a vague sense of their debts. The conversations that go best are with people who come in with a clear picture — what they own, what they owe, what comes in, what goes out, and what they actually want to achieve. Finn's Clarity Session builds exactly that picture before you sit down with anyone. You'll know your numbers, understand your situation, and be able to ask better questions. That changes the whole dynamic of the conversation."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I know if my home loan rate is competitive?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The rate you were given when you signed isn't necessarily the rate you deserve today. Lenders regularly offer better deals to new customers while existing customers sit on older rates. A rough check: look up what major lenders are currently advertising for a loan of your size and type. If you're more than 0.5% above that, it's worth a conversation with your current lender or a broker. Finn can help you understand exactly what your rate is costing you in dollar terms — which makes that conversation a lot easier to have."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "I have savings in a bank account but I'm also paying off a home loan — is that a problem?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Not always, but often. If your savings are sitting in a standard account earning 4–5% while your mortgage is charging you 6–7%, you're losing money on the gap. An offset account links your savings directly to your mortgage — every dollar in offset reduces the interest you're charged. Whether that's worth setting up depends on your specific numbers. Finn can help you work out what the difference actually looks like for your situation."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "I think I might have old super accounts from previous jobs — does that matter?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It matters more than most people realise. Every extra account is probably paying fees — sometimes hundreds of dollars a year — on a balance that isn't growing fast enough to cover them. The ATO's myGov portal shows all your super accounts in one place. If you find old ones, consolidating them is usually straightforward. Finn can walk you through what to look for and what consolidation actually involves before you contact anyone."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does my money disappear at the end of every month even though we earn good money?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "This is one of the most common things people describe — a solid income, not a lot to show for it, and no obvious explanation. Usually it's a combination: spending that's slightly higher than it feels (subscriptions, eating out, convenience purchases that don't register as spending), savings that aren't automatic so they get absorbed, and no clear picture of where things are going. Understanding your actual cash flow — not an estimate, the real numbers — is usually the thing that makes it click. Finn starts there."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I know if my family would be financially okay if something happened to me?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The honest answer is that most people don't know — and that uncertainty is genuinely uncomfortable. The starting point is understanding what your family's ongoing financial needs actually are: mortgage payments, living costs, kids' education, everything. Then comparing that to what would actually be available — your super death benefit, any life insurance, savings. The gap between those two numbers is what you're trying to cover. Finn helps you build that picture clearly so you can have an informed conversation with an adviser if you need one."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Have I set my family up legally if something happened to both of us?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "This is the question most couples avoid because it feels like a lot. The essentials are: a valid will (updated since you had kids), a guardian nominated for any children, a power of attorney for if you're incapacitated, and a super beneficiary nomination that's current. Many people find one or two of these have slipped — a will from before the kids arrived, or a super nomination that still lists a former partner. Finn helps you identify what's in place and what needs attention before you sit down with a solicitor."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why do Australians earning good incomes often feel financially stuck?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Income solves a lot of problems but not all of them. High-income households often have expenses that scaled up with income — better suburb, bigger mortgage, private school fees, two cars, overseas holidays. The income looks great from outside and busy from inside, but the gap between what comes in and what's actually building wealth can be surprisingly thin. The other factor is complexity — more accounts, more decisions, more things that need attention — with less time to deal with any of it. Clarity comes before progress. Finn is the clarity part."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What does the federal budget mean for my household finances?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Budget announcements affect households differently depending on income, family structure, age, and debt. The things most likely to affect a typical Australian household: changes to tax thresholds, cost of living relief measures, super rules, childcare subsidies, and housing policy. The better question is always: which announcements are relevant to my specific situation? Finn can help you understand your current picture clearly enough that when something changes, you can see immediately whether it affects you."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "I know I should be doing more with my money but I don't know where to start — what's the first step?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The first step is always the same: see the full picture. Not a budget in a spreadsheet — the actual picture. What you own, what you owe, what it costs to run your life, and where the gaps are. Most people who feel stuck don't lack discipline or information — they lack a clear starting point. Finn's free snapshot takes about five minutes and gives you that. From there, the right next steps become obvious in a way they usually aren't before."
+      }
+    }
+  ]
+}
+</script>
 </head>
 <body>
 
@@ -400,7 +503,7 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
       <a href="/snapshot" class="btn-primary" style="display:inline-block;max-width:320px;">Begin my free snapshot →</a>
     </div>
     <div class="cta-right">
-      <span class="section-eyebrow" style="margin-bottom:20px;">Or join the waitlist for early access to the full session</span>
+      <span class="section-eyebrow" style="margin-bottom:20px;">Or join the waitlist for early access to the Clarity Session</span>
       <span class="form-label">Join the waitlist — $97 clarity session</span>
       <div class="form-row" id="cta-form-row">
         <input type="email" id="cta-email" placeholder="Your email address">
@@ -408,9 +511,70 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
       </div>
       <div class="thankyou" id="cta-thanks">
         <div class="thankyou-title">You're in.</div>
-        <div class="thankyou-text">We'll be in touch when the full Finn session launches. Founding members get first access and a special rate.</div>
+        <div class="thankyou-text">We'll be in touch when the Clarity Session launches. Founding members get first access and a special rate.</div>
       </div>
       <p class="form-note">Founding members get first access and a special rate. No spam.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section-faq">
+  <div class="faq-inner">
+    <span class="section-eyebrow">Common questions</span>
+    <h2 class="faq-heading">Questions people ask before they start.</h2>
+    <div class="faq-list">
+
+      <details class="faq-item">
+        <summary class="faq-q">What should I do to prepare before seeing a financial advisor or mortgage broker?</summary>
+        <p class="faq-a">Most people walk in with a rough idea of their income and a vague sense of their debts. The conversations that go best are with people who come in with a clear picture — what they own, what they owe, what comes in, what goes out, and what they actually want to achieve. Finn's Clarity Session builds exactly that picture before you sit down with anyone. You'll know your numbers, understand your situation, and be able to ask better questions. That changes the whole dynamic of the conversation.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">How do I know if my home loan rate is competitive?</summary>
+        <p class="faq-a">The rate you were given when you signed isn't necessarily the rate you deserve today. Lenders regularly offer better deals to new customers while existing customers sit on older rates. A rough check: look up what major lenders are currently advertising for a loan of your size and type. If you're more than 0.5% above that, it's worth a conversation with your current lender or a broker. Finn can help you understand exactly what your rate is costing you in dollar terms — which makes that conversation a lot easier to have.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">I have savings in a bank account but I'm also paying off a home loan — is that a problem?</summary>
+        <p class="faq-a">Not always, but often. If your savings are sitting in a standard account earning 4–5% while your mortgage is charging you 6–7%, you're losing money on the gap. An offset account links your savings directly to your mortgage — every dollar in offset reduces the interest you're charged. Whether that's worth setting up depends on your specific numbers. Finn can help you work out what the difference actually looks like for your situation.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">I think I might have old super accounts from previous jobs — does that matter?</summary>
+        <p class="faq-a">It matters more than most people realise. Every extra account is probably paying fees — sometimes hundreds of dollars a year — on a balance that isn't growing fast enough to cover them. The ATO's myGov portal shows all your super accounts in one place. If you find old ones, consolidating them is usually straightforward. Finn can walk you through what to look for and what consolidation actually involves before you contact anyone.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">Why does my money disappear at the end of every month even though we earn good money?</summary>
+        <p class="faq-a">This is one of the most common things people describe — a solid income, not a lot to show for it, and no obvious explanation. Usually it's a combination: spending that's slightly higher than it feels (subscriptions, eating out, convenience purchases that don't register as spending), savings that aren't automatic so they get absorbed, and no clear picture of where things are going. Understanding your actual cash flow — not an estimate, the real numbers — is usually the thing that makes it click. Finn starts there.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">How do I know if my family would be financially okay if something happened to me?</summary>
+        <p class="faq-a">The honest answer is that most people don't know — and that uncertainty is genuinely uncomfortable. The starting point is understanding what your family's ongoing financial needs actually are: mortgage payments, living costs, kids' education, everything. Then comparing that to what would actually be available — your super death benefit, any life insurance, savings. The gap between those two numbers is what you're trying to cover. Finn helps you build that picture clearly so you can have an informed conversation with an adviser if you need one.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">Have I set my family up legally if something happened to both of us?</summary>
+        <p class="faq-a">This is the question most couples avoid because it feels like a lot. The essentials are: a valid will (updated since you had kids), a guardian nominated for any children, a power of attorney for if you're incapacitated, and a super beneficiary nomination that's current. Many people find one or two of these have slipped — a will from before the kids arrived, or a super nomination that still lists a former partner. Finn helps you identify what's in place and what needs attention before you sit down with a solicitor.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">Why do Australians earning good incomes often feel financially stuck?</summary>
+        <p class="faq-a">Income solves a lot of problems but not all of them. High-income households often have expenses that scaled up with income — better suburb, bigger mortgage, private school fees, two cars, overseas holidays. The income looks great from outside and busy from inside, but the gap between what comes in and what's actually building wealth can be surprisingly thin. The other factor is complexity — more accounts, more decisions, more things that need attention — with less time to deal with any of it. Clarity comes before progress. Finn is the clarity part.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">What does the federal budget mean for my household finances?</summary>
+        <p class="faq-a">Budget announcements affect households differently depending on income, family structure, age, and debt. The things most likely to affect a typical Australian household: changes to tax thresholds, cost of living relief measures, super rules, childcare subsidies, and housing policy. The better question is always: which announcements are relevant to my specific situation? Finn can help you understand your current picture clearly enough that when something changes, you can see immediately whether it affects you.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">I know I should be doing more with my money but I don't know where to start — what's the first step?</summary>
+        <p class="faq-a">The first step is always the same: see the full picture. Not a budget in a spreadsheet — the actual picture. What you own, what you owe, what it costs to run your life, and where the gaps are. Most people who feel stuck don't lack discipline or information — they lack a clear starting point. Finn's free snapshot takes about five minutes and gives you that. From there, the right next steps become obvious in a way they usually aren't before.</p>
+      </details>
+
     </div>
   </div>
 </section>
