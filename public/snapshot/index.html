@@ -24,14 +24,15 @@
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { font-family: 'Jost', sans-serif; background: var(--bg); color: var(--dark); min-height: 100vh; -webkit-font-smoothing: antialiased; line-height: 1.75; }
+body { font-family: 'Jost', sans-serif; background: var(--accent); color: var(--dark); min-height: 100vh; -webkit-font-smoothing: antialiased; line-height: 1.75; }
+body.questions-mode { background: var(--bg); }
 
-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 40px; height: 64px; display: flex; justify-content: space-between; align-items: center; background: var(--dark); }
-.nav-logo { font-size: 20px; color: var(--bg); text-decoration: none; }
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 40px; height: 64px; display: flex; justify-content: space-between; align-items: center; background: var(--accent); }
+.nav-logo { font-size: 20px; color: var(--white); text-decoration: none; }
 .finn-wordmark { font-family: 'Jost', sans-serif; font-weight: 700; letter-spacing: 0.05em; }
 .finn-period { color: var(--steel); }
-.nav-back { font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 400; color: rgba(245,241,235,0.5); text-decoration: none; transition: color 0.2s; }
-.nav-back:hover { color: var(--bg); }
+.nav-back { font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 400; color: rgba(255,255,255,0.6); text-decoration: none; transition: color 0.2s; }
+.nav-back:hover { color: var(--white); }
 
 .progress-wrap { position: fixed; top: 64px; left: 0; right: 0; z-index: 99; height: 3px; background: var(--rule); }
 .progress-bar { height: 3px; background: var(--accent); transition: width 0.3s ease; width: 0%; }
@@ -40,16 +41,16 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
 
 /* INTRO */
 .intro-screen { text-align: center; padding: 60px 0; animation: fadeUp 0.8s ease forwards; }
-.intro-eyebrow { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--light); margin-bottom: 24px; font-weight: 500; }
-.intro-title { font-family: 'Jost', sans-serif; font-size: clamp(36px, 5vw, 52px); font-weight: 700; line-height: 1.1; color: var(--dark); letter-spacing: -0.02em; margin-bottom: 24px; }
-.intro-body { font-size: 16px; font-weight: 400; line-height: 1.75; color: var(--mid); max-width: 480px; margin: 0 auto 48px; }
+.intro-eyebrow { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--steel); margin-bottom: 24px; font-weight: 500; }
+.intro-title { font-family: 'Jost', sans-serif; font-size: clamp(36px, 5vw, 52px); font-weight: 700; line-height: 1.1; color: var(--white); letter-spacing: -0.02em; margin-bottom: 24px; }
+.intro-body { font-size: 16px; font-weight: 400; line-height: 1.75; color: rgba(255,255,255,0.85); max-width: 480px; margin: 0 auto 48px; }
 .intro-meta { display: flex; justify-content: center; gap: 32px; margin-bottom: 48px; flex-wrap: wrap; }
 .meta-item { text-align: center; }
-.meta-val { font-family: 'Jost', sans-serif; font-size: 26px; font-weight: 600; color: var(--dark); display: block; line-height: 1; margin-bottom: 4px; letter-spacing: -0.02em; }
-.meta-label { font-size: 11px; color: var(--light); text-transform: uppercase; letter-spacing: 0.1em; }
-.btn-start { display: inline-block; padding: 14px 48px; background: var(--dark); color: var(--bg); font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 500; letter-spacing: 0.02em; border: none; cursor: pointer; transition: opacity 0.15s ease; border-radius: 3px; }
+.meta-val { font-family: 'Jost', sans-serif; font-size: 26px; font-weight: 600; color: var(--steel); display: block; line-height: 1; margin-bottom: 4px; letter-spacing: -0.02em; }
+.meta-label { font-size: 11px; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.1em; }
+.btn-start { display: inline-block; padding: 14px 48px; background: var(--white); color: var(--accent); font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 500; letter-spacing: 0.02em; border: none; cursor: pointer; transition: opacity 0.15s ease; border-radius: 3px; }
 .btn-start:hover { opacity: 0.85; }
-.intro-disclaimer { font-size: 11px; color: var(--light); margin-top: 20px; letter-spacing: 0.03em; line-height: 1.6; }
+.intro-disclaimer { font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 20px; letter-spacing: 0.03em; line-height: 1.6; }
 
 /* QUESTIONS */
 .question-screen { display: none; animation: fadeUp 0.5s ease forwards; }
@@ -155,7 +156,7 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
   <!-- INTRO -->
   <div class="intro-screen" id="intro">
     <div class="intro-eyebrow">Free financial snapshot</div>
-    <h1 class="intro-title">Your finances,<br><span style="font-family:'Fraunces',serif;font-style:italic;font-weight:400;color:var(--accent);">honestly</span> assessed.</h1>
+    <h1 class="intro-title">Your finances,<br><span style="font-family:'Fraunces',serif;font-style:italic;font-weight:400;color:var(--steel);">honestly</span> assessed.</h1>
     <p class="intro-body">Eight minutes. Nineteen questions. A plain English picture of where your household actually stands — and what it might be costing you to stay where you are.</p>
     <div class="intro-meta">
       <div class="meta-item"><span class="meta-val">19</span><span class="meta-label">Questions</span></div>
@@ -551,6 +552,7 @@ let answers = {};
 function startSession() {
   document.getElementById('intro').style.display = 'none';
   document.getElementById('questions').style.display = 'block';
+  document.body.classList.add('questions-mode');
   renderQuestion();
 }
 

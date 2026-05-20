@@ -31,13 +31,13 @@ nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 100;
   padding: 0 40px; height: 64px;
   display: flex; justify-content: space-between; align-items: center;
-  background: var(--dark);
+  background: var(--accent);
 }
-.nav-logo { font-size: 20px; color: var(--bg); text-decoration: none; }
+.nav-logo { font-size: 20px; color: var(--white); text-decoration: none; }
 .finn-wordmark { font-family: 'Jost', sans-serif; font-weight: 700; letter-spacing: 0.05em; }
 .finn-period { color: var(--steel); }
-.nav-cta { font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 400; color: rgba(245,241,235,0.5); text-decoration: none; transition: color 0.2s; }
-.nav-cta:hover { color: var(--bg); }
+.nav-cta { font-family: 'Jost', sans-serif; font-size: 13px; font-weight: 400; color: var(--white); text-decoration: none; transition: opacity 0.2s; border: 1px solid var(--steel); padding: 8px 16px; border-radius: 3px; }
+.nav-cta:hover { opacity: 0.8; }
 
 /* HERO */
 .hero {
@@ -45,38 +45,38 @@ nav {
   display: grid;
   grid-template-columns: 1fr 1fr;
   padding-top: 64px;
-  background: var(--white);
+  background: var(--accent);
 }
 .hero-left {
   padding: 100px 60px 80px;
   display: flex; flex-direction: column; justify-content: center;
-  border-right: 1px solid var(--rule);
+  border-right: 1px solid rgba(255,255,255,0.1);
 }
-.hero-eyebrow { font-size: 10px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--light); margin-bottom: 32px; }
+.hero-eyebrow { font-size: 10px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--steel); margin-bottom: 32px; }
 .hero h1 {
   font-family: 'Jost', sans-serif;
   font-size: clamp(40px, 4.5vw, 68px);
   font-weight: 700; line-height: 1.05;
-  color: var(--dark); letter-spacing: -0.02em; margin-bottom: 32px;
+  color: var(--white); letter-spacing: -0.02em; margin-bottom: 32px;
 }
-.hero-sub { font-size: 16px; font-weight: 400; line-height: 1.75; color: var(--mid); max-width: 420px; margin-bottom: 48px; }
+.hero-sub { font-size: 16px; font-weight: 400; line-height: 1.75; color: rgba(255,255,255,0.85); max-width: 420px; margin-bottom: 48px; }
 
 .hero-actions { display: flex; flex-direction: column; gap: 16px; max-width: 380px; }
 .btn-primary {
-  display: block; padding: 14px 28px; background: var(--dark); color: var(--bg);
+  display: block; padding: 14px 28px; background: var(--white); color: var(--accent);
   font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 500;
   letter-spacing: 0.02em; text-decoration: none;
   text-align: center; transition: opacity 0.15s ease; border-radius: 3px; border: none; cursor: pointer;
 }
 .btn-primary:hover { opacity: 0.85; }
 .btn-secondary {
-  display: block; padding: 13px 28px; background: transparent; color: var(--dark);
+  display: block; padding: 13px 28px; background: transparent; color: var(--white);
   font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 500;
   letter-spacing: 0.02em; text-decoration: none;
-  text-align: center; border: 1px solid var(--dark); transition: opacity 0.15s ease; border-radius: 3px; cursor: pointer;
+  text-align: center; border: 1px solid rgba(255,255,255,0.3); transition: opacity 0.15s ease; border-radius: 3px; cursor: pointer;
 }
 .btn-secondary:hover { opacity: 0.7; }
-.hero-disclaimer { font-size: 11px; color: var(--light); margin-top: 16px; line-height: 1.6; }
+.hero-disclaimer { font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 16px; line-height: 1.6; }
 
 .hero-right {
   background: var(--bg); padding: 100px 60px 80px;
@@ -117,21 +117,23 @@ nav {
 .step-price { font-family: 'Jost', sans-serif; font-size: 18px; font-weight: 600; color: var(--accent); margin-top: 12px; letter-spacing: -0.01em; }
 
 /* PROBLEM */
-.section-problem { padding: 100px 60px; background: var(--white); border-top: 1px solid var(--rule); }
+.section-problem { padding: 100px 60px; background: var(--accent); border-top: none; }
+.section-problem .section-eyebrow { color: var(--steel); }
 .problem-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: start; }
-.problem-left h2 { font-family: 'Jost', sans-serif; font-size: clamp(22px, 2.8vw, 36px); font-weight: 700; line-height: 1.15; color: var(--dark); letter-spacing: -0.02em; margin-bottom: 24px; }
-.problem-left p { font-size: 16px; font-weight: 400; line-height: 1.75; color: var(--mid); margin-bottom: 16px; }
+.problem-left h2 { font-family: 'Jost', sans-serif; font-size: clamp(22px, 2.8vw, 36px); font-weight: 700; line-height: 1.15; color: var(--white); letter-spacing: -0.02em; margin-bottom: 24px; }
+.problem-left p { font-size: 16px; font-weight: 400; line-height: 1.75; color: rgba(255,255,255,0.85); margin-bottom: 16px; }
 .problem-right { display: flex; flex-direction: column; gap: 20px; padding-top: 8px; }
 .problem-item { padding: 24px 28px; border: 1px solid var(--rule); background: var(--white); border-radius: 6px; }
-.problem-item-title { font-size: 15px; font-weight: 600; color: var(--dark); margin-bottom: 8px; letter-spacing: -0.01em; }
+.problem-item-title { font-size: 15px; font-weight: 600; color: var(--accent); margin-bottom: 8px; letter-spacing: -0.01em; }
 .problem-item-body { font-size: 14px; font-weight: 400; color: var(--mid); line-height: 1.75; }
 
 /* HOW IT WORKS */
 .section-how { padding: 100px 60px; background: var(--bg); border-top: 1px solid var(--rule); }
+.section-how .section-eyebrow { color: var(--accent); }
 .how-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
 .how-step { padding: 0 48px 0 0; border-right: 1px solid var(--rule); margin-right: 48px; }
 .how-step:last-child { border-right: none; margin-right: 0; padding-right: 0; }
-.how-num { font-family: 'Jost', sans-serif; font-size: 44px; font-weight: 600; color: var(--rule); line-height: 1; margin-bottom: 20px; letter-spacing: -0.02em; }
+.how-num { font-family: 'Jost', sans-serif; font-size: 44px; font-weight: 600; color: var(--accent); line-height: 1; margin-bottom: 20px; letter-spacing: -0.02em; }
 .how-title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; color: var(--dark); margin-bottom: 12px; }
 .how-body { font-size: 14px; font-weight: 400; line-height: 1.75; color: var(--mid); }
 
@@ -145,30 +147,32 @@ nav {
 .ind-body { font-family: 'Jost', sans-serif; font-size: 17px; font-weight: 400; line-height: 1.65; color: var(--bg); }
 
 /* SUBSCRIPTION */
-.section-subscription { padding: 100px 60px; background: var(--steel-light); border-top: 1px solid var(--rule); }
+.section-subscription { padding: 100px 60px; background: var(--accent); border-top: none; }
+.section-subscription .section-eyebrow { color: var(--steel); }
 .sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
-.sub-left h2 { font-family: 'Jost', sans-serif; font-size: clamp(24px, 2.8vw, 38px); font-weight: 700; line-height: 1.15; color: var(--dark); letter-spacing: -0.02em; margin-bottom: 24px; }
-.sub-left p { font-size: 16px; font-weight: 400; line-height: 1.75; color: var(--mid); margin-bottom: 16px; }
+.sub-left h2 { font-family: 'Jost', sans-serif; font-size: clamp(24px, 2.8vw, 38px); font-weight: 700; line-height: 1.15; color: var(--white); letter-spacing: -0.02em; margin-bottom: 24px; }
+.sub-left p { font-size: 16px; font-weight: 400; line-height: 1.75; color: rgba(255,255,255,0.85); margin-bottom: 16px; }
 .sub-right { display: flex; flex-direction: column; gap: 16px; }
 .sub-moment { padding: 24px 28px; background: var(--white); border: 1px solid var(--rule); border-radius: 6px; }
-.sub-moment-title { font-size: 14px; font-weight: 600; color: var(--dark); margin-bottom: 6px; letter-spacing: -0.01em; }
+.sub-moment-title { font-size: 14px; font-weight: 600; color: var(--accent); margin-bottom: 6px; letter-spacing: -0.01em; }
 .sub-moment-body { font-size: 13px; font-weight: 400; color: var(--mid); line-height: 1.65; }
 
 /* CTA SECTION */
-.section-cta { padding: 120px 60px; background: var(--white); border-top: 1px solid var(--rule); }
+.section-cta { padding: 120px 60px; background: var(--accent); border-top: none; }
+.section-cta .section-eyebrow { color: var(--steel); }
 .cta-inner { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 120px; align-items: center; }
-.cta-left h2 { font-family: 'Jost', sans-serif; font-size: clamp(26px, 3.2vw, 44px); font-weight: 700; line-height: 1.1; color: var(--dark); letter-spacing: -0.02em; margin-bottom: 20px; }
-.cta-left p { font-size: 16px; font-weight: 400; line-height: 1.75; color: var(--mid); margin-bottom: 32px; }
+.cta-left h2 { font-family: 'Jost', sans-serif; font-size: clamp(26px, 3.2vw, 44px); font-weight: 700; line-height: 1.1; color: var(--white); letter-spacing: -0.02em; margin-bottom: 20px; }
+.cta-left p { font-size: 16px; font-weight: 400; line-height: 1.75; color: rgba(255,255,255,0.85); margin-bottom: 32px; }
 .cta-right { display: flex; flex-direction: column; gap: 16px; }
 
 /* WAITLIST FORM */
-.form-label { font-size: 10px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--light); margin-bottom: 10px; display: block; }
+.form-label { font-size: 10px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--steel); margin-bottom: 10px; display: block; }
 .form-row { display: flex; border: 1px solid var(--rule); background: var(--white); border-radius: 3px; overflow: hidden; }
 .form-row input { flex: 1; padding: 16px 20px; background: transparent; border: none; outline: none; font-family: 'Jost', sans-serif; font-size: 14px; color: var(--dark); font-weight: 400; }
 .form-row input::placeholder { color: var(--light); }
-.form-row button { padding: 14px 28px; background: var(--dark); border: none; color: var(--bg); font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 500; letter-spacing: 0.02em; cursor: pointer; transition: opacity 0.15s ease; white-space: nowrap; }
+.form-row button { padding: 14px 28px; background: var(--white); border: none; color: var(--accent); font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 500; letter-spacing: 0.02em; cursor: pointer; transition: opacity 0.15s ease; white-space: nowrap; }
 .form-row button:hover { opacity: 0.85; }
-.form-note { font-size: 11px; color: var(--light); margin-top: 12px; letter-spacing: 0.03em; }
+.form-note { font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 12px; letter-spacing: 0.03em; }
 .thankyou { display: none; flex-direction: column; gap: 8px; padding: 24px; background: var(--accent-light); border: 1px solid var(--rule); border-radius: 6px; }
 .thankyou.show { display: flex; }
 .thankyou-title { font-family: 'Jost', sans-serif; font-size: 20px; font-weight: 700; color: var(--dark); letter-spacing: -0.01em; }
@@ -184,7 +188,8 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
 .footer-link:hover { color: rgba(245,241,235,0.7); }
 
 /* FAQ */
-.section-faq { padding: 100px 60px; background: var(--white); border-top: 1px solid var(--rule); }
+.section-faq { padding: 100px 60px; background: var(--bg); border-top: 1px solid var(--rule); }
+.section-faq .section-eyebrow { color: var(--accent); }
 .faq-inner { max-width: 1100px; margin: 0 auto; }
 .faq-heading { font-family: 'Jost', sans-serif; font-size: clamp(22px, 2.8vw, 36px); font-weight: 700; line-height: 1.15; color: var(--dark); letter-spacing: -0.02em; margin-bottom: 56px; max-width: 580px; }
 .faq-list { max-width: 760px; }
@@ -193,7 +198,7 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
 .faq-item summary { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding: 22px 0; cursor: pointer; list-style: none; font-size: 15px; font-weight: 500; color: var(--dark); line-height: 1.55; letter-spacing: -0.01em; }
 .faq-item summary::-webkit-details-marker { display: none; }
 .faq-item summary::marker { content: ''; }
-.faq-item summary::after { content: '+'; font-family: 'Jost', sans-serif; font-size: 20px; font-weight: 300; color: var(--light); flex-shrink: 0; line-height: 1.2; }
+.faq-item summary::after { content: '+'; font-family: 'Jost', sans-serif; font-size: 20px; font-weight: 300; color: var(--accent); flex-shrink: 0; line-height: 1.2; }
 .faq-item[open] > summary::after { content: '−'; }
 .faq-a { padding: 0 40px 24px 0; font-size: 14px; font-weight: 400; line-height: 1.85; color: var(--mid); }
 
@@ -316,7 +321,7 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
 <section class="hero">
   <div class="hero-left">
     <div class="hero-eyebrow">Meet Finn — Free financial snapshot</div>
-    <h1>Your finances.<br><span style="font-family:'Fraunces',serif;font-style:italic;font-weight:400;color:var(--accent);">Finally</span><br>clear.</h1>
+    <h1>Your finances.<br><span style="font-family:'Fraunces',serif;font-style:italic;font-weight:400;color:var(--steel);">Finally</span><br>clear.</h1>
     <p class="hero-sub">Before you talk to a broker, an advisor, or anyone else about your money — understand exactly where you stand. No advice. No agenda beyond helping you see clearly.</p>
     <div class="hero-actions">
       <a href="/snapshot" class="btn-primary">Start your free snapshot →</a>
@@ -353,7 +358,7 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
     <div class="problem-cols">
       <div class="problem-left">
         <span class="section-eyebrow">The problem</span>
-        <h2>Good income. Aware something should be happening. Not sure what.</h2>
+        <h2>Good income. <span style="font-family:'Fraunces',serif;font-style:italic;font-weight:400;color:var(--steel);">Aware</span> something should be happening. Not sure what.</h2>
         <p>You watch the content. You follow the gurus. You nearly called that broker three times. But you can't tell who's genuinely trying to help and who's running a funnel toward something they want to sell you.</p>
         <p>So you do nothing. And doing nothing — for most Australian households — is the most expensive decision they never made.</p>
       </div>

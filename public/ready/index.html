@@ -23,19 +23,19 @@
   --warm-light: #fdf6ee;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Jost', sans-serif; background: var(--bg); color: var(--dark); min-height: 100vh; -webkit-font-smoothing: antialiased; line-height: 1.75; }
+body { font-family: 'Jost', sans-serif; background: var(--accent); color: var(--white); min-height: 100vh; -webkit-font-smoothing: antialiased; line-height: 1.75; }
 
 nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 100;
   padding: 0 40px; height: 64px;
   display: flex; justify-content: space-between; align-items: center;
-  background: var(--dark);
+  background: var(--accent);
 }
-.nav-logo { font-size: 20px; color: var(--bg); text-decoration: none; }
+.nav-logo { font-size: 20px; color: var(--white); text-decoration: none; }
 .finn-wordmark { font-family: 'Jost', sans-serif; font-weight: 700; letter-spacing: 0.05em; }
 .finn-period { color: var(--steel); }
-.nav-link { font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 400; color: rgba(245,241,235,0.5); text-decoration: none; transition: color 0.2s; }
-.nav-link:hover { color: var(--bg); }
+.nav-link { font-family: 'Jost', sans-serif; font-size: 13px; font-weight: 400; color: var(--white); text-decoration: none; transition: opacity 0.2s; border: 1px solid var(--steel); padding: 8px 16px; border-radius: 3px; }
+.nav-link:hover { opacity: 0.8; }
 
 main {
   min-height: 100vh;
@@ -49,22 +49,22 @@ main {
 
 .eyebrow {
   font-size: 10px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase;
-  color: var(--light); margin-bottom: 24px;
+  color: var(--steel); margin-bottom: 24px;
 }
 
 h1 {
   font-family: 'Jost', sans-serif;
   font-size: clamp(36px, 5vw, 56px);
   font-weight: 700; line-height: 1.1;
-  color: var(--dark); letter-spacing: -0.02em;
+  color: var(--white); letter-spacing: -0.02em;
   max-width: 18ch; margin-bottom: 20px;
 }
 
-h1 em { font-style: italic; color: var(--accent); }
+h1 em { font-style: italic; color: var(--steel); }
 
 .sub {
   font-size: 16px; font-weight: 400; line-height: 1.75;
-  color: var(--mid); max-width: 38ch; margin-bottom: 48px;
+  color: rgba(255,255,255,0.85); max-width: 38ch; margin-bottom: 48px;
 }
 
 .form-row {
@@ -78,21 +78,21 @@ h1 em { font-style: italic; color: var(--accent); }
   flex: 1; padding: 16px 20px;
   background: transparent; border: none; outline: none;
   font-family: 'Jost', sans-serif; font-size: 14px;
-  color: var(--dark); font-weight: 400;
+  color: var(--accent); font-weight: 400;
 }
-.form-row input::placeholder { color: var(--light); }
+.form-row input::placeholder { color: var(--accent); opacity: 0.5; }
 .form-row input:focus { box-shadow: inset 0 0 0 1px var(--accent); }
 .form-row button {
   padding: 14px 28px;
-  background: var(--dark); border: none;
-  color: var(--bg);
+  background: var(--white); border: none;
+  color: var(--accent);
   font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 500;
   letter-spacing: 0.02em;
   cursor: pointer; transition: opacity 0.15s ease; white-space: nowrap;
 }
 .form-row button:hover { opacity: 0.85; }
 
-.note { font-size: 11px; color: var(--light); margin-top: 16px; letter-spacing: 0.03em; }
+.note { font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 16px; letter-spacing: 0.03em; }
 
 .thankyou {
   display: none; flex-direction: column; gap: 8px;
