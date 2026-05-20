@@ -598,6 +598,7 @@ LEGAL: Never give personal financial advice. Never recommend specific products. 
 
 let currentQ = 0;
 let answers = {};
+let snapshotText = '';
 
 const LOADING_MESSAGES = [
   'Reading your answers carefully...',
@@ -804,6 +805,7 @@ async function generateOutput() {
     }
 
     if (!fullText) throw new Error('Empty response from API');
+    snapshotText = fullText;
 
     stopLoadingCycle();
     document.getElementById('loading').style.display = 'none';
@@ -862,11 +864,19 @@ function renderOutput(text) {
       const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
       const normEff = norm(effective);
       const normPara = norm(paras[0]);
-      if (normPara === normEff) {
+      // Remove any paragraph(s) that are exactly the heading text
+      while (paras.length > 0 && norm(paras[0]) === normEff) {
         paras.shift();
-      } else if (normPara.startsWith(normEff)) {
-        // Heading leaked into paragraph start — trim it off
-        paras[0] = paras[0].slice(effective.length).replace(/^[.,!? ]+/, '').trim();
+      }
+      // After removing exact-match paragraphs, also trim heading prefix from the first paragraph
+      if (paras.length > 0 && norm(paras[0]).startsWith(normEff)) {
+        // Walk character-by-character to find where the heading ends in the original string
+        let srcIdx = 0, normIdx = 0;
+        while (srcIdx < paras[0].length && normIdx < normEff.length) {
+          if (/[a-z0-9]/i.test(paras[0][srcIdx])) normIdx++;
+          srcIdx++;
+        }
+        paras[0] = paras[0].slice(srcIdx).replace(/^[.,!? ]+/, '').trim();
         if (!paras[0]) paras.shift();
       }
     }
@@ -996,16 +1006,43 @@ function renderOutput(text) {
 
 function submitEmailCapture() {
   const input = document.getElementById('email-capture-input');
+  const btn = document.querySelector('.email-capture-btn');
   const email = input.value.trim();
-  if (!email || !email.includes('@')) { input.focus(); return; }
-  document.querySelector('.email-capture-row').style.display = 'none';
-  document.querySelector('.email-capture-note').style.display = 'none';
-  document.getElementById('email-capture-thanks').style.display = 'block';
+  if (!email || !email.includes('@')) {
+    input.style.borderColor = 'var(--warm)';
+    setTimeout(() => { input.style.borderColor = ''; }, 2000);
+    input.focus();
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+
+  const answersText = questions.map(q => {
+    const ans = answers[q.id];
+    return `${q.id}: ${Array.isArray(ans) ? ans.join(', ') : (ans || 'Not answered')}`;
+  }).join('\n');
+
   fetch('https://formspree.io/f/mgodedzl', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, source: 'snapshot-output' })
-  }).catch(() => {});
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ email, _replyto: email, source: 'snapshot-output', answers: answersText })
+  })
+  .then(r => {
+    if (!r.ok) throw new Error('submission failed');
+    document.querySelector('.email-capture-row').style.display = 'none';
+    document.querySelector('.email-capture-note').style.display = 'none';
+    document.getElementById('email-capture-thanks').style.display = 'block';
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.textContent = 'Send it to me';
+    input.style.borderColor = 'var(--warm)';
+    const note = document.querySelector('.email-capture-note');
+    note.textContent = 'Something went wrong — please try again or email hello@meetfinn.com.au';
+    note.style.color = 'var(--warm)';
+    note.style.display = 'block';
+  });
 }
 </script>
 </body>
