@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Finn — Your Financial Picture</title>
+<meta name="description" content="Answer a few questions and get a personalised snapshot of your financial position — income, debt, super, insurance, and what to focus on first.">
+<meta name="robots" content="noindex">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://meetfinn.com.au/snapshot">
+<meta property="og:title" content="Finn — Your Financial Picture">
+<meta property="og:description" content="Answer a few questions and get a personalised snapshot of your financial position.">
+<meta property="og:image" content="https://meetfinn.com.au/assets/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Finn — Your Financial Picture">
+<meta name="twitter:description" content="Answer a few questions and get a personalised snapshot of your financial position.">
+<meta name="twitter:image" content="https://meetfinn.com.au/assets/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400&display=swap" rel="stylesheet">
@@ -131,6 +142,28 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes dotPulse { 0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
 
+*:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.session-restore { background: var(--steel-light); border-bottom: 1px solid var(--steel); padding: 14px 24px; display: none; justify-content: center; align-items: center; gap: 16px; flex-wrap: wrap; }
+.session-restore.show { display: flex; }
+.session-restore-msg { font-size: 13px; color: var(--mid); }
+.session-restore-btn { padding: 8px 16px; font-family: 'Jost', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 3px; transition: opacity 0.15s; }
+.session-restore-continue { background: var(--accent); color: var(--white); border: none; }
+.session-restore-fresh { background: transparent; color: var(--mid); border: 1px solid var(--rule); }
+.session-restore-btn:hover { opacity: 0.8; }
+
+.email-capture { padding: 32px 40px; background: var(--white); border: 1px solid var(--rule); border-radius: 6px; display: none; }
+.email-capture.show { display: block; }
+.email-capture-title { font-family: 'Jost', sans-serif; font-size: 18px; font-weight: 700; color: var(--dark); margin-bottom: 8px; letter-spacing: -0.01em; }
+.email-capture-body { font-size: 14px; color: var(--mid); line-height: 1.7; margin-bottom: 20px; }
+.email-capture-row { display: flex; gap: 8px; }
+.email-capture-input { flex: 1; padding: 12px 16px; border: 1px solid var(--rule); border-radius: 3px; font-family: 'Jost', sans-serif; font-size: 14px; color: var(--dark); background: var(--bg); outline: none; }
+.email-capture-input:focus { border-color: var(--accent); }
+.email-capture-btn { padding: 12px 24px; background: var(--accent); color: var(--white); font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 500; border: none; border-radius: 3px; cursor: pointer; transition: opacity 0.15s; white-space: nowrap; }
+.email-capture-btn:hover { opacity: 0.85; }
+.email-capture-note { font-size: 11px; color: var(--light); margin-top: 10px; }
+.email-capture-thanks { font-size: 14px; color: var(--accent); font-weight: 500; display: none; margin-top: 12px; }
+
 @media (max-width: 600px) {
   nav { padding: 16px 20px; }
   main { padding: 100px 16px 60px; }
@@ -149,6 +182,11 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
 </nav>
 <div class="progress-wrap">
   <div class="progress-bar" id="progress"></div>
+</div>
+<div class="session-restore" id="session-restore" role="alert">
+  <span class="session-restore-msg">You have answers saved from a previous session.</span>
+  <button class="session-restore-btn session-restore-continue" onclick="restoreSession()">Continue where I left off</button>
+  <button class="session-restore-btn session-restore-fresh" onclick="clearSession()">Start fresh</button>
 </div>
 
 <main>
@@ -183,8 +221,8 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
   <!-- LOADING -->
   <div class="loading-screen" id="loading">
     <div class="loading-title">Putting your picture together.</div>
-    <div class="loading-sub">Finn is reading your answers carefully. This takes about 20 seconds.</div>
-    <div class="loading-dots">
+    <div class="loading-sub" id="loading-sub">Reading your answers carefully...</div>
+    <div class="loading-dots" aria-hidden="true">
       <div class="dot"></div><div class="dot"></div><div class="dot"></div>
     </div>
   </div>
@@ -237,6 +275,18 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
           <div class="clarity-body">Not advice. A plain English summary of what households with your profile typically focus on — and which professional is usually most useful for each area. So when you do talk to someone, you know exactly what to ask.</div>
         </div>
       </div>
+    </div>
+
+    <div class="output-divider" id="email-divider" style="display:none"></div>
+    <div class="email-capture" id="email-capture">
+      <div class="email-capture-title">Want a copy sent to your inbox?</div>
+      <div class="email-capture-body">We'll send you a summary of your snapshot — so you have it when you're ready to act on it.</div>
+      <div class="email-capture-row">
+        <input type="email" id="email-capture-input" class="email-capture-input" placeholder="your@email.com" autocomplete="email" aria-label="Your email address">
+        <button class="email-capture-btn" onclick="submitEmailCapture()">Send it to me</button>
+      </div>
+      <div class="email-capture-thanks" id="email-capture-thanks">Done — check your inbox shortly.</div>
+      <p class="email-capture-note">No spam. Unsubscribe any time.</p>
     </div>
 
     <div class="output-divider"></div>
@@ -549,12 +599,73 @@ LEGAL: Never give personal financial advice. Never recommend specific products. 
 let currentQ = 0;
 let answers = {};
 
+const LOADING_MESSAGES = [
+  'Reading your answers carefully...',
+  'Building your financial picture...',
+  'Identifying what matters most...',
+  'Putting it all together...'
+];
+let loadingInterval = null;
+
+function startLoadingCycle() {
+  let i = 0;
+  const el = document.getElementById('loading-sub');
+  el.textContent = LOADING_MESSAGES[0];
+  loadingInterval = setInterval(() => {
+    i = (i + 1) % LOADING_MESSAGES.length;
+    el.textContent = LOADING_MESSAGES[i];
+  }, 4000);
+}
+
+function stopLoadingCycle() {
+  clearInterval(loadingInterval);
+  loadingInterval = null;
+}
+
 function startSession() {
+  answers = {};
+  currentQ = 0;
   document.getElementById('intro').style.display = 'none';
   document.getElementById('questions').style.display = 'block';
+  document.getElementById('session-restore').classList.remove('show');
   document.body.classList.add('questions-mode');
+  history.replaceState({ stage: 'question', index: 0 }, '');
   renderQuestion();
 }
+
+function restoreSession() {
+  try {
+    answers = JSON.parse(sessionStorage.getItem('finn_answers')) || {};
+    currentQ = parseInt(sessionStorage.getItem('finn_q'), 10) || 0;
+  } catch(e) { answers = {}; currentQ = 0; }
+  document.getElementById('intro').style.display = 'none';
+  document.getElementById('questions').style.display = 'block';
+  document.getElementById('session-restore').classList.remove('show');
+  document.body.classList.add('questions-mode');
+  history.replaceState({ stage: 'question', index: currentQ }, '');
+  renderQuestion();
+}
+
+function clearSession() {
+  sessionStorage.removeItem('finn_answers');
+  sessionStorage.removeItem('finn_q');
+  document.getElementById('session-restore').classList.remove('show');
+}
+
+window.addEventListener('popstate', function(e) {
+  if (!e.state || e.state.stage !== 'question') return;
+  const target = e.state.index;
+  if (typeof target === 'number' && target < currentQ) {
+    currentQ = target;
+    renderQuestion();
+  }
+});
+
+(function checkSavedSession() {
+  if (sessionStorage.getItem('finn_answers') && sessionStorage.getItem('finn_q')) {
+    document.getElementById('session-restore').classList.add('show');
+  }
+})();
 
 function renderQuestion() {
   const q = questions[currentQ];
@@ -579,6 +690,7 @@ function renderQuestion() {
     const btn = document.createElement('button');
     btn.className = 'option';
     btn.textContent = opt;
+    btn.setAttribute('aria-label', opt);
     const isSelected = q.multi ? (currentAnswers.includes(opt)) : (currentAnswers === opt);
     if (isSelected) btn.classList.add('selected');
     btn.addEventListener('click', () => selectOption(opt, btn, q));
@@ -609,14 +721,24 @@ function selectOption(value, btn, q) {
     btn.classList.add('selected');
     document.getElementById('btn-next').disabled = false;
   }
+  sessionStorage.setItem('finn_answers', JSON.stringify(answers));
+  sessionStorage.setItem('finn_q', currentQ);
 }
 
 function nextQuestion() {
   const q = questions[currentQ];
   const hasAnswer = q.multi ? (answers[q.id] && answers[q.id].length > 0) : !!answers[q.id];
   if (!hasAnswer) return;
-  if (currentQ < questions.length - 1) { currentQ++; renderQuestion(); }
-  else { generateOutput(); }
+  if (currentQ < questions.length - 1) {
+    currentQ++;
+    sessionStorage.setItem('finn_q', currentQ);
+    history.pushState({ stage: 'question', index: currentQ }, '');
+    renderQuestion();
+  } else {
+    sessionStorage.removeItem('finn_answers');
+    sessionStorage.removeItem('finn_q');
+    generateOutput();
+  }
 }
 
 function prevQuestion() {
@@ -627,6 +749,7 @@ async function generateOutput() {
   document.getElementById('questions').style.display = 'none';
   document.getElementById('loading').style.display = 'block';
   document.getElementById('progress').style.width = '100%';
+  startLoadingCycle();
 
   const answersText = questions.map(q => {
     const ans = answers[q.id];
@@ -682,15 +805,21 @@ async function generateOutput() {
 
     if (!fullText) throw new Error('Empty response from API');
 
+    stopLoadingCycle();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('output').style.display = 'block';
     renderOutput(fullText);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
   } catch (err) {
+    stopLoadingCycle();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('output').style.display = 'block';
-    document.getElementById('output-sections').innerHTML = '<p style="color:#c0392b;padding:20px;background:#fdf0f0;border-radius:4px;">Something went wrong. Please refresh and try again. Error: ' + err.message + '</p>';
+    document.getElementById('output-sections').innerHTML = `
+      <div style="padding:24px 28px;background:var(--warm-light);border-left:3px solid var(--warm);border-radius:0 6px 6px 0;margin-bottom:24px;">
+        <div style="font-family:'Jost',sans-serif;font-size:17px;font-weight:700;color:var(--dark);margin-bottom:8px;">Something went wrong.</div>
+        <div style="font-size:14px;color:var(--mid);line-height:1.7;">We weren't able to generate your snapshot. Please refresh the page and try again. If the problem persists, email us at <a href="mailto:hello@meetfinn.com.au" style="color:var(--accent);">hello@meetfinn.com.au</a> and we'll help you out.</div>
+      </div>`;
     console.error('Finn error:', err);
   }
 }
@@ -851,6 +980,9 @@ function renderOutput(text) {
     if (ctaBody && convText) ctaBody.textContent = convText + ' ' + ctaBody.textContent;
   }
 
+  document.getElementById('email-capture').classList.add('show');
+  document.getElementById('email-divider').style.display = 'block';
+
   const asp = answers['aspiration'] || '';
   let ctaTitle = 'See your complete financial picture.';
   if (asp.includes('Peace of mind') || asp.includes('peace')) ctaTitle = 'Your peace of mind starts with knowing exactly where you stand.';
@@ -860,6 +992,20 @@ function renderOutput(text) {
   else if (asp.includes('control') || asp.includes('Control')) ctaTitle = 'Being in control starts with seeing your complete financial picture clearly.';
   else if (asp.includes('start')) ctaTitle = 'The best starting point is knowing exactly where you stand.';
   document.getElementById('cta-title').textContent = ctaTitle;
+}
+
+function submitEmailCapture() {
+  const input = document.getElementById('email-capture-input');
+  const email = input.value.trim();
+  if (!email || !email.includes('@')) { input.focus(); return; }
+  document.querySelector('.email-capture-row').style.display = 'none';
+  document.querySelector('.email-capture-note').style.display = 'none';
+  document.getElementById('email-capture-thanks').style.display = 'block';
+  fetch('https://formspree.io/f/mgodedzl', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, source: 'snapshot-output' })
+  }).catch(() => {});
 }
 </script>
 </body>

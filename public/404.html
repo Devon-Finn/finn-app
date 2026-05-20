@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page not found — Finn</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f5f1eb;
+  --white: #ffffff;
+  --dark: #1c1917;
+  --mid: #5c5a55;
+  --light: #9a9a94;
+  --rule: #e6e0d6;
+  --accent: #2a4a3a;
+  --steel: #c2d4de;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Jost', sans-serif; background: var(--accent); color: var(--white); min-height: 100vh; -webkit-font-smoothing: antialiased; line-height: 1.75; }
+*:focus-visible { outline: 2px solid var(--steel); outline-offset: 3px; }
+
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  padding: 0 40px; height: 64px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--accent);
+}
+.nav-logo { font-size: 20px; color: var(--white); text-decoration: none; }
+.finn-wordmark { font-family: 'Jost', sans-serif; font-weight: 700; letter-spacing: 0.05em; }
+.finn-period { color: var(--steel); }
+
+main {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120px 24px 80px;
+  text-align: center;
+}
+
+.eyebrow { font-size: 10px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--steel); margin-bottom: 24px; }
+
+h1 {
+  font-family: 'Jost', sans-serif;
+  font-size: clamp(36px, 5vw, 56px);
+  font-weight: 700; line-height: 1.1;
+  color: var(--white); letter-spacing: -0.02em;
+  max-width: 16ch; margin-bottom: 20px;
+}
+
+.sub { font-size: 16px; font-weight: 400; line-height: 1.75; color: rgba(255,255,255,0.7); max-width: 36ch; margin-bottom: 40px; }
+
+.btn-home {
+  display: inline-block; padding: 14px 40px;
+  background: var(--white); color: var(--accent);
+  font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 500;
+  letter-spacing: 0.02em; text-decoration: none;
+  border-radius: 3px; transition: opacity 0.15s;
+}
+.btn-home:hover { opacity: 0.85; }
+
+@media (max-width: 600px) { nav { padding: 0 24px; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo"><span class="finn-wordmark">Finn<span class="finn-period">.</span></span></a>
+</nav>
+
+<main>
+  <div class="eyebrow">404</div>
+  <h1>This page doesn't exist.</h1>
+  <p class="sub">It may have moved, or the link might be wrong. Head back to Finn and start from there.</p>
+  <a href="/" class="btn-home">Back to Finn →</a>
+</main>
+
+</body>
+</html>

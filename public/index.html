@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Finn — Understand your finances before you talk to anyone</title>
+<meta name="description" content="Finn gives Australian households a clear picture of their finances — income, debt, super, insurance — before they speak to a broker, adviser, or accountant.">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://meetfinn.com.au/">
+<meta property="og:title" content="Finn — Understand your finances before you talk to anyone">
+<meta property="og:description" content="Finn gives Australian households a clear picture of their finances — income, debt, super, insurance — before they speak to a broker, adviser, or accountant.">
+<meta property="og:image" content="https://meetfinn.com.au/assets/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Finn — Understand your finances before you talk to anyone">
+<meta name="twitter:description" content="Finn gives Australian households a clear picture of their finances — income, debt, super, insurance — before they speak to a broker, adviser, or accountant.">
+<meta name="twitter:image" content="https://meetfinn.com.au/assets/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400&display=swap" rel="stylesheet">
@@ -23,6 +34,7 @@
   --warm-light: #fdf6ee;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
+*:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 html { scroll-behavior: smooth; }
 body { font-family: 'Jost', sans-serif; background: var(--bg); color: var(--dark); overflow-x: hidden; -webkit-font-smoothing: antialiased; line-height: 1.75; }
 
@@ -117,14 +129,14 @@ nav {
 .step-price { font-family: 'Jost', sans-serif; font-size: 18px; font-weight: 600; color: var(--accent); margin-top: 12px; letter-spacing: -0.01em; }
 
 /* PROBLEM */
-.section-problem { padding: 100px 60px; background: var(--accent); border-top: none; }
-.section-problem .section-eyebrow { color: var(--steel); }
+.section-problem { padding: 100px 60px; background: var(--bg); border-top: none; }
+.section-problem .section-eyebrow { color: var(--accent); }
 .problem-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: start; }
-.problem-left h2 { font-family: 'Jost', sans-serif; font-size: clamp(22px, 2.8vw, 36px); font-weight: 700; line-height: 1.15; color: var(--white); letter-spacing: -0.02em; margin-bottom: 24px; }
-.problem-left p { font-size: 16px; font-weight: 400; line-height: 1.75; color: rgba(255,255,255,0.85); margin-bottom: 16px; }
+.problem-left h2 { font-family: 'Jost', sans-serif; font-size: clamp(22px, 2.8vw, 36px); font-weight: 700; line-height: 1.15; color: var(--dark); letter-spacing: -0.02em; margin-bottom: 24px; }
+.problem-left p { font-size: 16px; font-weight: 400; line-height: 1.75; color: var(--dark); margin-bottom: 16px; }
 .problem-right { display: flex; flex-direction: column; gap: 20px; padding-top: 8px; }
 .problem-item { padding: 24px 28px; border: 1px solid var(--rule); background: var(--white); border-radius: 6px; }
-.problem-item-title { font-size: 15px; font-weight: 600; color: var(--accent); margin-bottom: 8px; letter-spacing: -0.01em; }
+.problem-item-title { font-size: 15px; font-weight: 600; color: var(--dark); margin-bottom: 8px; letter-spacing: -0.01em; }
 .problem-item-body { font-size: 14px; font-weight: 400; color: var(--mid); line-height: 1.75; }
 
 /* HOW IT WORKS */
@@ -147,14 +159,14 @@ nav {
 .ind-body { font-family: 'Jost', sans-serif; font-size: 17px; font-weight: 400; line-height: 1.65; color: var(--bg); }
 
 /* SUBSCRIPTION */
-.section-subscription { padding: 100px 60px; background: var(--accent); border-top: none; }
-.section-subscription .section-eyebrow { color: var(--steel); }
+.section-subscription { padding: 100px 60px; background: var(--accent-light); border-top: 1px solid var(--rule); }
+.section-subscription .section-eyebrow { color: var(--accent); }
 .sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
-.sub-left h2 { font-family: 'Jost', sans-serif; font-size: clamp(24px, 2.8vw, 38px); font-weight: 700; line-height: 1.15; color: var(--white); letter-spacing: -0.02em; margin-bottom: 24px; }
-.sub-left p { font-size: 16px; font-weight: 400; line-height: 1.75; color: rgba(255,255,255,0.85); margin-bottom: 16px; }
+.sub-left h2 { font-family: 'Jost', sans-serif; font-size: clamp(24px, 2.8vw, 38px); font-weight: 700; line-height: 1.15; color: var(--dark); letter-spacing: -0.02em; margin-bottom: 24px; }
+.sub-left p { font-size: 16px; font-weight: 400; line-height: 1.75; color: var(--dark); margin-bottom: 16px; }
 .sub-right { display: flex; flex-direction: column; gap: 16px; }
 .sub-moment { padding: 24px 28px; background: var(--white); border: 1px solid var(--rule); border-radius: 6px; }
-.sub-moment-title { font-size: 14px; font-weight: 600; color: var(--accent); margin-bottom: 6px; letter-spacing: -0.01em; }
+.sub-moment-title { font-size: 14px; font-weight: 600; color: var(--dark); margin-bottom: 6px; letter-spacing: -0.01em; }
 .sub-moment-body { font-size: 13px; font-weight: 400; color: var(--mid); line-height: 1.65; }
 
 /* CTA SECTION */
@@ -195,12 +207,10 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
 .faq-list { max-width: 760px; }
 .faq-item { border-bottom: 1px solid var(--rule); }
 .faq-item:first-child { border-top: 1px solid var(--rule); }
-.faq-item summary { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding: 22px 0; cursor: pointer; list-style: none; font-size: 15px; font-weight: 500; color: var(--dark); line-height: 1.55; letter-spacing: -0.01em; }
-.faq-item summary::-webkit-details-marker { display: none; }
-.faq-item summary::marker { content: ''; }
-.faq-item summary::after { content: '+'; font-family: 'Jost', sans-serif; font-size: 20px; font-weight: 300; color: var(--accent); flex-shrink: 0; line-height: 1.2; }
-.faq-item[open] > summary::after { content: '−'; }
-.faq-a { padding: 0 40px 24px 0; font-size: 14px; font-weight: 400; line-height: 1.85; color: var(--mid); }
+.faq-btn { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding: 22px 0; cursor: pointer; width: 100%; background: none; border: none; font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 500; color: var(--dark); line-height: 1.55; letter-spacing: -0.01em; text-align: left; }
+.faq-icon { font-size: 20px; font-weight: 300; color: var(--accent); flex-shrink: 0; line-height: 1.2; }
+.faq-a { display: none; padding: 0 40px 24px 0; font-size: 14px; font-weight: 400; line-height: 1.85; color: var(--mid); }
+.faq-a.open { display: block; }
 
 /* RESPONSIVE */
 @media (max-width: 900px) {
@@ -358,7 +368,7 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
     <div class="problem-cols">
       <div class="problem-left">
         <span class="section-eyebrow">The problem</span>
-        <h2>Good income. <span style="font-family:'Fraunces',serif;font-style:italic;font-weight:400;color:var(--steel);">Aware</span> something should be happening. Not sure what.</h2>
+        <h2>Good income. <span style="font-family:'Fraunces',serif;font-style:italic;font-weight:400;color:var(--accent);">Aware</span> something should be happening. Not sure what.</h2>
         <p>You watch the content. You follow the gurus. You nearly called that broker three times. But you can't tell who's genuinely trying to help and who's running a funnel toward something they want to sell you.</p>
         <p>So you do nothing. And doing nothing — for most Australian households — is the most expensive decision they never made.</p>
       </div>
@@ -538,55 +548,55 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
     <h2 class="faq-heading">Questions people ask before they start.</h2>
     <div class="faq-list">
 
-      <details class="faq-item">
-        <summary class="faq-q">What should I do to prepare before seeing a financial advisor or mortgage broker?</summary>
+      <div class="faq-item">
+        <button class="faq-btn" aria-expanded="false" onclick="toggleFaq(this)">What should I do to prepare before seeing a financial advisor or mortgage broker?<span class="faq-icon" aria-hidden="true">+</span></button>
         <p class="faq-a">Most people walk in with a rough idea of their income and a vague sense of their debts. The conversations that go best are with people who come in with a clear picture — what they own, what they owe, what comes in, what goes out, and what they actually want to achieve. Finn's Clarity Session builds exactly that picture before you sit down with anyone. You'll know your numbers, understand your situation, and be able to ask better questions. That changes the whole dynamic of the conversation.</p>
-      </details>
+      </div>
 
-      <details class="faq-item">
-        <summary class="faq-q">How do I know if my home loan rate is competitive?</summary>
+      <div class="faq-item">
+        <button class="faq-btn" aria-expanded="false" onclick="toggleFaq(this)">How do I know if my home loan rate is competitive?<span class="faq-icon" aria-hidden="true">+</span></button>
         <p class="faq-a">The rate you were given when you signed isn't necessarily the rate you deserve today. Lenders regularly offer better deals to new customers while existing customers sit on older rates. A rough check: look up what major lenders are currently advertising for a loan of your size and type. If you're more than 0.5% above that, it's worth a conversation with your current lender or a broker. Finn can help you understand exactly what your rate is costing you in dollar terms — which makes that conversation a lot easier to have.</p>
-      </details>
+      </div>
 
-      <details class="faq-item">
-        <summary class="faq-q">I have savings in a bank account but I'm also paying off a home loan — is that a problem?</summary>
+      <div class="faq-item">
+        <button class="faq-btn" aria-expanded="false" onclick="toggleFaq(this)">I have savings in a bank account but I'm also paying off a home loan — is that a problem?<span class="faq-icon" aria-hidden="true">+</span></button>
         <p class="faq-a">Not always, but often. If your savings are sitting in a standard account earning 4–5% while your mortgage is charging you 6–7%, you're losing money on the gap. An offset account links your savings directly to your mortgage — every dollar in offset reduces the interest you're charged. Whether that's worth setting up depends on your specific numbers. Finn can help you work out what the difference actually looks like for your situation.</p>
-      </details>
+      </div>
 
-      <details class="faq-item">
-        <summary class="faq-q">I think I might have old super accounts from previous jobs — does that matter?</summary>
+      <div class="faq-item">
+        <button class="faq-btn" aria-expanded="false" onclick="toggleFaq(this)">I think I might have old super accounts from previous jobs — does that matter?<span class="faq-icon" aria-hidden="true">+</span></button>
         <p class="faq-a">It matters more than most people realise. Every extra account is probably paying fees — sometimes hundreds of dollars a year — on a balance that isn't growing fast enough to cover them. The ATO's myGov portal shows all your super accounts in one place. If you find old ones, consolidating them is usually straightforward. Finn can walk you through what to look for and what consolidation actually involves before you contact anyone.</p>
-      </details>
+      </div>
 
-      <details class="faq-item">
-        <summary class="faq-q">Why does my money disappear at the end of every month even though we earn good money?</summary>
+      <div class="faq-item">
+        <button class="faq-btn" aria-expanded="false" onclick="toggleFaq(this)">Why does my money disappear at the end of every month even though we earn good money?<span class="faq-icon" aria-hidden="true">+</span></button>
         <p class="faq-a">This is one of the most common things people describe — a solid income, not a lot to show for it, and no obvious explanation. Usually it's a combination: spending that's slightly higher than it feels (subscriptions, eating out, convenience purchases that don't register as spending), savings that aren't automatic so they get absorbed, and no clear picture of where things are going. Understanding your actual cash flow — not an estimate, the real numbers — is usually the thing that makes it click. Finn starts there.</p>
-      </details>
+      </div>
 
-      <details class="faq-item">
-        <summary class="faq-q">How do I know if my family would be financially okay if something happened to me?</summary>
+      <div class="faq-item">
+        <button class="faq-btn" aria-expanded="false" onclick="toggleFaq(this)">How do I know if my family would be financially okay if something happened to me?<span class="faq-icon" aria-hidden="true">+</span></button>
         <p class="faq-a">The honest answer is that most people don't know — and that uncertainty is genuinely uncomfortable. The starting point is understanding what your family's ongoing financial needs actually are: mortgage payments, living costs, kids' education, everything. Then comparing that to what would actually be available — your super death benefit, any life insurance, savings. The gap between those two numbers is what you're trying to cover. Finn helps you build that picture clearly so you can have an informed conversation with an adviser if you need one.</p>
-      </details>
+      </div>
 
-      <details class="faq-item">
-        <summary class="faq-q">Have I set my family up legally if something happened to both of us?</summary>
+      <div class="faq-item">
+        <button class="faq-btn" aria-expanded="false" onclick="toggleFaq(this)">Have I set my family up legally if something happened to both of us?<span class="faq-icon" aria-hidden="true">+</span></button>
         <p class="faq-a">This is the question most couples avoid because it feels like a lot. The essentials are: a valid will (updated since you had kids), a guardian nominated for any children, a power of attorney for if you're incapacitated, and a super beneficiary nomination that's current. Many people find one or two of these have slipped — a will from before the kids arrived, or a super nomination that still lists a former partner. Finn helps you identify what's in place and what needs attention before you sit down with a solicitor.</p>
-      </details>
+      </div>
 
-      <details class="faq-item">
-        <summary class="faq-q">Why do Australians earning good incomes often feel financially stuck?</summary>
+      <div class="faq-item">
+        <button class="faq-btn" aria-expanded="false" onclick="toggleFaq(this)">Why do Australians earning good incomes often feel financially stuck?<span class="faq-icon" aria-hidden="true">+</span></button>
         <p class="faq-a">Income solves a lot of problems but not all of them. High-income households often have expenses that scaled up with income — better suburb, bigger mortgage, private school fees, two cars, overseas holidays. The income looks great from outside and busy from inside, but the gap between what comes in and what's actually building wealth can be surprisingly thin. The other factor is complexity — more accounts, more decisions, more things that need attention — with less time to deal with any of it. Clarity comes before progress. Finn is the clarity part.</p>
-      </details>
+      </div>
 
-      <details class="faq-item">
-        <summary class="faq-q">What does the federal budget mean for my household finances?</summary>
+      <div class="faq-item">
+        <button class="faq-btn" aria-expanded="false" onclick="toggleFaq(this)">What does the federal budget mean for my household finances?<span class="faq-icon" aria-hidden="true">+</span></button>
         <p class="faq-a">Budget announcements affect households differently depending on income, family structure, age, and debt. The things most likely to affect a typical Australian household: changes to tax thresholds, cost of living relief measures, super rules, childcare subsidies, and housing policy. The better question is always: which announcements are relevant to my specific situation? Finn can help you understand your current picture clearly enough that when something changes, you can see immediately whether it affects you.</p>
-      </details>
+      </div>
 
-      <details class="faq-item">
-        <summary class="faq-q">I know I should be doing more with my money but I don't know where to start — what's the first step?</summary>
+      <div class="faq-item">
+        <button class="faq-btn" aria-expanded="false" onclick="toggleFaq(this)">I know I should be doing more with my money but I don't know where to start — what's the first step?<span class="faq-icon" aria-hidden="true">+</span></button>
         <p class="faq-a">The first step is always the same: see the full picture. Not a budget in a spreadsheet — the actual picture. What you own, what you owe, what it costs to run your life, and where the gaps are. Most people who feel stuck don't lack discipline or information — they lack a clear starting point. Finn's free snapshot takes about eight minutes and gives you that. From there, the right next steps become obvious in a way they usually aren't before.</p>
-      </details>
+      </div>
 
     </div>
   </div>
@@ -608,6 +618,14 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
 </footer>
 
 <script>
+function toggleFaq(btn) {
+  const expanded = btn.getAttribute('aria-expanded') === 'true';
+  btn.setAttribute('aria-expanded', String(!expanded));
+  btn.querySelector('.faq-icon').textContent = expanded ? '+' : '−';
+  const answer = btn.nextElementSibling;
+  answer.classList.toggle('open', !expanded);
+}
+
 function submitForm() {
   const email = document.getElementById('cta-email').value;
   if (!email || !email.includes('@')) { alert('Please enter a valid email address.'); return; }

@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /snapshot
+Disallow: /ready
+
+Sitemap: https://meetfinn.com.au/sitemap.xml
