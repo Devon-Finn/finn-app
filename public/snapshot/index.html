@@ -6,72 +6,75 @@
 <title>Finn — Your Financial Picture</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #faf8f4;
+  --bg: #f5f1eb;
   --white: #ffffff;
-  --dark: #1c1c1a;
-  --mid: #5a5a56;
+  --dark: #1c1917;
+  --mid: #5c5a55;
   --light: #9a9a94;
-  --rule: #e8e4dc;
+  --rule: #e6e0d6;
   --accent: #2a4a3a;
   --accent-light: #f0f4f1;
+  --steel: #c2d4de;
+  --steel-light: #eaf2f6;
   --warm: #c4956a;
   --warm-light: #fdf6ee;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { font-family: 'Jost', sans-serif; background: var(--bg); color: var(--dark); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+body { font-family: 'Jost', sans-serif; background: var(--bg); color: var(--dark); min-height: 100vh; -webkit-font-smoothing: antialiased; line-height: 1.75; }
 
-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; background: rgba(250,248,244,0.95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--rule); }
-.nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 400; color: var(--dark); letter-spacing: 0.04em; text-decoration: none; }
-.nav-back { font-size: 12px; font-weight: 400; letter-spacing: 0.1em; text-transform: uppercase; color: var(--light); text-decoration: none; transition: color 0.2s; }
-.nav-back:hover { color: var(--dark); }
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 40px; height: 64px; display: flex; justify-content: space-between; align-items: center; background: var(--dark); }
+.nav-logo { font-size: 20px; color: var(--bg); text-decoration: none; }
+.finn-wordmark { font-family: 'Jost', sans-serif; font-weight: 700; letter-spacing: 0.05em; }
+.finn-period { color: var(--steel); }
+.nav-back { font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 400; color: rgba(245,241,235,0.5); text-decoration: none; transition: color 0.2s; }
+.nav-back:hover { color: var(--bg); }
 
-.progress-wrap { position: fixed; top: 61px; left: 0; right: 0; z-index: 99; height: 2px; background: var(--rule); }
-.progress-bar { height: 2px; background: var(--accent); transition: width 0.5s ease; width: 0%; }
+.progress-wrap { position: fixed; top: 64px; left: 0; right: 0; z-index: 99; height: 3px; background: var(--rule); }
+.progress-bar { height: 3px; background: var(--accent); transition: width 0.3s ease; width: 0%; }
 
 main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
 
 /* INTRO */
 .intro-screen { text-align: center; padding: 60px 0; animation: fadeUp 0.8s ease forwards; }
-.intro-eyebrow { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm); margin-bottom: 24px; font-weight: 500; }
-.intro-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(36px, 5vw, 56px); font-weight: 300; line-height: 1.15; color: var(--dark); letter-spacing: -0.01em; margin-bottom: 24px; }
-.intro-title em { font-style: italic; color: var(--accent); }
-.intro-body { font-size: 16px; font-weight: 300; line-height: 1.8; color: var(--mid); max-width: 480px; margin: 0 auto 48px; }
+.intro-eyebrow { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--light); margin-bottom: 24px; font-weight: 500; }
+.intro-title { font-family: 'Jost', sans-serif; font-size: clamp(36px, 5vw, 52px); font-weight: 700; line-height: 1.1; color: var(--dark); letter-spacing: -0.02em; margin-bottom: 24px; }
+.intro-body { font-size: 16px; font-weight: 400; line-height: 1.75; color: var(--mid); max-width: 480px; margin: 0 auto 48px; }
 .intro-meta { display: flex; justify-content: center; gap: 32px; margin-bottom: 48px; flex-wrap: wrap; }
 .meta-item { text-align: center; }
-.meta-val { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 300; color: var(--dark); display: block; line-height: 1; margin-bottom: 4px; }
+.meta-val { font-family: 'Jost', sans-serif; font-size: 26px; font-weight: 600; color: var(--dark); display: block; line-height: 1; margin-bottom: 4px; letter-spacing: -0.02em; }
 .meta-label { font-size: 11px; color: var(--light); text-transform: uppercase; letter-spacing: 0.1em; }
-.btn-start { display: inline-block; padding: 16px 48px; background: var(--dark); color: var(--white); font-family: 'Jost', sans-serif; font-size: 13px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; border: none; cursor: pointer; transition: background 0.2s; border-radius: 2px; }
-.btn-start:hover { background: var(--accent); }
+.btn-start { display: inline-block; padding: 14px 48px; background: var(--dark); color: var(--bg); font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 500; letter-spacing: 0.02em; border: none; cursor: pointer; transition: opacity 0.15s ease; border-radius: 3px; }
+.btn-start:hover { opacity: 0.85; }
 .intro-disclaimer { font-size: 11px; color: var(--light); margin-top: 20px; letter-spacing: 0.03em; line-height: 1.6; }
 
 /* QUESTIONS */
 .question-screen { display: none; animation: fadeUp 0.5s ease forwards; }
-.q-step { font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--light); margin-bottom: 12px; }
-.q-text { font-family: 'Cormorant Garamond', serif; font-size: clamp(24px, 3.5vw, 36px); font-weight: 300; line-height: 1.25; color: var(--dark); letter-spacing: -0.01em; margin-bottom: 12px; }
-.q-context { font-size: 14px; font-weight: 300; color: var(--mid); line-height: 1.7; margin-bottom: 20px; padding: 12px 16px; background: var(--warm-light); border-left: 2px solid var(--warm); }
+.q-step { font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--light); margin-bottom: 12px; }
+.q-text { font-family: 'Jost', sans-serif; font-size: clamp(22px, 3vw, 32px); font-weight: 700; line-height: 1.2; color: var(--dark); letter-spacing: -0.02em; margin-bottom: 12px; }
+.q-context { font-size: 14px; font-weight: 400; color: var(--mid); line-height: 1.7; margin-bottom: 20px; padding: 12px 16px; background: var(--steel-light); border-left: 2px solid var(--steel); }
 .q-multi-hint { font-size: 12px; color: var(--accent); margin-bottom: 16px; font-weight: 400; letter-spacing: 0.04em; }
 
 .options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px; }
-.option { padding: 14px 18px; border: 1px solid var(--rule); background: var(--white); font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 300; color: var(--mid); cursor: pointer; text-align: left; transition: all 0.15s; line-height: 1.5; border-radius: 2px; position: relative; }
+.option { padding: 14px 18px; border: 1px solid var(--rule); background: var(--white); font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 400; color: var(--mid); cursor: pointer; text-align: left; transition: all 0.15s; line-height: 1.5; border-radius: 3px; position: relative; }
 .option:hover { border-color: var(--accent); color: var(--dark); background: var(--accent-light); }
-.option.selected { border-color: var(--accent); background: var(--accent-light); color: var(--accent); font-weight: 400; }
+.option.selected { border-color: var(--accent); background: var(--accent-light); color: var(--accent); font-weight: 500; }
 .option.selected::after { content: '✓'; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: var(--accent); font-size: 14px; }
 
 .q-nav { display: flex; gap: 12px; align-items: center; }
-.btn-next { padding: 14px 36px; background: var(--dark); color: var(--white); font-family: 'Jost', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; border: none; cursor: pointer; transition: background 0.2s; border-radius: 2px; }
-.btn-next:hover { background: var(--accent); }
+.btn-next { padding: 14px 36px; background: var(--dark); color: var(--bg); font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 500; letter-spacing: 0.02em; border: none; cursor: pointer; transition: opacity 0.15s ease; border-radius: 3px; }
+.btn-next:hover { opacity: 0.85; }
 .btn-next:disabled { opacity: 0.3; cursor: not-allowed; }
-.btn-back { padding: 14px 24px; background: transparent; color: var(--light); font-family: 'Jost', sans-serif; font-size: 12px; font-weight: 400; letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid var(--rule); cursor: pointer; transition: all 0.2s; border-radius: 2px; }
-.btn-back:hover { color: var(--dark); border-color: var(--dark); }
+.btn-back { padding: 13px 24px; background: transparent; color: var(--dark); font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 500; letter-spacing: 0.02em; border: 1px solid var(--dark); cursor: pointer; transition: opacity 0.15s ease; border-radius: 3px; }
+.btn-back:hover { opacity: 0.7; }
 
 /* LOADING */
 .loading-screen { display: none; text-align: center; padding: 80px 0; }
-.loading-title { font-family: 'Cormorant Garamond', serif; font-size: 32px; font-weight: 300; color: var(--dark); margin-bottom: 16px; }
-.loading-sub { font-size: 14px; font-weight: 300; color: var(--light); margin-bottom: 48px; }
+.loading-title { font-family: 'Jost', sans-serif; font-size: 28px; font-weight: 700; color: var(--dark); margin-bottom: 16px; letter-spacing: -0.02em; line-height: 1.1; }
+.loading-sub { font-size: 14px; font-weight: 400; color: var(--light); margin-bottom: 48px; }
 .loading-dots { display: flex; justify-content: center; gap: 8px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: dotPulse 1.4s ease infinite; }
 .dot:nth-child(2) { animation-delay: 0.2s; }
@@ -80,45 +83,45 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
 /* OUTPUT */
 .output-screen { display: none; }
 .output-header { margin-bottom: 48px; padding-bottom: 32px; border-bottom: 1px solid var(--rule); }
-.output-eyebrow { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm); margin-bottom: 16px; font-weight: 500; }
-.output-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(28px, 4vw, 40px); font-weight: 300; line-height: 1.2; color: var(--dark); letter-spacing: -0.01em; }
+.output-eyebrow { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--light); margin-bottom: 16px; font-weight: 500; }
+.output-title { font-family: 'Jost', sans-serif; font-size: clamp(26px, 3.5vw, 36px); font-weight: 700; line-height: 1.15; color: var(--dark); letter-spacing: -0.02em; }
 
 /* OUTPUT SECTIONS */
 .output-section { margin-bottom: 0; }
-.output-section-label { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--warm); font-weight: 500; display: block; margin-bottom: 10px; }
-.output-section-heading { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 300; line-height: 1.2; color: var(--dark); letter-spacing: -0.01em; margin-bottom: 20px; }
-.output-section-body { font-size: 15px; font-weight: 300; line-height: 1.9; color: var(--mid); }
+.output-section-label { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--light); font-weight: 500; display: block; margin-bottom: 10px; }
+.output-section-heading { font-family: 'Jost', sans-serif; font-size: 24px; font-weight: 700; line-height: 1.15; color: var(--dark); letter-spacing: -0.02em; margin-bottom: 20px; }
+.output-section-body { font-size: 15px; font-weight: 400; line-height: 1.9; color: var(--mid); }
 .output-section-body p { margin-bottom: 16px; }
 .output-section-body p:last-child { margin-bottom: 0; }
-.output-section-body strong { color: var(--dark); font-weight: 500; }
-.gap-card { padding: 16px; border-left: 4px solid var(--warm); background: var(--warm-light); margin-bottom: 12px; border-radius: 6px; font-size: 15px; font-weight: 300; line-height: 1.85; color: var(--mid); }
-.section-intro { font-size: 15px; font-weight: 300; line-height: 1.9; color: var(--mid); margin-bottom: 20px; }
-.section-closing { font-size: 15px; font-weight: 300; line-height: 1.9; color: var(--mid); margin-top: 20px; }
+.output-section-body strong { color: var(--dark); font-weight: 600; }
+.gap-card { background: var(--warm-light); border-left: 3px solid var(--warm); border-radius: 0 6px 6px 0; padding: 16px 20px; margin-bottom: 12px; font-size: 15px; font-weight: 400; line-height: 1.85; color: var(--mid); }
+.section-intro { font-size: 15px; font-weight: 400; line-height: 1.9; color: var(--mid); margin-bottom: 20px; }
+.section-closing { font-size: 15px; font-weight: 400; line-height: 1.9; color: var(--mid); margin-top: 20px; }
 
 .output-divider { height: 1px; background: var(--rule); margin: 40px 0; }
 
 /* CLARITY SESSION */
-.clarity-section { margin-top: 0; padding: 40px; background: var(--accent-light); border-radius: 2px; }
-.clarity-eyebrow { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--warm); font-weight: 500; display: block; margin-bottom: 12px; }
-.clarity-heading { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 300; line-height: 1.2; color: var(--dark); letter-spacing: -0.01em; margin-bottom: 28px; }
+.clarity-section { margin-top: 0; padding: 40px; background: var(--accent-light); border-radius: 6px; }
+.clarity-eyebrow { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--light); font-weight: 500; display: block; margin-bottom: 12px; }
+.clarity-heading { font-family: 'Jost', sans-serif; font-size: 26px; font-weight: 700; line-height: 1.15; color: var(--dark); letter-spacing: -0.02em; margin-bottom: 28px; }
 .clarity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.clarity-item { background: var(--white); border: 1px solid var(--rule); padding: 20px 22px; border-radius: 2px; }
+.clarity-item { background: var(--white); border: 1px solid var(--rule); padding: 24px 28px; border-radius: 6px; }
 .clarity-item:nth-child(7) { grid-column: 1 / -1; justify-self: center; width: calc(50% - 7px); }
-.clarity-label { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--warm); font-weight: 500; display: block; margin-bottom: 8px; }
-.clarity-title { font-size: 14px; font-weight: 500; color: var(--dark); margin-bottom: 8px; line-height: 1.4; }
-.clarity-body { font-size: 13px; font-weight: 300; color: var(--mid); line-height: 1.75; }
+.clarity-label { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); opacity: 0.6; font-weight: 500; display: block; margin-bottom: 8px; }
+.clarity-title { font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 600; color: var(--dark); margin-bottom: 8px; line-height: 1.4; letter-spacing: -0.01em; }
+.clarity-body { font-size: 13px; font-weight: 400; color: var(--mid); line-height: 1.75; }
 
 /* CTA */
-.cta-box { padding: 40px; background: var(--dark); margin-top: 0; border-radius: 2px; }
-.cta-eyebrow { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm); margin-bottom: 16px; font-weight: 500; }
-.cta-title { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 300; color: var(--white); margin-bottom: 16px; line-height: 1.3; }
-.cta-body { font-size: 14px; font-weight: 300; color: rgba(255,255,255,0.6); line-height: 1.8; margin-bottom: 32px; }
-.btn-cta { display: inline-block; padding: 18px 48px; background: var(--warm); color: var(--dark); font-family: 'Jost', sans-serif; font-size: 13px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; border: none; cursor: pointer; transition: opacity 0.2s; text-decoration: none; border-radius: 2px; }
-.btn-cta:hover { opacity: 0.85; }
+.cta-box { padding: 40px; background: var(--accent); margin-top: 0; border-radius: 6px; }
+.cta-eyebrow { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--steel); margin-bottom: 16px; font-weight: 500; }
+.cta-title { font-family: 'Jost', sans-serif; font-size: 26px; font-weight: 700; color: var(--bg); margin-bottom: 16px; line-height: 1.15; letter-spacing: -0.02em; }
+.cta-body { font-size: 14px; font-weight: 400; color: rgba(245,241,235,0.7); line-height: 1.8; margin-bottom: 32px; }
+.btn-cta { display: inline-block; padding: 14px 48px; background: var(--bg); color: var(--accent); font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 0.02em; border: none; cursor: pointer; transition: opacity 0.15s ease; text-decoration: none; border-radius: 3px; }
+.btn-cta:hover { opacity: 0.9; }
 
-.subscription-note { margin-top: 32px; padding: 28px 32px; background: var(--accent-light); border-left: 3px solid var(--accent); border-radius: 0 4px 4px 0; }
-.sub-title { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 400; color: var(--accent); margin-bottom: 10px; }
-.sub-body { font-size: 14px; font-weight: 300; color: var(--mid); line-height: 1.8; }
+.subscription-note { margin-top: 32px; padding: 28px 32px; background: var(--accent-light); border: 1px solid var(--rule); border-radius: 6px; }
+.sub-title { font-family: 'Jost', sans-serif; font-size: 18px; font-weight: 600; color: var(--accent); margin-bottom: 10px; letter-spacing: -0.01em; }
+.sub-body { font-size: 14px; font-weight: 400; color: var(--mid); line-height: 1.8; }
 
 .legal { margin-top: 40px; font-size: 11px; color: var(--light); line-height: 1.7; padding-top: 24px; border-top: 1px solid var(--rule); }
 .legal a { color: var(--light); text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 2px; }
@@ -140,7 +143,7 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
 <body>
 
 <nav>
-  <a href="/" class="nav-logo">Finn</a>
+  <a href="/" class="nav-logo"><span class="finn-wordmark">Finn<span class="finn-period">.</span></span></a>
   <a href="/" class="nav-back">← Back to Finn</a>
 </nav>
 <div class="progress-wrap">
@@ -152,7 +155,7 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
   <!-- INTRO -->
   <div class="intro-screen" id="intro">
     <div class="intro-eyebrow">Free financial snapshot</div>
-    <h1 class="intro-title">Your finances,<br><em>honestly</em> assessed.</h1>
+    <h1 class="intro-title">Your finances,<br><span style="font-family:'Fraunces',serif;font-style:italic;font-weight:400;color:var(--accent);">honestly</span> assessed.</h1>
     <p class="intro-body">Eight minutes. Nineteen questions. A plain English picture of where your household actually stands — and what it might be costing you to stay where you are.</p>
     <div class="intro-meta">
       <div class="meta-item"><span class="meta-val">19</span><span class="meta-label">Questions</span></div>

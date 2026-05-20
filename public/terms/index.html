@@ -6,30 +6,36 @@
 <title>Terms of Use — Finn</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #faf8f4;
+  --bg: #f5f1eb;
   --white: #ffffff;
-  --dark: #1c1c1a;
-  --mid: #5a5a56;
+  --dark: #1c1917;
+  --mid: #5c5a55;
   --light: #9a9a94;
-  --rule: #e8e4dc;
+  --rule: #e6e0d6;
   --accent: #2a4a3a;
+  --accent-light: #f0f4f1;
+  --steel: #c2d4de;
+  --steel-light: #eaf2f6;
   --warm: #c4956a;
+  --warm-light: #fdf6ee;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Jost', sans-serif; background: var(--bg); color: var(--dark); -webkit-font-smoothing: antialiased; }
+body { font-family: 'Jost', sans-serif; background: var(--bg); color: var(--dark); -webkit-font-smoothing: antialiased; line-height: 1.75; }
 
 nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  padding: 24px 60px;
+  padding: 0 40px; height: 64px;
   display: flex; justify-content: space-between; align-items: center;
-  background: rgba(250,248,244,0.92); backdrop-filter: blur(10px);
+  background: var(--dark);
 }
-.nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 400; color: var(--dark); letter-spacing: 0.04em; text-decoration: none; }
-.nav-link { font-size: 12px; font-weight: 400; letter-spacing: 0.1em; text-transform: uppercase; color: var(--light); text-decoration: none; transition: color 0.2s; }
-.nav-link:hover { color: var(--dark); }
+.nav-logo { font-size: 20px; color: var(--bg); text-decoration: none; }
+.finn-wordmark { font-family: 'Jost', sans-serif; font-weight: 700; letter-spacing: 0.05em; }
+.finn-period { color: var(--steel); }
+.nav-link { font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 400; color: rgba(245,241,235,0.5); text-decoration: none; transition: color 0.2s; }
+.nav-link:hover { color: var(--bg); }
 
 .legal-page {
   max-width: 760px;
@@ -38,20 +44,20 @@ nav {
 }
 
 .legal-eyebrow {
-  font-size: 11px; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--warm); margin-bottom: 20px;
+  font-size: 10px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--light); margin-bottom: 20px;
 }
 
 .legal-title {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(36px, 4vw, 56px);
-  font-weight: 300; line-height: 1.1;
-  color: var(--dark); letter-spacing: -0.01em;
+  font-family: 'Jost', sans-serif;
+  font-size: clamp(32px, 4vw, 52px);
+  font-weight: 700; line-height: 1.1;
+  color: var(--dark); letter-spacing: -0.02em;
   margin-bottom: 40px;
 }
 
 .legal-intro {
-  font-size: 15px; font-weight: 300; line-height: 1.85; color: var(--mid);
+  font-size: 15px; font-weight: 400; line-height: 1.85; color: var(--mid);
   margin-bottom: 56px; padding-bottom: 56px; border-bottom: 1px solid var(--rule);
 }
 
@@ -66,21 +72,21 @@ nav {
 .legal-section:last-of-type { border-bottom: none; }
 
 .legal-section h2 {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 24px; font-weight: 400;
-  color: var(--dark); letter-spacing: -0.01em;
+  font-family: 'Jost', sans-serif;
+  font-size: 22px; font-weight: 700;
+  color: var(--dark); letter-spacing: -0.02em;
   margin-bottom: 20px;
 }
 
 .legal-section p {
-  font-size: 15px; font-weight: 300; line-height: 1.85; color: var(--mid);
+  font-size: 15px; font-weight: 400; line-height: 1.85; color: var(--mid);
   margin-bottom: 16px;
 }
 .legal-section p:last-child { margin-bottom: 0; }
 
 .legal-section ul {
   margin: 12px 0 16px 20px;
-  font-size: 15px; font-weight: 300; line-height: 1.85; color: var(--mid);
+  font-size: 15px; font-weight: 400; line-height: 1.85; color: var(--mid);
 }
 .legal-section ul li { margin-bottom: 6px; }
 
@@ -89,7 +95,7 @@ nav {
 
 .product-item { margin-bottom: 20px; }
 .product-name { font-size: 14px; font-weight: 500; color: var(--dark); margin-bottom: 4px; }
-.product-desc { font-size: 15px; font-weight: 300; line-height: 1.85; color: var(--mid); }
+.product-desc { font-size: 15px; font-weight: 400; line-height: 1.85; color: var(--mid); }
 
 .legal-updated {
   font-size: 12px; color: var(--light); margin-top: 56px; padding-top: 32px;
@@ -98,15 +104,15 @@ nav {
 
 /* FOOTER */
 footer { padding: 48px 60px; background: var(--dark); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
-.footer-brand { font-family: 'Cormorant Garamond', serif; font-size: 22px; color: var(--white); letter-spacing: 0.04em; }
+.footer-brand { color: var(--bg); }
 .footer-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
-.footer-text { font-size: 12px; color: rgba(255,255,255,0.25); line-height: 1.7; text-align: right; }
+.footer-text { font-size: 12px; color: rgba(245,241,235,0.25); line-height: 1.7; text-align: right; }
 .footer-links { display: flex; gap: 20px; }
-.footer-link { font-size: 11px; color: rgba(255,255,255,0.35); text-decoration: none; letter-spacing: 0.06em; transition: color 0.2s; }
-.footer-link:hover { color: rgba(255,255,255,0.7); }
+.footer-link { font-size: 11px; color: rgba(245,241,235,0.35); text-decoration: none; letter-spacing: 0.06em; transition: color 0.2s; }
+.footer-link:hover { color: rgba(245,241,235,0.7); }
 
 @media (max-width: 700px) {
-  nav { padding: 18px 24px; }
+  nav { padding: 0 24px; }
   .legal-page { padding: 110px 24px 72px; }
   footer { flex-direction: column; align-items: flex-start; padding: 40px 24px; }
   .footer-right { align-items: flex-start; }
@@ -117,7 +123,7 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
 <body>
 
 <nav>
-  <a href="/" class="nav-logo">Finn</a>
+  <a href="/" class="nav-logo"><span class="finn-wordmark">Finn<span class="finn-period">.</span></span></a>
   <a href="/snapshot" class="nav-link">Get your free snapshot</a>
 </nav>
 
@@ -196,7 +202,7 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
 </div>
 
 <footer>
-  <div class="footer-brand">Finn</div>
+  <div class="footer-brand"><span class="finn-wordmark">Finn<span class="finn-period">.</span></span></div>
   <div class="footer-right">
     <div class="footer-links">
       <a href="/privacy" class="footer-link">Privacy Policy</a>

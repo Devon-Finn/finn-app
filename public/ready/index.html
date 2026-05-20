@@ -6,30 +6,36 @@
 <title>Join the waitlist — Finn</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #faf8f4;
+  --bg: #f5f1eb;
   --white: #ffffff;
-  --dark: #1c1c1a;
-  --mid: #5a5a56;
+  --dark: #1c1917;
+  --mid: #5c5a55;
   --light: #9a9a94;
-  --rule: #e8e4dc;
+  --rule: #e6e0d6;
   --accent: #2a4a3a;
+  --accent-light: #f0f4f1;
+  --steel: #c2d4de;
+  --steel-light: #eaf2f6;
   --warm: #c4956a;
+  --warm-light: #fdf6ee;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Jost', sans-serif; background: var(--bg); color: var(--dark); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+body { font-family: 'Jost', sans-serif; background: var(--bg); color: var(--dark); min-height: 100vh; -webkit-font-smoothing: antialiased; line-height: 1.75; }
 
 nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  padding: 24px 60px;
+  padding: 0 40px; height: 64px;
   display: flex; justify-content: space-between; align-items: center;
-  background: rgba(250,248,244,0.92); backdrop-filter: blur(10px);
+  background: var(--dark);
 }
-.nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 400; color: var(--dark); letter-spacing: 0.04em; text-decoration: none; }
-.nav-link { font-size: 12px; font-weight: 400; letter-spacing: 0.1em; text-transform: uppercase; color: var(--light); text-decoration: none; transition: color 0.2s; }
-.nav-link:hover { color: var(--dark); }
+.nav-logo { font-size: 20px; color: var(--bg); text-decoration: none; }
+.finn-wordmark { font-family: 'Jost', sans-serif; font-weight: 700; letter-spacing: 0.05em; }
+.finn-period { color: var(--steel); }
+.nav-link { font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 400; color: rgba(245,241,235,0.5); text-decoration: none; transition: color 0.2s; }
+.nav-link:hover { color: var(--bg); }
 
 main {
   min-height: 100vh;
@@ -42,22 +48,22 @@ main {
 }
 
 .eyebrow {
-  font-size: 11px; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--warm); margin-bottom: 24px;
+  font-size: 10px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--light); margin-bottom: 24px;
 }
 
 h1 {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(36px, 5vw, 58px);
-  font-weight: 300; line-height: 1.15;
-  color: var(--dark); letter-spacing: -0.01em;
+  font-family: 'Jost', sans-serif;
+  font-size: clamp(36px, 5vw, 56px);
+  font-weight: 700; line-height: 1.1;
+  color: var(--dark); letter-spacing: -0.02em;
   max-width: 18ch; margin-bottom: 20px;
 }
 
 h1 em { font-style: italic; color: var(--accent); }
 
 .sub {
-  font-size: 16px; font-weight: 300; line-height: 1.8;
+  font-size: 16px; font-weight: 400; line-height: 1.75;
   color: var(--mid); max-width: 38ch; margin-bottom: 48px;
 }
 
@@ -65,51 +71,52 @@ h1 em { font-style: italic; color: var(--accent); }
   display: flex;
   border: 1px solid var(--rule);
   background: var(--white);
+  border-radius: 3px; overflow: hidden;
   width: 100%; max-width: 480px;
 }
 .form-row input {
   flex: 1; padding: 16px 20px;
   background: transparent; border: none; outline: none;
   font-family: 'Jost', sans-serif; font-size: 14px;
-  color: var(--dark); font-weight: 300;
+  color: var(--dark); font-weight: 400;
 }
 .form-row input::placeholder { color: var(--light); }
 .form-row input:focus { box-shadow: inset 0 0 0 1px var(--accent); }
 .form-row button {
-  padding: 16px 28px;
+  padding: 14px 28px;
   background: var(--dark); border: none;
-  color: var(--white);
-  font-family: 'Jost', sans-serif; font-size: 12px; font-weight: 500;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  cursor: pointer; transition: background 0.2s; white-space: nowrap;
+  color: var(--bg);
+  font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer; transition: opacity 0.15s ease; white-space: nowrap;
 }
-.form-row button:hover { background: var(--accent); }
+.form-row button:hover { opacity: 0.85; }
 
 .note { font-size: 11px; color: var(--light); margin-top: 16px; letter-spacing: 0.03em; }
 
 .thankyou {
   display: none; flex-direction: column; gap: 8px;
-  padding: 24px 32px; background: #f0f4f1;
-  border: 1px solid var(--rule); max-width: 480px; width: 100%;
+  padding: 24px 32px; background: var(--accent-light);
+  border: 1px solid var(--rule); border-radius: 6px; max-width: 480px; width: 100%;
 }
 .thankyou.show { display: flex; }
-.thankyou-title { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 300; color: var(--dark); }
-.thankyou-text { font-size: 14px; font-weight: 300; color: var(--mid); line-height: 1.7; }
+.thankyou-title { font-family: 'Jost', sans-serif; font-size: 22px; font-weight: 700; color: var(--dark); letter-spacing: -0.01em; }
+.thankyou-text { font-size: 14px; font-weight: 400; color: var(--mid); line-height: 1.75; }
 
 /* FOOTER */
 footer { padding: 48px 60px; background: var(--dark); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
-.footer-brand { font-family: 'Cormorant Garamond', serif; font-size: 22px; color: var(--white); letter-spacing: 0.04em; }
+.footer-brand { color: var(--bg); }
 .footer-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
-.footer-text { font-size: 12px; color: rgba(255,255,255,0.25); line-height: 1.7; text-align: right; }
+.footer-text { font-size: 12px; color: rgba(245,241,235,0.25); line-height: 1.7; text-align: right; }
 .footer-links { display: flex; gap: 20px; }
-.footer-link { font-size: 11px; color: rgba(255,255,255,0.35); text-decoration: none; letter-spacing: 0.06em; transition: color 0.2s; }
-.footer-link:hover { color: rgba(255,255,255,0.7); }
+.footer-link { font-size: 11px; color: rgba(245,241,235,0.35); text-decoration: none; letter-spacing: 0.06em; transition: color 0.2s; }
+.footer-link:hover { color: rgba(245,241,235,0.7); }
 
 @media (max-width: 600px) {
-  nav { padding: 18px 24px; }
-  .form-row { flex-direction: column; border: none; gap: 8px; }
-  .form-row input { border: 1px solid var(--rule); padding: 14px 16px; }
-  .form-row button { padding: 14px 16px; }
+  nav { padding: 0 24px; }
+  .form-row { flex-direction: column; border: none; gap: 8px; border-radius: 0; }
+  .form-row input { border: 1px solid var(--rule); padding: 14px 16px; border-radius: 3px; }
+  .form-row button { padding: 14px 16px; border-radius: 3px; }
   footer { flex-direction: column; align-items: flex-start; padding: 40px 24px; }
   .footer-right { align-items: flex-start; }
   .footer-text { text-align: left; }
@@ -119,7 +126,7 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
 <body>
 
 <nav>
-  <a href="/" class="nav-logo">Finn</a>
+  <a href="/" class="nav-logo"><span class="finn-wordmark">Finn<span class="finn-period">.</span></span></a>
   <a href="/snapshot" class="nav-link">Get your free snapshot</a>
 </nav>
 
@@ -156,7 +163,7 @@ function submitForm() {
 </script>
 
 <footer>
-  <div class="footer-brand">Finn</div>
+  <div class="footer-brand"><span class="finn-wordmark">Finn<span class="finn-period">.</span></span></div>
   <div class="footer-right">
     <div class="footer-links">
       <a href="/privacy" class="footer-link">Privacy Policy</a>
