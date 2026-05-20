@@ -18,6 +18,23 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400&display=swap" rel="stylesheet">
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '150146338838549');
+fbq('track', 'PageView');
+fbq('track', 'ViewContent');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=150146338838549&ev=PageView&noscript=1"/></noscript>
+<!-- End Meta Pixel Code -->
 <style>
 :root {
   --bg: #f5f1eb;
@@ -294,7 +311,7 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
       <div class="cta-eyebrow">The Clarity Session</div>
       <div class="cta-title" id="cta-title">See your complete financial picture.</div>
       <div class="cta-body">The Clarity Session walks you through your complete financial picture — real numbers, not estimates. Finn guides you step by step, tells you exactly where to find every number you need, and explains what it all means. In one sitting. No agenda beyond helping you see clearly.</div>
-      <a href="/ready" class="btn-cta">Join the waitlist — $97 at launch →</a>
+      <a href="/ready" class="btn-cta" onclick="fbq('track', 'InitiateCheckout')">Join the waitlist — $97 at launch →</a>
     </div>
     <div class="subscription-note">
       <div class="sub-title">And once you have your picture — Finn keeps it current.</div>
@@ -992,6 +1009,7 @@ function renderOutput(text) {
 
   document.getElementById('email-capture').classList.add('show');
   document.getElementById('email-divider').style.display = 'block';
+  fbq('track', 'CompleteRegistration');
 
   const asp = answers['aspiration'] || '';
   let ctaTitle = 'See your complete financial picture.';
