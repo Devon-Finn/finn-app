@@ -944,7 +944,7 @@ function renderOutput(text) {
 
     const lbl = document.createElement('span');
     lbl.className = 'output-section-label';
-    lbl.textContent = "WHAT'S WORTH LOOKING AT";
+    lbl.textContent = "03";
     section.appendChild(lbl);
 
     const h = document.createElement('div');
@@ -983,9 +983,9 @@ function renderOutput(text) {
     sectionsEl.appendChild(section);
   }
 
-  if (s1Match) renderStandard(s1Match[1], "YOU'RE NOT ALONE", "You're not alone.");
+  if (s1Match) renderStandard(s1Match[1], "01", "You're not alone.");
   if (s1Match && s2Match) addDivider();
-  if (s2Match) renderStandard(s2Match[1], "YOUR PICTURE RIGHT NOW", "Your picture right now.");
+  if (s2Match) renderStandard(s2Match[1], "02", "Your picture right now.");
   if (s2Match && s3Match) addDivider();
   if (s3Match) renderGaps(s3Match[1]);
 
