@@ -785,7 +785,7 @@ async function generateOutput() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         system: SYSTEM_PROMPT,
-        max_tokens: 1500,
+        max_tokens: 2500,
         messages: [{ role: 'user', content: userMessage }]
       })
     });
