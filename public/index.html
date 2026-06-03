@@ -354,7 +354,7 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
       <a href="/snapshot" class="btn-primary">Start your free snapshot →</a>
       <a href="#how" class="btn-secondary">See how it works</a>
     </div>
-    <p class="hero-disclaimer">Not advice. Not a sales pitch dressed up as education.<br>Just clarity — before you talk to anyone else.</p>
+    <p class="hero-disclaimer">Not advice. Just clarity — before you talk to anyone else.</p>
   </div>
   <div class="hero-right">
     <div class="hero-stats">
@@ -490,8 +490,8 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
         <div class="ind-body">Finn organises and clarifies. It never tells you what to do with your money. That decision stays with you — and the professionals you choose.</div>
       </div>
       <div class="ind-item">
-        <div class="ind-title">Not a funnel</div>
-        <div class="ind-body">Your clarity is the product. Nothing is waiting at the end of this conversation except a clear picture of where you stand.</div>
+        <div class="ind-title">No one pushing product</div>
+        <div class="ind-body">Finn doesn't sell financial products and doesn't push you toward anything. Its job is to help you see clearly first. The hardest part has never been finding a professional — it's knowing which ones you can trust. When you're ready, Finn introduces you to someone genuine. Your call, in your own time.</div>
       </div>
       <div class="ind-item">
         <div class="ind-title">Not a bank</div>
@@ -644,15 +644,29 @@ function toggleFaq(btn) {
 }
 
 function submitForm() {
-  const email = document.getElementById('cta-email').value;
+  const emailInput = document.getElementById('cta-email');
+  const email = emailInput.value.trim();
   if (!email || !email.includes('@')) { alert('Please enter a valid email address.'); return; }
-  document.getElementById('cta-form-row').style.display = 'none';
-  document.getElementById('cta-thanks').classList.add('show');
+  const btn = document.querySelector('#cta-form-row button');
+  btn.disabled = true;
+  btn.textContent = "Joining...";
   fetch('https://formspree.io/f/mgodedzl', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: email })
-  }).catch(() => {});
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ email: email, _replyto: email, source: 'waitlist-homepage' })
+  })
+  .then(r => {
+    if (!r.ok) throw new Error('submission failed');
+    document.getElementById('cta-form-row').style.display = 'none';
+    document.getElementById('cta-thanks').classList.add('show');
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.textContent = "I'm in";
+    const note = document.querySelector('.form-note');
+    note.textContent = 'Something went wrong — please try again or email hello@meetfinn.com.au';
+    note.style.color = 'var(--warm)';
+  });
 }
 </script>
 </body>

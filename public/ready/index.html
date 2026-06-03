@@ -178,16 +178,30 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
 
 <script>
 function submitForm() {
-  const email = document.getElementById('email').value;
+  const emailInput = document.getElementById('email');
+  const email = emailInput.value.trim();
   if (!email || !email.includes('@')) { alert('Please enter a valid email address.'); return; }
-  document.getElementById('form-row').style.display = 'none';
-  document.getElementById('thankyou').classList.add('show');
-  fbq('track', 'Lead');
+  const btn = document.querySelector('#form-row button');
+  btn.disabled = true;
+  btn.textContent = 'Joining...';
   fetch('https://formspree.io/f/mgodedzl', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: email })
-  }).catch(() => {});
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ email: email, _replyto: email, source: 'waitlist-ready' })
+  })
+  .then(r => {
+    if (!r.ok) throw new Error('submission failed');
+    document.getElementById('form-row').style.display = 'none';
+    document.getElementById('thankyou').classList.add('show');
+    fbq('track', 'Lead');
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.textContent = 'Join waitlist';
+    const note = document.querySelector('.note');
+    note.textContent = 'Something went wrong — please try again or email hello@meetfinn.com.au';
+    note.style.color = 'rgba(194,212,222,0.9)';
+  });
 }
 </script>
 
