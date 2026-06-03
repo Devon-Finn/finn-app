@@ -627,6 +627,7 @@ LEGAL: Never give personal financial advice. Never recommend specific products. 
 let currentQ = 0;
 let answers = {};
 let snapshotText = '';
+let snapshotId = null; // set after generation — holds the Supabase row UUID
 
 const LOADING_MESSAGES = [
   'Reading your answers carefully...',
@@ -795,9 +796,14 @@ async function generateOutput() {
       body: JSON.stringify({
         system: SYSTEM_PROMPT,
         max_tokens: 2500,
+        answers: answers,
         messages: [{ role: 'user', content: userMessage }]
       })
     });
+
+    // Read snapshot UUID from response header before consuming the body stream.
+    // The edge function pre-generates this and saves the row to Supabase in the background.
+    snapshotId = response.headers.get('X-Snapshot-Id');
 
     if (!response.ok) {
       const errText = await response.text();

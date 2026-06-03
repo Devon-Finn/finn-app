@@ -16,6 +16,105 @@ function checkRateLimit(ip) {
   return entry.count <= RATE_LIMIT;
 }
 
+// Parse Anthropic SSE stream bytes and accumulate the full text output.
+// Reads from a ReadableStream (the tee'd save copy), returns the complete string.
+async function accumulateStreamText(stream) {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let fullText = "";
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      // SSE lines end with \n; split and keep any incomplete trailing line in buffer
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const raw = line.slice(6).trim();
+        if (!raw || raw === "[DONE]") continue;
+        try {
+          const evt = JSON.parse(raw);
+          if (
+            evt.type === "content_block_delta" &&
+            evt.delta?.type === "text_delta" &&
+            typeof evt.delta.text === "string"
+          ) {
+            fullText += evt.delta.text;
+          }
+        } catch {
+          // malformed SSE line — skip
+        }
+      }
+    }
+    // Process any remaining buffer content
+    if (buffer.startsWith("data: ")) {
+      const raw = buffer.slice(6).trim();
+      if (raw && raw !== "[DONE]") {
+        try {
+          const evt = JSON.parse(raw);
+          if (
+            evt.type === "content_block_delta" &&
+            evt.delta?.type === "text_delta" &&
+            typeof evt.delta.text === "string"
+          ) {
+            fullText += evt.delta.text;
+          }
+        } catch {}
+      }
+    }
+  } catch (err) {
+    console.error("Finn: error reading save stream:", err);
+  }
+
+  return fullText;
+}
+
+// Save snapshot row to Supabase using service_role key (bypasses RLS).
+// Failures are logged but never surface to the user.
+async function saveSnapshot(snapshotId, output, answers) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!supabaseUrl || !serviceKey) {
+    console.error("Finn: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set — skipping save");
+    return;
+  }
+
+  if (!output) {
+    console.error("Finn: empty output after stream accumulation — skipping save");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/snapshots`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": serviceKey,
+        "Authorization": `Bearer ${serviceKey}`,
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify({
+        id: snapshotId,
+        output,
+        answers: answers ?? null,
+        source: "snapshot-output",
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      console.error(`Finn: Supabase insert failed — ${res.status}: ${body}`);
+    }
+  } catch (err) {
+    console.error("Finn: Supabase save threw:", err);
+  }
+}
+
 export default async function handler(request, context) {
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders() });
@@ -58,6 +157,10 @@ export default async function handler(request, context) {
     });
   }
 
+  // Pre-generate snapshot UUID here, before streaming begins.
+  // This is returned to the client via X-Snapshot-Id header and used for the Supabase insert.
+  const snapshotId = crypto.randomUUID();
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
@@ -73,7 +176,7 @@ export default async function handler(request, context) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: payload.max_tokens ?? 1500,
+        max_tokens: payload.max_tokens ?? 2500,
         stream: true,
         ...(payload.system ? { system: payload.system } : {}),
         messages: payload.messages,
@@ -98,11 +201,26 @@ export default async function handler(request, context) {
     });
   }
 
-  return new Response(upstream.body, {
+  // Tee the stream: clientStream goes to the browser (SSE, unchanged UX),
+  // saveStream is consumed in the background to accumulate the full text for Supabase.
+  const [clientStream, saveStream] = upstream.body.tee();
+
+  // Background task: accumulate text then save. context.waitUntil keeps the
+  // edge function alive after the HTTP response is returned until this resolves.
+  context.waitUntil(
+    accumulateStreamText(saveStream).then((output) =>
+      saveSnapshot(snapshotId, output, payload.answers ?? null)
+    )
+  );
+
+  return new Response(clientStream, {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       "X-Accel-Buffering": "no",
+      // Snapshot UUID — client reads this from the fetch response headers
+      // before consuming the body, so it knows the result URL immediately.
+      "X-Snapshot-Id": snapshotId,
       ...corsHeaders(),
     },
   });
@@ -113,5 +231,8 @@ function corsHeaders() {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
+    // Expose X-Snapshot-Id so client JS can read it (required for cross-origin;
+    // harmless for same-origin — added for defence in depth).
+    "Access-Control-Expose-Headers": "X-Snapshot-Id",
   };
 }
