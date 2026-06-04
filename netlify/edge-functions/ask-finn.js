@@ -79,13 +79,20 @@ async function saveSnapshot(snapshotId, output, answers) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
+  // DIAGNOSTIC — logs env var presence and accumulated text length.
+  // Remove once save is confirmed working.
+  console.log(`[Finn save] SUPABASE_URL present: ${!!supabaseUrl} (length: ${supabaseUrl?.length ?? 0})`);
+  console.log(`[Finn save] SUPABASE_SERVICE_ROLE_KEY present: ${!!serviceKey} (length: ${serviceKey?.length ?? 0})`);
+  console.log(`[Finn save] accumulated output length: ${output?.length ?? 0} chars`);
+  console.log(`[Finn save] snapshotId: ${snapshotId}`);
+
   if (!supabaseUrl || !serviceKey) {
-    console.error("Finn: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set — skipping save");
+    console.error("[Finn save] MISSING env var — SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not available in edge function runtime. Check Netlify env var scope: must be 'All' or include Edge Functions, not just 'Functions' (serverless).");
     return;
   }
 
   if (!output) {
-    console.error("Finn: empty output after stream accumulation — skipping save");
+    console.error("[Finn save] empty output after stream accumulation — skipping insert");
     return;
   }
 
@@ -106,12 +113,15 @@ async function saveSnapshot(snapshotId, output, answers) {
       }),
     });
 
-    if (!res.ok) {
-      const body = await res.text();
-      console.error(`Finn: Supabase insert failed — ${res.status}: ${body}`);
+    // DIAGNOSTIC — log full Supabase response regardless of success/failure.
+    const responseBody = await res.text();
+    if (res.ok) {
+      console.log(`[Finn save] Supabase insert OK — status: ${res.status}`);
+    } else {
+      console.error(`[Finn save] Supabase insert FAILED — status: ${res.status}, body: ${responseBody}`);
     }
   } catch (err) {
-    console.error("Finn: Supabase save threw:", err);
+    console.error("[Finn save] fetch to Supabase threw:", err);
   }
 }
 
