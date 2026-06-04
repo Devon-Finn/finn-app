@@ -48,7 +48,9 @@ src="https://www.facebook.com/tr?id=1501463388385490&ev=PageView&noscript=1"/></
   --steel: #c2d4de;
   --steel-light: #eaf2f6;
   --warm: #c4956a;
-  --warm-light: #fdf6ee;
+  --warm-deep: #a8703f;
+  --warm-light: #fbeede;
+  --bridge-bg: #eef0ec;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -123,9 +125,15 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
 .output-section-body p { margin-bottom: 16px; }
 .output-section-body p:last-child { margin-bottom: 0; }
 .output-section-body strong { color: var(--dark); font-weight: 600; }
-.gap-card { background: var(--warm-light); border-left: 3px solid var(--warm); border-radius: 0 6px 6px 0; padding: 16px 20px; margin-bottom: 12px; font-size: 15px; font-weight: 400; line-height: 1.85; color: var(--mid); }
-.section-intro { font-size: 15px; font-weight: 400; line-height: 1.9; color: var(--mid); margin-bottom: 20px; }
-.section-closing { font-size: 15px; font-weight: 400; line-height: 1.9; color: var(--mid); margin-top: 20px; }
+.gap-card { background: var(--warm-light); border: 1.5px solid var(--warm); border-left: 5px solid var(--warm); border-radius: 8px; padding: 18px 20px; margin-bottom: 20px; font-size: 15px; font-weight: 400; line-height: 1.85; color: #4a4843; }
+.gap-card > strong:first-child { display: block; color: var(--warm-deep); font-weight: 600; font-size: 14px; letter-spacing: -0.01em; margin-bottom: 6px; font-style: normal; }
+.gap-card strong { color: var(--warm-deep); font-weight: 600; }
+.gap-figure { font-weight: 600; color: var(--accent); }
+.gap-bridge { background: var(--bridge-bg); border-radius: 8px; padding: 16px 20px; font-size: 13px; line-height: 1.7; color: var(--mid); margin-top: 8px; margin-bottom: 0; }
+.gap-bridge strong { font-weight: 600; color: var(--accent); }
+.fraunces-accent { font-family: 'Fraunces', serif; font-style: italic; font-weight: 400; color: var(--steel); }
+.section-intro { font-size: 15px; font-style: italic; color: var(--light); line-height: 1.8; margin-bottom: 24px; }
+.section-closing { font-size: 15px; font-weight: 400; line-height: 1.8; color: var(--mid); margin-top: 24px; }
 
 .output-divider { height: 1px; background: var(--rule); margin: 40px 0; }
 
@@ -252,48 +260,6 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
     </div>
     <div id="output-sections"></div>
 
-    <div class="clarity-section">
-      <span class="clarity-eyebrow">The Clarity Session</span>
-      <div class="clarity-heading">What the Finn Clarity Session gives you</div>
-      <div class="clarity-grid">
-        <div class="clarity-item">
-          <span class="clarity-label">YOUR NUMBERS</span>
-          <div class="clarity-title">Your real numbers. Not estimates.</div>
-          <div class="clarity-body">The free snapshot gives you a picture. The Clarity Session fills it in with actual figures. Your exact monthly position — what's coming in, what's going out, and what's genuinely left over. Most people are surprised by this number.</div>
-        </div>
-        <div class="clarity-item">
-          <span class="clarity-label">YOUR BUDGET</span>
-          <div class="clarity-title">Where your money actually goes.</div>
-          <div class="clarity-body">Using your actual bank statements, Finn breaks down your spending by category — groceries, subscriptions, bills, dining, kids activities, everything. Most households have never seen this laid out clearly. Most are surprised by what they find.</div>
-        </div>
-        <div class="clarity-item">
-          <span class="clarity-label">YOUR HOME LOAN</span>
-          <div class="clarity-title">Your home loan. Properly understood.</div>
-          <div class="clarity-body">Finn walks you through your loan structure step by step — your actual rate, how it compares to the market, and how your savings are positioned relative to your loan. If there's money being lost here — and there usually is — you'll see exactly how much and why.</div>
-        </div>
-        <div class="clarity-item">
-          <span class="clarity-label">YOUR SUPER</span>
-          <div class="clarity-title">Your super. Benchmarked honestly.</div>
-          <div class="clarity-body">How much you actually have. What it's costing you in fees. How it compares to other Australians your age and gender. And what the gap looks like between where you are now and a comfortable retirement.</div>
-        </div>
-        <div class="clarity-item">
-          <span class="clarity-label">YOUR PROTECTION</span>
-          <div class="clarity-title">Your protection picture. Clearly laid out.</div>
-          <div class="clarity-body">What cover you actually have if income stopped. Whether your family is legally protected. And your emergency fund runway in months — a number most households have never calculated.</div>
-        </div>
-        <div class="clarity-item">
-          <span class="clarity-label">YOUR TAX POSITION</span>
-          <div class="clarity-title">Tax considerations worth knowing.</div>
-          <div class="clarity-body">For many households there are straightforward tax opportunities that are consistently overlooked — particularly around superannuation contributions and income structure. Finn flags what's worth exploring with an accountant or advisor. Not advice — just clarity on what questions to ask.</div>
-        </div>
-        <div class="clarity-item">
-          <span class="clarity-label">WHAT COMES NEXT</span>
-          <div class="clarity-title">What people in your situation typically look at first.</div>
-          <div class="clarity-body">Not advice. A plain English summary of what households with your profile typically focus on — and which professional is usually most useful for each area. So when you do talk to someone, you know exactly what to ask.</div>
-        </div>
-      </div>
-    </div>
-
     <div class="output-divider" id="email-divider" style="display:none"></div>
     <div class="email-capture" id="email-capture">
       <div class="email-capture-title">Want a copy sent to your inbox?</div>
@@ -308,14 +274,10 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
 
     <div class="output-divider"></div>
     <div class="cta-box">
-      <div class="cta-eyebrow">The Clarity Session</div>
+      <div class="cta-eyebrow">Your next step — The Clarity Session</div>
       <div class="cta-title" id="cta-title">See your complete financial picture.</div>
-      <div class="cta-body">The Clarity Session walks you through your complete financial picture — real numbers, not estimates. Finn guides you step by step, tells you exactly where to find every number you need, and explains what it all means. In one sitting. No agenda beyond helping you see clearly.</div>
+      <div class="cta-body">The Clarity Session walks you through your complete financial picture — real numbers, not estimates. Finn guides you step by step, tells you exactly where to find every number you need, and explains what it all means. In one sitting.</div>
       <a href="/ready" class="btn-cta" onclick="fbq('track', 'InitiateCheckout')">Join the waitlist — $97 at launch →</a>
-    </div>
-    <div class="subscription-note">
-      <div class="sub-title">And once you have your picture — Finn keeps it current.</div>
-      <div class="sub-body">On the days you're feeling anxious, making a big decision, or just want to know where you stand — your picture is there. Updated. Clear. Ready. That's what the Finn subscription is. Not a product. A financial home base.</div>
     </div>
     <div class="legal">This session is for general financial education and organisational purposes only. It does not constitute personal financial advice. Any cost estimates are based on general patterns observed in Australian households and do not reflect your specific circumstances. Finn is not a licensed financial advisor, mortgage broker, or financial planner. Before making any financial decisions, please seek advice from a qualified professional. meetfinn.com.au<br><br><a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="/terms">Terms of Use</a></div>
   </div>
@@ -578,7 +540,7 @@ First, identify all gaps that genuinely apply to their answers using the criteri
 To choose the three: lead with the gap(s) most connected to what the person said matters most. Use their 'aspiration' answer and their 'feeling' answer. If they signalled family security, protection, or worry about something happening — lead with the protection or estate gap even if it's not the largest dollar figure. The goal is the person feeling seen, not audited. Fill the remaining card slots with the highest financial-impact gaps (largest typical dollar cost).
 
 FULL CARD FORMAT (for the chosen 3):
-For each selected gap write 3-4 sentences as flowing prose — what the gap is, why it matters, what it typically costs, and end with a fixable note. Use warm, honest language — not alarming.
+Begin each card with a **bold title sentence** — a short, direct statement of the gap (e.g. **Your savings are working against you.**). Then write 3-4 sentences as flowing prose — what the gap is, why it matters, what it typically costs (use **$X,XXX** bold for the dollar figure), and end with a fixable note. Use warm, honest language — not alarming.
 
 CHECK EACH GAP (apply criteria, then rank and select):
 
@@ -869,16 +831,30 @@ function renderOutput(text) {
   const s3Match = text.match(/===SECTION THREE===([\s\S]*?)(?====CONVERSION===|$)/);
   const convMatch = text.match(/===CONVERSION===([\s\S]*?)$/);
 
-  // Convert **bold** and *italic* markdown to HTML (entities escaped first)
+  // Inject Fraunces italic accent on one word in a heading
+  function applyAccent(text, word) {
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const escaped = esc(text);
+    const re = new RegExp(`(${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'i');
+    return escaped.replace(re, '<span class="fraunces-accent">$1</span>');
+  }
+
+  // Convert markdown to HTML — entities first, then figure emphasis, then bold/italic
   function toHTML(str) {
-    return str
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const esc = str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const withFigs = esc.replace(
+      /(\$[\d,]+(?:[–\-][\d,]+)?(?:\s+(?:per|a)\s+\w+)?)/g,
+      '<span class="gap-figure">$1</span>'
+    );
+    return withFigs
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*([^*\n]+?)\*/g, '<em>$1</em>');
   }
 
   function extractParts(content, fallbackHeading) {
-    const lines = content.trim().split('\n');
+    // Strip --- horizontal rules the AI sometimes emits
+    const cleaned = content.replace(/^-{3,}\s*$/gm, '');
+    const lines = cleaned.trim().split('\n');
     let heading = null;
     let startIdx = 0;
     for (let i = 0; i < lines.length; i++) {
@@ -890,21 +866,16 @@ function renderOutput(text) {
         break;
       }
     }
-    // Preserve paragraph boundaries by not stripping blank lines before splitting
     const bodyText = lines.slice(startIdx).join('\n');
     const paras = bodyText.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
     const effective = heading || fallbackHeading || '';
     if (effective && paras.length > 0) {
       const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
       const normEff = norm(effective);
-      const normPara = norm(paras[0]);
-      // Remove any paragraph(s) that are exactly the heading text
       while (paras.length > 0 && norm(paras[0]) === normEff) {
         paras.shift();
       }
-      // After removing exact-match paragraphs, also trim heading prefix from the first paragraph
       if (paras.length > 0 && norm(paras[0]).startsWith(normEff)) {
-        // Walk character-by-character to find where the heading ends in the original string
         let srcIdx = 0, normIdx = 0;
         while (srcIdx < paras[0].length && normIdx < normEff.length) {
           if (/[a-z0-9]/i.test(paras[0][srcIdx])) normIdx++;
@@ -923,6 +894,9 @@ function renderOutput(text) {
     sectionsEl.appendChild(d);
   }
 
+  // Accent words per section (one word each, italic Fraunces steel)
+  const ACCENT_WORDS = { '01': 'alone', '02': 'picture', '03': 'worth' };
+
   function renderStandard(content, label, fallbackHeading) {
     if (!content) return;
     const { heading, paras } = extractParts(content, fallbackHeading);
@@ -936,7 +910,7 @@ function renderOutput(text) {
 
     const h = document.createElement('div');
     h.className = 'output-section-heading';
-    h.textContent = heading || fallbackHeading;
+    h.innerHTML = applyAccent(heading || fallbackHeading, ACCENT_WORDS[label] || '');
     section.appendChild(h);
 
     const body = document.createElement('div');
@@ -964,7 +938,7 @@ function renderOutput(text) {
 
     const h = document.createElement('div');
     h.className = 'output-section-heading';
-    h.textContent = heading || fallback;
+    h.innerHTML = applyAccent(heading || fallback, 'worth');
     section.appendChild(h);
 
     if (paras.length <= 2) {
@@ -977,22 +951,48 @@ function renderOutput(text) {
       });
       section.appendChild(body);
     } else {
+      // Intro — first paragraph
       const intro = document.createElement('p');
       intro.className = 'section-intro';
       intro.innerHTML = toHTML(paras[0]);
       section.appendChild(intro);
 
-      paras.slice(1, -1).forEach(p => {
+      // Middle paragraphs — gap cards (up to 3) and bridge line
+      // Bridge detection: paragraph mentioning "clarity session" after ≥1 card = bridge
+      const middle = paras.slice(1, -1);
+      const closing = paras[paras.length - 1];
+      const gapCards = [];
+      const bridgeLines = [];
+
+      for (const p of middle) {
+        const lower = p.toLowerCase();
+        if (lower.includes('clarity session') && gapCards.length >= 1) {
+          bridgeLines.push(p);
+        } else if (gapCards.length < 3) {
+          gapCards.push(p);
+        } else {
+          bridgeLines.push(p);
+        }
+      }
+
+      gapCards.forEach(p => {
         const card = document.createElement('div');
         card.className = 'gap-card';
         card.innerHTML = toHTML(p);
         section.appendChild(card);
       });
 
-      const closing = document.createElement('p');
-      closing.className = 'section-closing';
-      closing.innerHTML = toHTML(paras[paras.length - 1]);
-      section.appendChild(closing);
+      bridgeLines.forEach(p => {
+        const bridge = document.createElement('div');
+        bridge.className = 'gap-bridge';
+        bridge.innerHTML = toHTML(p);
+        section.appendChild(bridge);
+      });
+
+      const closingEl = document.createElement('p');
+      closingEl.className = 'section-closing';
+      closingEl.innerHTML = toHTML(closing);
+      section.appendChild(closingEl);
     }
 
     sectionsEl.appendChild(section);
@@ -1021,7 +1021,7 @@ function renderOutput(text) {
   if (convMatch) {
     const convText = convMatch[1].trim().split('\n').filter(l => l.trim()).join(' ');
     const ctaBody = document.querySelector('.cta-body');
-    if (ctaBody && convText) ctaBody.textContent = convText + ' ' + ctaBody.textContent;
+    if (ctaBody && convText) ctaBody.textContent = convText;
   }
 
   document.getElementById('email-capture').classList.add('show');
