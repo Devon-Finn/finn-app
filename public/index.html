@@ -144,6 +144,11 @@ nav {
 .step-title { font-size: 15px; font-weight: 600; color: var(--dark); margin-bottom: 10px; letter-spacing: -0.01em; }
 .step-body { font-size: 13px; font-weight: 400; line-height: 1.75; color: var(--mid); }
 .step-price { font-family: 'Jost', sans-serif; font-size: 18px; font-weight: 600; color: var(--accent); margin-top: 12px; letter-spacing: -0.01em; }
+/* Journey: the free first step reads as the clear primary action; steps 2–4 are the journey ahead */
+.journey-step.primary .step-num { color: var(--accent); }
+.journey-step.primary .step-tag { color: var(--white); background: var(--accent); opacity: 1; padding: 4px 10px; border-radius: 3px; display: inline-block; letter-spacing: 0.12em; }
+.journey-cta { display: inline-block; margin-top: 14px; padding: 10px 20px; background: var(--accent); color: var(--white); font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 500; letter-spacing: 0.02em; text-decoration: none; border-radius: 3px; transition: opacity 0.15s ease; }
+.journey-cta:hover { opacity: 0.85; }
 
 /* PROBLEM */
 .section-problem { padding: 100px 60px; background: var(--bg); border-top: none; }
@@ -418,33 +423,33 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
       <p>Finn meets you where you are — from the first free snapshot through to a complete financial picture and the professionals who can help you act on it. No pressure. No agenda. You decide what's next at every step.</p>
     </div>
     <div class="journey-steps">
-      <div class="journey-step">
+      <div class="journey-step primary">
         <div class="step-num">01</div>
-        <span class="step-tag">Free</span>
+        <span class="step-tag">Start here · Free</span>
         <div class="step-title">Your free snapshot</div>
         <div class="step-body">Eight minutes. Nineteen questions. Finn gives you an honest picture of where your household stands — and what the gaps in your knowledge are likely costing you.</div>
-        <div class="step-price">Free →</div>
+        <a href="/snapshot" class="journey-cta">Start free →</a>
       </div>
       <div class="journey-step">
         <div class="step-num">02</div>
         <span class="step-tag">$97 one-off</span>
-        <div class="step-title">Your complete picture</div>
-        <div class="step-body">Real numbers. Your actual monthly position. Your loan structure. Your super compared to others your age. Your complete financial life, explained the way a knowledgeable friend would — in one sitting.</div>
+        <div class="step-title">The Clarity Session</div>
+        <div class="step-body">Your complete picture. Real numbers — your actual monthly position, your loan structure, your super compared to others your age — your whole financial life, explained the way a knowledgeable friend would. You go at your own pace and you can't get it wrong; Finn keeps you on track with a gentle nudge whenever you need one. Most people get there over a couple of short sittings.</div>
         <div class="step-price">$97</div>
       </div>
       <div class="journey-step">
         <div class="step-num">03</div>
         <span class="step-tag">When you're ready</span>
         <div class="step-title">The right professional</div>
-        <div class="step-body">When you're ready to act — Finn connects you with independently vetted professionals. Brokers, advisors, accountants, and planners who have no interest in selling you anything you don't need. Referral fees disclosed transparently.</div>
+        <div class="step-body">When you're ready to act — Finn connects you with professionals it chooses itself. They don't apply and they can't buy their way onto the list. Finn picks every one — only the brokers, advisors, accountants, and planners we'd send our own family to. Referral fees disclosed transparently.</div>
         <div class="step-price">Your choice</div>
       </div>
       <div class="journey-step">
         <div class="step-num">04</div>
-        <span class="step-tag">$19–25/month</span>
+        <span class="step-tag">$19/month</span>
         <div class="step-title">Your financial home base</div>
         <div class="step-body">The place you go on any day — good or bad — and know exactly where you stand. Upload documents as they arrive. Finn keeps your picture current. Available any time you need it.</div>
-        <div class="step-price">$19–25/mo</div>
+        <div class="step-price">$19/mo</div>
       </div>
     </div>
   </div>
@@ -456,15 +461,15 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
     <div class="section-header">
       <div>
         <span class="section-eyebrow">How Finn works</span>
-        <h2>Questions. Not a spreadsheet.</h2>
+        <h2>A guided conversation. Not a spreadsheet.</h2>
       </div>
-      <p>Finn doesn't ask you to fill in a spreadsheet or know your numbers off the top of your head. It asks you questions without terms you'd need to Google — and when you don't know something, it tells you exactly where to find it.</p>
+      <p>The free snapshot is a handful of quick, guided questions — no jargon, nothing to look up. The Clarity Session goes deeper: a warm, guided conversation where Finn walks you through everything step by step, and when you don't know a number, tells you exactly where to find it.</p>
     </div>
     <div class="how-steps">
       <div class="how-step">
         <div class="how-num">01</div>
-        <div class="how-title">Finn asks the questions</div>
-        <div class="how-body">A warm, guided conversation — one question at a time. No jargon. No judgment. When you don't know a number, Finn tells you exactly where to find it — step by step, bank by bank.</div>
+        <div class="how-title">Finn walks you through it</div>
+        <div class="how-body">A warm, guided conversation — one step at a time, never a wall of questions. No jargon. No judgment. When you don't know a number, Finn tells you exactly where to find it — step by step, bank by bank.</div>
       </div>
       <div class="how-step">
         <div class="how-num">02</div>
@@ -490,44 +495,12 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
         <div class="ind-body">Finn organises and clarifies. It never tells you what to do with your money. That decision stays with you — and the professionals you choose.</div>
       </div>
       <div class="ind-item">
-        <div class="ind-title">No one pushing product</div>
-        <div class="ind-body">Finn doesn't sell financial products and doesn't push you toward anything. Its job is to help you see clearly first. The hardest part has never been finding a professional — it's knowing which ones you can trust. When you're ready, Finn introduces you to someone genuine. Your call, in your own time.</div>
+        <div class="ind-title">Nothing to sell</div>
+        <div class="ind-body">Finn isn't a bank, a broker, or a fund — there's no product on the other side of this. So there's no reason to steer you toward one option over another. The picture you get is simply yours, not a step in someone's funnel.</div>
       </div>
       <div class="ind-item">
-        <div class="ind-title">Not a bank</div>
-        <div class="ind-body">No products. No hidden agenda. No reason to steer you anywhere. Finn's only job is to help you see your own picture clearly.</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- SUBSCRIPTION -->
-<section class="section-subscription">
-  <div class="section-inner">
-    <div class="sub-grid">
-      <div class="sub-left">
-        <span class="section-eyebrow">The Finn subscription</span>
-        <h2>Not a product. A financial home base.</h2>
-        <p>Once you have your picture — Finn keeps it current. Documents roll in — bank statements, retirement fund statements, loan notices, insurance renewals. Upload them and Finn updates your picture automatically.</p>
-        <p>But the deepest value is simpler than that. It's the place you go on any day — good or bad — and know where you stand.</p>
-      </div>
-      <div class="sub-right">
-        <div class="sub-moment">
-          <div class="sub-moment-title">The 2am anxiety moment</div>
-          <div class="sub-moment-body">Something financial is worrying you. You open Finn. You see your picture. The anxiety settles.</div>
-        </div>
-        <div class="sub-moment">
-          <div class="sub-moment-title">The news trigger moment</div>
-          <div class="sub-moment-body">Interest rates move. You open Finn to see what it means for your specific situation — not households in general.</div>
-        </div>
-        <div class="sub-moment">
-          <div class="sub-moment-title">The decision moment</div>
-          <div class="sub-moment-body">You're about to make a financial decision. You open Finn to make sure you're working from an accurate picture.</div>
-        </div>
-        <div class="sub-moment">
-          <div class="sub-moment-title">The professional meeting</div>
-          <div class="sub-moment-body">You're seeing your accountant next week. You open Finn to check your picture is current and you know what to ask.</div>
-        </div>
+        <div class="ind-title">Paid by you, not by them</div>
+        <div class="ind-body">Finn earns from you — never from commissions on what you buy. So Finn's interests and yours stay on the same side. And when Finn introduces a professional, any referral fee is disclosed up front.</div>
       </div>
     </div>
   </div>
@@ -554,6 +527,38 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
         <div class="thankyou-text">We'll be in touch when the Clarity Session launches. Founding members get first access and a special rate.</div>
       </div>
       <p class="form-note">Founding members get first access and a special rate. No spam.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SUBSCRIPTION — imagine where this goes -->
+<section class="section-subscription">
+  <div class="section-inner">
+    <div class="sub-grid">
+      <div class="sub-left">
+        <span class="section-eyebrow">Where this goes</span>
+        <h2>Imagine money never being the thing that keeps you up at night.</h2>
+        <p>Picture a year from now. Your whole financial life sits in one place, quietly kept current — bank statements, super, loan notices, insurance renewals all folded in as they arrive. Nothing to dig up. Nothing hanging over you.</p>
+        <p>This is the life on the other side of clarity. The moments that used to knot your stomach become simple — because you can always see exactly where you stand.</p>
+      </div>
+      <div class="sub-right">
+        <div class="sub-moment">
+          <div class="sub-moment-title">The 2am moment</div>
+          <div class="sub-moment-body">Something financial is gnawing at you. You glance at your picture — and the worry quietly settles.</div>
+        </div>
+        <div class="sub-moment">
+          <div class="sub-moment-title">The news moment</div>
+          <div class="sub-moment-body">Interest rates move. You already know what it means for you specifically — not for households in general.</div>
+        </div>
+        <div class="sub-moment">
+          <div class="sub-moment-title">The decision moment</div>
+          <div class="sub-moment-body">A big choice lands in your lap. You make it from an accurate picture, not a guess.</div>
+        </div>
+        <div class="sub-moment">
+          <div class="sub-moment-title">The meeting moment</div>
+          <div class="sub-moment-body">You're seeing your accountant next week. You walk in current, calm, and clear on exactly what to ask.</div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
