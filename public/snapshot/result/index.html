@@ -87,14 +87,16 @@ main { max-width: 680px; margin: 0 auto; padding: 104px 24px 80px; }
 .output-section-body p { margin-bottom: 16px; }
 .output-section-body p:last-child { margin-bottom: 0; }
 .output-section-body strong { color: var(--dark); font-weight: 600; }
-.gap-card { background: var(--warm-light); border: 1.5px solid var(--warm); border-left: 5px solid var(--warm); border-radius: 8px; padding: 18px 20px; margin-bottom: 20px; font-size: 15px; font-weight: 400; line-height: 1.85; color: #4a4843; }
-.gap-card > strong:first-child { display: block; color: var(--warm-deep); font-weight: 600; font-size: 14px; letter-spacing: -0.01em; margin-bottom: 6px; font-style: normal; }
-.gap-card strong { color: var(--warm-deep); font-weight: 600; }
+.gap-card { background: var(--warm-light); border: 1.5px solid var(--warm); border-left: 5px solid var(--warm); border-radius: 8px; padding: 20px 22px; margin-bottom: 24px; }
+.gap-card-heading { color: var(--warm-deep); font-weight: 600; font-size: 16px; line-height: 1.35; letter-spacing: -0.01em; margin-bottom: 8px; }
+.gap-card-body { font-size: 15px; font-weight: 400; line-height: 1.85; color: #4a4843; }
+.gap-card-body strong { color: var(--warm-deep); font-weight: 600; }
 .gap-figure { font-weight: 600; color: var(--accent); }
-.gap-bridge { background: var(--bridge-bg); border-radius: 8px; padding: 16px 20px; font-size: 13px; line-height: 1.7; color: var(--mid); margin-top: 8px; margin-bottom: 0; }
+.gap-bridge { background: var(--bridge-bg); border: 1px solid #d8dcd5; border-radius: 8px; padding: 16px 20px; font-size: 14px; line-height: 1.7; color: var(--mid); margin-top: 24px; margin-bottom: 0; }
 .gap-bridge strong { font-weight: 600; color: var(--accent); }
-.fraunces-accent { font-family: 'Fraunces', serif; font-style: italic; font-weight: 400; color: var(--steel); }
-.section-intro { font-size: 15px; font-style: italic; color: var(--light); line-height: 1.8; margin-bottom: 24px; }
+.fraunces-accent { font-family: 'Fraunces', serif; font-style: italic; font-weight: 400; color: var(--accent); }
+.fraunces-accent.on-forest { color: var(--steel); }
+.section-intro { font-size: 15px; font-style: italic; color: var(--mid); line-height: 1.8; margin-bottom: 24px; }
 .section-closing { font-size: 15px; font-weight: 400; line-height: 1.8; color: var(--mid); margin-top: 24px; }
 .output-divider { height: 1px; background: var(--rule); margin: 40px 0; }
 
@@ -113,7 +115,11 @@ main { max-width: 680px; margin: 0 auto; padding: 104px 24px 80px; }
 .cta-box { padding: 40px; background: var(--accent); border-radius: 6px; }
 .cta-eyebrow { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--steel); margin-bottom: 16px; font-weight: 500; }
 .cta-title { font-family: 'Jost', sans-serif; font-size: 26px; font-weight: 700; color: var(--bg); margin-bottom: 16px; line-height: 1.15; letter-spacing: -0.02em; }
-.cta-body { font-size: 14px; font-weight: 400; color: rgba(245,241,235,0.7); line-height: 1.8; margin-bottom: 32px; }
+.cta-body { font-size: 14px; font-weight: 400; color: rgba(245,241,235,0.7); line-height: 1.8; margin-bottom: 24px; }
+.cta-points { list-style: none; margin: 0 0 32px; padding: 0; }
+.cta-points li { position: relative; padding-left: 22px; font-size: 14px; line-height: 1.55; color: rgba(245,241,235,0.88); margin-bottom: 12px; }
+.cta-points li:last-child { margin-bottom: 0; }
+.cta-points li::before { content: ''; position: absolute; left: 0; top: 8px; width: 6px; height: 6px; border-radius: 50%; background: var(--steel); }
 .btn-cta { display: inline-block; padding: 14px 48px; background: var(--bg); color: var(--accent); font-family: 'Jost', sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 0.02em; text-decoration: none; border-radius: 3px; transition: opacity 0.15s; }
 .btn-cta:hover { opacity: 0.9; }
 
@@ -199,6 +205,12 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
       <div class="cta-eyebrow">Your next step — The Clarity Session</div>
       <div class="cta-title" id="cta-title">See your complete financial picture.</div>
       <div class="cta-body" id="cta-body">The Clarity Session walks you through your complete financial picture — real numbers, not estimates. Finn guides you step by step, tells you exactly where to find every number you need, and explains what it all means. In one sitting.</div>
+      <ul class="cta-points">
+        <li>A guided conversation — Finn walks you through it, step by step</li>
+        <li>No spreadsheets, no homework, no figuring it out alone</li>
+        <li>When you don't know a number, Finn tells you exactly where to find it</li>
+        <li>Your whole picture, built with you in one sitting — and yours to keep</li>
+      </ul>
       <a href="/ready" class="btn-cta" onclick="fbq('track', 'InitiateCheckout')">Join the waitlist — $97 at launch →</a>
     </div>
 
@@ -291,12 +303,13 @@ function renderOutput(text, answers) {
   const s3Match = text.match(/===SECTION THREE===([\s\S]*?)(?====CONVERSION===|$)/);
   const convMatch = text.match(/===CONVERSION===([\s\S]*?)$/);
 
-  function applyAccent(text, word) {
+  function applyAccent(text, word, extraClass) {
     const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const escaped = esc(text);
     if (!word) return escaped;
+    const cls = 'fraunces-accent' + (extraClass ? ' ' + extraClass : '');
     const re = new RegExp(`(${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'i');
-    return escaped.replace(re, '<span class="fraunces-accent">$1</span>');
+    return escaped.replace(re, `<span class="${cls}">$1</span>`);
   }
 
   function toHTML(str) {
@@ -381,10 +394,37 @@ function renderOutput(text, answers) {
     sectionsEl.appendChild(section);
   }
 
+  function buildGapCard(text) {
+    const card = document.createElement('div');
+    card.className = 'gap-card';
+    const trimmed = text.replace(/\s*\n\s*/g, ' ').trim();
+    const titleMatch = trimmed.match(/^\*\*(.+?)\*\*\s*/);
+    let bodyText = trimmed;
+    if (titleMatch) {
+      const h = document.createElement('div');
+      h.className = 'gap-card-heading';
+      h.innerHTML = toHTML(titleMatch[1].trim());
+      card.appendChild(h);
+      bodyText = trimmed.slice(titleMatch[0].length).trim();
+    }
+    if (bodyText) {
+      const b = document.createElement('div');
+      b.className = 'gap-card-body';
+      b.innerHTML = toHTML(bodyText);
+      card.appendChild(b);
+    }
+    return card;
+  }
+
   function renderGaps(content) {
     if (!content) return;
     const fallback = "What's worth looking at.";
-    const { heading, paras } = extractParts(content, fallback);
+    const cleaned = content.replace(/^-{3,}\s*$/gm, '');
+
+    let heading = fallback;
+    const hMatch = cleaned.match(/^\s*(?:Heading:\s*|#+\s*)(.+)$/m);
+    if (hMatch) heading = hMatch[1].trim();
+
     const section = document.createElement('div');
     section.className = 'output-section';
 
@@ -398,7 +438,16 @@ function renderOutput(text, answers) {
     h.innerHTML = applyAccent(heading || fallback, 'worth');
     section.appendChild(h);
 
-    if (paras.length <= 2) {
+    const blocks = [];
+    const re = /\[(INTRO|GAP|MORE|CLOSE)\]([\s\S]*?)(?=\[(?:INTRO|GAP|MORE|CLOSE)\]|$)/g;
+    let m;
+    while ((m = re.exec(cleaned)) !== null) {
+      const t = m[2].trim();
+      if (t) blocks.push({ type: m[1], text: t });
+    }
+
+    if (blocks.length === 0) {
+      const { paras } = extractParts(cleaned, fallback);
       const body = document.createElement('div');
       body.className = 'output-section-body';
       paras.forEach(p => {
@@ -407,47 +456,32 @@ function renderOutput(text, answers) {
         body.appendChild(el);
       });
       section.appendChild(body);
-    } else {
-      const intro = document.createElement('p');
-      intro.className = 'section-intro';
-      intro.innerHTML = toHTML(paras[0]);
-      section.appendChild(intro);
+      sectionsEl.appendChild(section);
+      return;
+    }
 
-      const middle = paras.slice(1, -1);
-      const closing = paras[paras.length - 1];
-      const gapCards = [];
-      const bridgeLines = [];
-
-      for (const p of middle) {
-        const lower = p.toLowerCase();
-        if (lower.includes('clarity session') && gapCards.length >= 1) {
-          bridgeLines.push(p);
-        } else if (gapCards.length < 3) {
-          gapCards.push(p);
-        } else {
-          bridgeLines.push(p);
-        }
-      }
-
-      gapCards.forEach(p => {
-        const card = document.createElement('div');
-        card.className = 'gap-card';
-        card.innerHTML = toHTML(p);
-        section.appendChild(card);
-      });
-
-      bridgeLines.forEach(p => {
+    let gapCount = 0;
+    blocks.forEach(({ type, text }) => {
+      if (type === 'INTRO') {
+        const intro = document.createElement('p');
+        intro.className = 'section-intro';
+        intro.innerHTML = toHTML(text);
+        section.appendChild(intro);
+      } else if (type === 'GAP' && gapCount < 3) {
+        section.appendChild(buildGapCard(text));
+        gapCount++;
+      } else if (type === 'MORE') {
         const bridge = document.createElement('div');
         bridge.className = 'gap-bridge';
-        bridge.innerHTML = toHTML(p);
+        bridge.innerHTML = toHTML(text.replace(/\s*\n\s*/g, ' ').trim());
         section.appendChild(bridge);
-      });
-
-      const closingEl = document.createElement('p');
-      closingEl.className = 'section-closing';
-      closingEl.innerHTML = toHTML(closing);
-      section.appendChild(closingEl);
-    }
+      } else if (type === 'CLOSE') {
+        const closingEl = document.createElement('p');
+        closingEl.className = 'section-closing';
+        closingEl.innerHTML = toHTML(text.replace(/\s*\n\s*/g, ' ').trim());
+        section.appendChild(closingEl);
+      }
+    });
 
     sectionsEl.appendChild(section);
   }
@@ -468,13 +502,14 @@ function renderOutput(text, answers) {
   // Personalise CTA title from aspiration answer
   const asp = (answers && answers['aspiration']) ? answers['aspiration'] : '';
   let ctaTitle = 'See your complete financial picture.';
-  if (asp.includes('Peace of mind') || asp.includes('peace')) ctaTitle = 'Your peace of mind starts with knowing exactly where you stand.';
-  else if (asp.includes('ahead') || asp.includes('Getting ahead')) ctaTitle = 'Getting ahead starts with a clear picture of where you actually are.';
-  else if (asp.includes('Confidence') || asp.includes('confidence')) ctaTitle = 'Confidence comes from understanding your complete picture.';
-  else if (asp.includes('Security') || asp.includes('security')) ctaTitle = 'Security starts with knowing exactly what you have — and what you don\'t.';
-  else if (asp.includes('control') || asp.includes('Control')) ctaTitle = 'Being in control starts with seeing your complete financial picture clearly.';
-  else if (asp.includes('start')) ctaTitle = 'The best starting point is knowing exactly where you stand.';
-  document.getElementById('cta-title').textContent = ctaTitle;
+  let ctaAccent = 'complete';
+  if (asp.includes('Peace of mind') || asp.includes('peace')) { ctaTitle = 'Your peace of mind starts with knowing exactly where you stand.'; ctaAccent = 'peace'; }
+  else if (asp.includes('ahead') || asp.includes('Getting ahead')) { ctaTitle = 'Getting ahead starts with a clear picture of where you actually are.'; ctaAccent = 'ahead'; }
+  else if (asp.includes('Confidence') || asp.includes('confidence')) { ctaTitle = 'Confidence comes from understanding your complete picture.'; ctaAccent = 'Confidence'; }
+  else if (asp.includes('Security') || asp.includes('security')) { ctaTitle = 'Security starts with knowing exactly what you have — and what you don\'t.'; ctaAccent = 'Security'; }
+  else if (asp.includes('control') || asp.includes('Control')) { ctaTitle = 'Being in control starts with seeing your complete financial picture clearly.'; ctaAccent = 'control'; }
+  else if (asp.includes('start')) { ctaTitle = 'The best starting point is knowing exactly where you stand.'; ctaAccent = 'starting'; }
+  document.getElementById('cta-title').innerHTML = applyAccent(ctaTitle, ctaAccent, 'on-forest');
 
   // Add divider before output sections' trailing content
   const trailingDivider = document.createElement('div');
