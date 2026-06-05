@@ -800,6 +800,11 @@ async function generateOutput() {
     let fullText = '';
     let buffer = '';
 
+    // Progressive renderer: paints each section/card the moment it completes in
+    // the stream, fully-formed and styled — so the user watches the picture
+    // assemble instead of staring at the loading state until generation ends.
+    const stream = createStreamRenderer();
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -820,16 +825,19 @@ async function generateOutput() {
           fullText += event.delta.text;
         }
       }
+
+      // Paint any elements that became complete with this chunk (no-op until a
+      // boundary delimiter proves the next element is fully received).
+      stream.flush(fullText, false);
     }
 
     if (!fullText) throw new Error('Empty response from API');
     snapshotText = fullText;
 
-    stopLoadingCycle();
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('output').style.display = 'block';
-    renderOutput(fullText);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Final pass: paints the closing block + any trailing element, then
+    // personalises the CTA and reveals the email-capture box.
+    stream.flush(fullText, true);
+    finalizeOutput(fullText, answers);
 
   } catch (err) {
     stopLoadingCycle();
@@ -844,228 +852,309 @@ async function generateOutput() {
   }
 }
 
-function renderOutput(text) {
+// ─── Shared render helpers (module scope) ───────────────────────────────────
+// Used by both the progressive stream renderer and the final CTA pass.
+
+// Inject Fraunces italic accent on one word in a heading.
+// extraClass (e.g. 'on-forest') switches the accent colour for dark backgrounds.
+function applyAccent(text, word, extraClass) {
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const escaped = esc(text);
+  if (!word) return escaped;
+  const cls = 'fraunces-accent' + (extraClass ? ' ' + extraClass : '');
+  const re = new RegExp(`(${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'i');
+  return escaped.replace(re, `<span class="${cls}">$1</span>`);
+}
+
+// Convert markdown to HTML — entities first, then figure emphasis, then bold/italic
+function toHTML(str) {
+  const esc = str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const withFigs = esc.replace(
+    /(\$[\d,]+(?:[–\-][\d,]+)?(?:\s+(?:per|a)\s+\w+)?)/g,
+    '<span class="gap-figure">$1</span>'
+  );
+  return withFigs
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*\n]+?)\*/g, '<em>$1</em>');
+}
+
+function extractParts(content, fallbackHeading) {
+  // Strip --- horizontal rules the AI sometimes emits
+  const cleaned = content.replace(/^-{3,}\s*$/gm, '');
+  const lines = cleaned.trim().split('\n');
+  let heading = null;
+  let startIdx = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim()) {
+      if (lines[i].startsWith('Heading:') || lines[i].startsWith('#')) {
+        heading = lines[i].replace(/^Heading:\s*|^#+\s*/, '').trim();
+        startIdx = i + 1;
+      }
+      break;
+    }
+  }
+  const bodyText = lines.slice(startIdx).join('\n');
+  const paras = bodyText.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+  const effective = heading || fallbackHeading || '';
+  if (effective && paras.length > 0) {
+    const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normEff = norm(effective);
+    while (paras.length > 0 && norm(paras[0]) === normEff) {
+      paras.shift();
+    }
+    if (paras.length > 0 && norm(paras[0]).startsWith(normEff)) {
+      let srcIdx = 0, normIdx = 0;
+      while (srcIdx < paras[0].length && normIdx < normEff.length) {
+        if (/[a-z0-9]/i.test(paras[0][srcIdx])) normIdx++;
+        srcIdx++;
+      }
+      paras[0] = paras[0].slice(srcIdx).replace(/^[.,!? ]+/, '').trim();
+      if (!paras[0]) paras.shift();
+    }
+  }
+  return { heading, paras };
+}
+
+// Accent words per section (one word each, italic Fraunces)
+const ACCENT_WORDS = { '01': 'alone', '02': 'picture', '03': 'worth' };
+
+function makeDivider() {
+  const d = document.createElement('div');
+  d.className = 'output-divider';
+  return d;
+}
+
+// Build a complete Section One / Two element from its content. Returns the node;
+// caller appends it. Never appends partial content — only called once content
+// for the section is proven complete.
+function buildStandardSection(content, label, fallbackHeading) {
+  const { heading, paras } = extractParts(content, fallbackHeading);
+  const section = document.createElement('div');
+  section.className = 'output-section';
+
+  const lbl = document.createElement('span');
+  lbl.className = 'output-section-label';
+  lbl.textContent = label;
+  section.appendChild(lbl);
+
+  const h = document.createElement('div');
+  h.className = 'output-section-heading';
+  h.innerHTML = applyAccent(heading || fallbackHeading, ACCENT_WORDS[label] || '');
+  section.appendChild(h);
+
+  const body = document.createElement('div');
+  body.className = 'output-section-body';
+  paras.forEach(p => {
+    const el = document.createElement('p');
+    el.innerHTML = toHTML(p);
+    body.appendChild(el);
+  });
+  section.appendChild(body);
+  return section;
+}
+
+// Build the Section Three container (label + heading) without any body blocks.
+// Blocks are appended progressively as each one completes.
+function buildS3Container(content) {
+  const fallback = "What's worth looking at.";
+  const cleaned = content.replace(/^-{3,}\s*$/gm, '');
+  let heading = fallback;
+  const hMatch = cleaned.match(/^\s*(?:Heading:\s*|#+\s*)(.+)$/m);
+  if (hMatch) heading = hMatch[1].trim();
+
+  const section = document.createElement('div');
+  section.className = 'output-section';
+
+  const lbl = document.createElement('span');
+  lbl.className = 'output-section-label';
+  lbl.textContent = '03';
+  section.appendChild(lbl);
+
+  const h = document.createElement('div');
+  h.className = 'output-section-heading';
+  h.innerHTML = applyAccent(heading || fallback, 'worth');
+  section.appendChild(h);
+  return section;
+}
+
+// Build one warm gap card: leading **bold** sentence becomes the copper heading,
+// the remainder becomes the body. Internal line breaks collapse to flowing prose.
+function buildGapCard(text) {
+  const card = document.createElement('div');
+  card.className = 'gap-card';
+  const trimmed = text.replace(/\s*\n\s*/g, ' ').trim();
+  const titleMatch = trimmed.match(/^\*\*(.+?)\*\*\s*/);
+  let bodyText = trimmed;
+  if (titleMatch) {
+    const h = document.createElement('div');
+    h.className = 'gap-card-heading';
+    h.innerHTML = toHTML(titleMatch[1].trim());
+    card.appendChild(h);
+    bodyText = trimmed.slice(titleMatch[0].length).trim();
+  }
+  if (bodyText) {
+    const b = document.createElement('div');
+    b.className = 'gap-card-body';
+    b.innerHTML = toHTML(bodyText);
+    card.appendChild(b);
+  }
+  return card;
+}
+
+// Append one completed Section Three block (INTRO / GAP / MORE / CLOSE) to the
+// container. `state.gapCount` caps gap cards at 3, matching the original design.
+function appendGapBlock(section, type, text, state) {
+  if (type === 'INTRO') {
+    const intro = document.createElement('p');
+    intro.className = 'section-intro';
+    intro.innerHTML = toHTML(text);
+    section.appendChild(intro);
+  } else if (type === 'GAP') {
+    if (state.gapCount >= 3) return;
+    section.appendChild(buildGapCard(text));
+    state.gapCount++;
+  } else if (type === 'MORE') {
+    const bridge = document.createElement('div');
+    bridge.className = 'gap-bridge';
+    bridge.innerHTML = toHTML(text.replace(/\s*\n\s*/g, ' ').trim());
+    section.appendChild(bridge);
+  } else if (type === 'CLOSE') {
+    const closingEl = document.createElement('p');
+    closingEl.className = 'section-closing';
+    closingEl.innerHTML = toHTML(text.replace(/\s*\n\s*/g, ' ').trim());
+    section.appendChild(closingEl);
+  }
+}
+
+// ─── Progressive stream renderer ────────────────────────────────────────────
+// Paints each section / gap card the MOMENT it is proven complete in the stream
+// — never half-parsed. Completeness is proven only when the NEXT delimiter has
+// arrived (so we know the element is fully received). A `painted` Set keys each
+// element so it is built exactly once → no re-render, no flicker, no jumping.
+function createStreamRenderer() {
   const sectionsEl = document.getElementById('output-sections');
   sectionsEl.innerHTML = '';
+  const painted = new Set();
+  const s3State = { gapCount: 0, blocksPainted: 0 };
+  let s3El = null;
+  let revealed = false;
 
-  const s1Match = text.match(/===SECTION ONE===([\s\S]*?)(?====SECTION TWO===|$)/);
-  const s2Match = text.match(/===SECTION TWO===([\s\S]*?)(?====SECTION THREE===|$)/);
-  const s3Match = text.match(/===SECTION THREE===([\s\S]*?)(?====CONVERSION===|$)/);
-  const convMatch = text.match(/===CONVERSION===([\s\S]*?)$/);
-
-  // Inject Fraunces italic accent on one word in a heading.
-  // extraClass (e.g. 'on-forest') switches the accent colour for dark backgrounds.
-  function applyAccent(text, word, extraClass) {
-    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const escaped = esc(text);
-    if (!word) return escaped;
-    const cls = 'fraunces-accent' + (extraClass ? ' ' + extraClass : '');
-    const re = new RegExp(`(${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'i');
-    return escaped.replace(re, `<span class="${cls}">$1</span>`);
+  // Swap the loading state for the output panel once — on the first painted
+  // element. Subsequent paints append into the already-visible panel.
+  function reveal() {
+    if (revealed) return;
+    revealed = true;
+    stopLoadingCycle();
+    document.getElementById('loading').style.display = 'none';
+    const out = document.getElementById('output');
+    out.style.display = 'block';
+    out.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // Convert markdown to HTML — entities first, then figure emphasis, then bold/italic
-  function toHTML(str) {
-    const esc = str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const withFigs = esc.replace(
-      /(\$[\d,]+(?:[–\-][\d,]+)?(?:\s+(?:per|a)\s+\w+)?)/g,
-      '<span class="gap-figure">$1</span>'
-    );
-    return withFigs
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*([^*\n]+?)\*/g, '<em>$1</em>');
-  }
+  function flush(text, isDone) {
+    const hasS2 = text.includes('===SECTION TWO===');
+    const hasS3 = text.includes('===SECTION THREE===');
+    const hasConv = text.includes('===CONVERSION===');
 
-  function extractParts(content, fallbackHeading) {
-    // Strip --- horizontal rules the AI sometimes emits
-    const cleaned = content.replace(/^-{3,}\s*$/gm, '');
-    const lines = cleaned.trim().split('\n');
-    let heading = null;
-    let startIdx = 0;
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].trim()) {
-        if (lines[i].startsWith('Heading:') || lines[i].startsWith('#')) {
-          heading = lines[i].replace(/^Heading:\s*|^#+\s*/, '').trim();
-          startIdx = i + 1;
+    const s1Match = text.match(/===SECTION ONE===([\s\S]*?)(?====SECTION TWO===|$)/);
+    const s2Match = text.match(/===SECTION TWO===([\s\S]*?)(?====SECTION THREE===|$)/);
+    const s3Match = text.match(/===SECTION THREE===([\s\S]*?)(?====CONVERSION===|$)/);
+
+    // Section One — complete once the SECTION TWO delimiter proves it's done.
+    if (s1Match && !painted.has('s1') && (hasS2 || isDone) && s1Match[1].trim()) {
+      reveal();
+      sectionsEl.appendChild(buildStandardSection(s1Match[1], '01', "You're not alone."));
+      painted.add('s1');
+    }
+
+    // Section Two — complete once the SECTION THREE delimiter proves it's done.
+    if (s2Match && !painted.has('s2') && (hasS3 || isDone) && s2Match[1].trim()) {
+      reveal();
+      if (painted.has('s1')) sectionsEl.appendChild(makeDivider());
+      sectionsEl.appendChild(buildStandardSection(s2Match[1], '02', 'Your picture right now.'));
+      painted.add('s2');
+    }
+
+    // Section Three heading — paint once the first body marker (or end) proves
+    // the heading line is complete.
+    if (s3Match && !painted.has('s3-head') &&
+        (/\[(?:INTRO|GAP|MORE|CLOSE)\]/.test(s3Match[1]) || hasConv || isDone) &&
+        s3Match[1].trim()) {
+      reveal();
+      if (painted.has('s2')) sectionsEl.appendChild(makeDivider());
+      s3El = buildS3Container(s3Match[1]);
+      sectionsEl.appendChild(s3El);
+      painted.add('s3-head');
+    }
+
+    // Section Three blocks — each block is complete once it is no longer the
+    // last match (a following marker arrived), or CONVERSION/end has arrived.
+    if (s3El && s3Match) {
+      const content = s3Match[1].replace(/^-{3,}\s*$/gm, '');
+      const re = /\[(INTRO|GAP|MORE|CLOSE)\]([\s\S]*?)(?=\[(?:INTRO|GAP|MORE|CLOSE)\]|$)/g;
+      const matches = [];
+      let m;
+      while ((m = re.exec(content)) !== null) matches.push(m);
+
+      for (let i = 0; i < matches.length; i++) {
+        const key = 's3-block-' + i;
+        if (painted.has(key)) continue;
+        const isLast = i === matches.length - 1;
+        const complete = !isLast || hasConv || isDone;
+        if (!complete) continue;
+        const blockText = matches[i][2].trim();
+        if (blockText) {
+          appendGapBlock(s3El, matches[i][1], blockText, s3State);
+          s3State.blocksPainted++;
         }
-        break;
+        painted.add(key);
+      }
+
+      // Safety net: Section Three present but emitted no markers at all — render
+      // it as plain prose once the stream ends.
+      if (isDone && s3State.blocksPainted === 0 && matches.length === 0) {
+        const { paras } = extractParts(content, "What's worth looking at.");
+        const body = document.createElement('div');
+        body.className = 'output-section-body';
+        paras.forEach(p => {
+          const el = document.createElement('p');
+          el.innerHTML = toHTML(p);
+          body.appendChild(el);
+        });
+        s3El.appendChild(body);
+        s3State.blocksPainted = -1;
       }
     }
-    const bodyText = lines.slice(startIdx).join('\n');
-    const paras = bodyText.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
-    const effective = heading || fallbackHeading || '';
-    if (effective && paras.length > 0) {
-      const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const normEff = norm(effective);
-      while (paras.length > 0 && norm(paras[0]) === normEff) {
-        paras.shift();
-      }
-      if (paras.length > 0 && norm(paras[0]).startsWith(normEff)) {
-        let srcIdx = 0, normIdx = 0;
-        while (srcIdx < paras[0].length && normIdx < normEff.length) {
-          if (/[a-z0-9]/i.test(paras[0][srcIdx])) normIdx++;
-          srcIdx++;
-        }
-        paras[0] = paras[0].slice(srcIdx).replace(/^[.,!? ]+/, '').trim();
-        if (!paras[0]) paras.shift();
-      }
-    }
-    return { heading, paras };
-  }
 
-  function addDivider() {
-    const d = document.createElement('div');
-    d.className = 'output-divider';
-    sectionsEl.appendChild(d);
-  }
-
-  // Accent words per section (one word each, italic Fraunces steel)
-  const ACCENT_WORDS = { '01': 'alone', '02': 'picture', '03': 'worth' };
-
-  function renderStandard(content, label, fallbackHeading) {
-    if (!content) return;
-    const { heading, paras } = extractParts(content, fallbackHeading);
-    const section = document.createElement('div');
-    section.className = 'output-section';
-
-    const lbl = document.createElement('span');
-    lbl.className = 'output-section-label';
-    lbl.textContent = label;
-    section.appendChild(lbl);
-
-    const h = document.createElement('div');
-    h.className = 'output-section-heading';
-    h.innerHTML = applyAccent(heading || fallbackHeading, ACCENT_WORDS[label] || '');
-    section.appendChild(h);
-
-    const body = document.createElement('div');
-    body.className = 'output-section-body';
-    paras.forEach(p => {
-      const el = document.createElement('p');
-      el.innerHTML = toHTML(p);
-      body.appendChild(el);
-    });
-    section.appendChild(body);
-    sectionsEl.appendChild(section);
-  }
-
-  // Build one warm gap card: leading **bold** sentence becomes the copper heading,
-  // the remainder becomes the body. Internal line breaks collapse to flowing prose.
-  function buildGapCard(text) {
-    const card = document.createElement('div');
-    card.className = 'gap-card';
-    const trimmed = text.replace(/\s*\n\s*/g, ' ').trim();
-    const titleMatch = trimmed.match(/^\*\*(.+?)\*\*\s*/);
-    let bodyText = trimmed;
-    if (titleMatch) {
-      const h = document.createElement('div');
-      h.className = 'gap-card-heading';
-      h.innerHTML = toHTML(titleMatch[1].trim());
-      card.appendChild(h);
-      bodyText = trimmed.slice(titleMatch[0].length).trim();
-    }
-    if (bodyText) {
-      const b = document.createElement('div');
-      b.className = 'gap-card-body';
-      b.innerHTML = toHTML(bodyText);
-      card.appendChild(b);
-    }
-    return card;
-  }
-
-  function renderGaps(content) {
-    if (!content) return;
-    const fallback = "What's worth looking at.";
-    const cleaned = content.replace(/^-{3,}\s*$/gm, '');
-
-    // Pull the heading line, then parse the marked blocks from the remainder.
-    let heading = fallback;
-    const hMatch = cleaned.match(/^\s*(?:Heading:\s*|#+\s*)(.+)$/m);
-    if (hMatch) heading = hMatch[1].trim();
-
-    const section = document.createElement('div');
-    section.className = 'output-section';
-
-    const lbl = document.createElement('span');
-    lbl.className = 'output-section-label';
-    lbl.textContent = "03";
-    section.appendChild(lbl);
-
-    const h = document.createElement('div');
-    h.className = 'output-section-heading';
-    h.innerHTML = applyAccent(heading || fallback, 'worth');
-    section.appendChild(h);
-
-    // Parse [INTRO]/[GAP]/[MORE]/[CLOSE] blocks. Each block runs until the next marker.
-    const blocks = [];
-    const re = /\[(INTRO|GAP|MORE|CLOSE)\]([\s\S]*?)(?=\[(?:INTRO|GAP|MORE|CLOSE)\]|$)/g;
-    let m;
-    while ((m = re.exec(cleaned)) !== null) {
-      const text = m[2].trim();
-      if (text) blocks.push({ type: m[1], text });
-    }
-
-    if (blocks.length === 0) {
-      // Fallback for un-marked output: render as plain prose paragraphs.
-      const { paras } = extractParts(cleaned, fallback);
+    // Safety net: stream ended with no recognised section delimiters at all —
+    // render whatever text we have as plain prose so the user never sees blank.
+    if (isDone && !painted.has('s1') && !painted.has('s2') && !painted.has('s3-head') &&
+        !painted.has('fallback') && text.trim()) {
+      reveal();
+      const div = document.createElement('div');
+      div.className = 'output-section';
       const body = document.createElement('div');
       body.className = 'output-section-body';
-      paras.forEach(p => {
+      text.split(/\n\n+/).filter(p => p.trim()).forEach(p => {
         const el = document.createElement('p');
-        el.innerHTML = toHTML(p);
+        el.innerHTML = toHTML(p.trim());
         body.appendChild(el);
       });
-      section.appendChild(body);
-      sectionsEl.appendChild(section);
-      return;
+      div.appendChild(body);
+      sectionsEl.appendChild(div);
+      painted.add('fallback');
     }
-
-    let gapCount = 0;
-    blocks.forEach(({ type, text }) => {
-      if (type === 'INTRO') {
-        const intro = document.createElement('p');
-        intro.className = 'section-intro';
-        intro.innerHTML = toHTML(text);
-        section.appendChild(intro);
-      } else if (type === 'GAP' && gapCount < 3) {
-        section.appendChild(buildGapCard(text));
-        gapCount++;
-      } else if (type === 'MORE') {
-        const bridge = document.createElement('div');
-        bridge.className = 'gap-bridge';
-        bridge.innerHTML = toHTML(text.replace(/\s*\n\s*/g, ' ').trim());
-        section.appendChild(bridge);
-      } else if (type === 'CLOSE') {
-        const closingEl = document.createElement('p');
-        closingEl.className = 'section-closing';
-        closingEl.innerHTML = toHTML(text.replace(/\s*\n\s*/g, ' ').trim());
-        section.appendChild(closingEl);
-      }
-    });
-
-    sectionsEl.appendChild(section);
   }
 
-  if (s1Match) renderStandard(s1Match[1], "01", "You're not alone.");
-  if (s1Match && s2Match) addDivider();
-  if (s2Match) renderStandard(s2Match[1], "02", "Your picture right now.");
-  if (s2Match && s3Match) addDivider();
-  if (s3Match) renderGaps(s3Match[1]);
+  return { flush };
+}
 
-  if (!s1Match && !s2Match && !s3Match) {
-    const div = document.createElement('div');
-    div.className = 'output-section';
-    const body = document.createElement('div');
-    body.className = 'output-section-body';
-    text.split(/\n\n+/).filter(p => p.trim()).forEach(p => {
-      const el = document.createElement('p');
-      el.innerHTML = toHTML(p.trim());
-      body.appendChild(el);
-    });
-    div.appendChild(body);
-    sectionsEl.appendChild(div);
-  }
-
+// ─── Final CTA pass ─────────────────────────────────────────────────────────
+// Runs once after the stream completes: personalises the conversion copy and
+// CTA headline, then reveals the email-capture box. Output sections themselves
+// are already painted by the stream renderer.
+function finalizeOutput(text, answersObj) {
+  const convMatch = text.match(/===CONVERSION===([\s\S]*?)$/);
   if (convMatch) {
     const convText = convMatch[1].trim().split('\n').filter(l => l.trim()).join(' ');
     const ctaBody = document.querySelector('.cta-body');
@@ -1076,7 +1165,7 @@ function renderOutput(text) {
   document.getElementById('email-divider').style.display = 'block';
   fbq('track', 'CompleteRegistration');
 
-  const asp = answers['aspiration'] || '';
+  const asp = (answersObj && answersObj['aspiration']) || '';
   let ctaTitle = 'See your complete financial picture.';
   let ctaAccent = 'complete';
   if (asp.includes('Peace of mind') || asp.includes('peace')) { ctaTitle = 'Your peace of mind starts with knowing exactly where you stand.'; ctaAccent = 'peace'; }
