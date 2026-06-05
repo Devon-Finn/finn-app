@@ -110,6 +110,10 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: dotPulse 1.4s ease infinite; }
 .dot:nth-child(2) { animation-delay: 0.2s; }
 .dot:nth-child(3) { animation-delay: 0.4s; }
+/* Inline "still assembling" cue — persists at the bottom of rendered content until generation is fully complete */
+.assembling-cue { display: flex; align-items: center; gap: 12px; padding: 28px 0 8px; color: var(--light); font-size: 13px; font-weight: 400; }
+.assembling-dots { display: flex; gap: 6px; }
+.assembling-cue .dot { width: 6px; height: 6px; }
 
 /* OUTPUT */
 .output-screen { display: none; }
@@ -278,8 +282,8 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
       <p class="email-capture-note">No spam. Unsubscribe any time.</p>
     </div>
 
-    <div class="output-divider"></div>
-    <div class="cta-box">
+    <div class="output-divider" id="cta-divider" style="display:none"></div>
+    <div class="cta-box" id="cta-box" style="display:none">
       <div class="cta-eyebrow">Your next step — The Clarity Session</div>
       <div class="cta-title" id="cta-title">See your complete financial picture.</div>
       <div class="cta-body">The Clarity Session walks you through your complete financial picture — real numbers, not estimates. Finn guides you step by step, tells you exactly where to find every number you need, and explains what it all means. In one sitting.</div>
@@ -291,7 +295,7 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
       </ul>
       <a href="/ready" class="btn-cta" onclick="fbq('track', 'InitiateCheckout')">Join the waitlist — $97 at launch →</a>
     </div>
-    <div class="legal">This session is for general financial education and organisational purposes only. It does not constitute personal financial advice. Any cost estimates are based on general patterns observed in Australian households and do not reflect your specific circumstances. Finn is not a licensed financial advisor, mortgage broker, or financial planner. Before making any financial decisions, please seek advice from a qualified professional. meetfinn.com.au<br><br><a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="/terms">Terms of Use</a></div>
+    <div class="legal" id="legal" style="display:none">This session is for general financial education and organisational purposes only. It does not constitute personal financial advice. Any cost estimates are based on general patterns observed in Australian households and do not reflect your specific circumstances. Finn is not a licensed financial advisor, mortgage broker, or financial planner. Before making any financial decisions, please seek advice from a qualified professional. meetfinn.com.au<br><br><a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="/terms">Terms of Use</a></div>
   </div>
 
 </main>
@@ -1027,20 +1031,36 @@ function appendGapBlock(section, type, text, state) {
 }
 
 // ─── Progressive stream renderer ────────────────────────────────────────────
-// Paints each section / gap card the MOMENT it is proven complete in the stream
-// — never half-parsed. Completeness is proven only when the NEXT delimiter has
-// arrived (so we know the element is fully received). A `painted` Set keys each
-// element so it is built exactly once → no re-render, no flicker, no jumping.
+// Paints content section-by-section, strictly in document order — each section
+// only once it is proven COMPLETE (the next delimiter has arrived). Section One,
+// then Two, then Three as a single complete unit (heading + every gap card,
+// bridge, and closing together). Nothing is ever painted above already-shown
+// content, so there is no reflow / push-down. A persistent "still assembling"
+// cue stays pinned to the bottom of the rendered-so-far content until the whole
+// output (including the CTA, revealed in finalizeOutput) has landed. The forest
+// CTA block is NEVER painted here — it is held until the very end.
 function createStreamRenderer() {
   const sectionsEl = document.getElementById('output-sections');
   sectionsEl.innerHTML = '';
   const painted = new Set();
-  const s3State = { gapCount: 0, blocksPainted: 0 };
-  let s3El = null;
   let revealed = false;
+  let cue = null;
 
-  // Swap the loading state for the output panel once — on the first painted
-  // element. Subsequent paints append into the already-visible panel.
+  // Build (once) the inline loading cue and keep it pinned to the end of the
+  // rendered content. appendChild on an existing node moves it, so calling this
+  // after each section append re-pins it below the latest content.
+  function ensureCue() {
+    if (!cue) {
+      cue = document.createElement('div');
+      cue.className = 'assembling-cue';
+      cue.setAttribute('aria-live', 'polite');
+      cue.innerHTML = '<span class="assembling-dots" aria-hidden="true"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span><span>Finn is still putting your picture together…</span>';
+    }
+    sectionsEl.appendChild(cue);
+  }
+
+  // Swap the full-screen loading state for the output panel once — on the first
+  // painted section — then pin the inline cue to the bottom.
   function reveal() {
     if (revealed) return;
     revealed = true;
@@ -1049,6 +1069,7 @@ function createStreamRenderer() {
     const out = document.getElementById('output');
     out.style.display = 'block';
     out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    ensureCue();
   }
 
   function flush(text, isDone) {
@@ -1065,54 +1086,43 @@ function createStreamRenderer() {
       reveal();
       sectionsEl.appendChild(buildStandardSection(s1Match[1], '01', "You're not alone."));
       painted.add('s1');
+      ensureCue();
     }
 
     // Section Two — complete once the SECTION THREE delimiter proves it's done.
-    if (s2Match && !painted.has('s2') && (hasS3 || isDone) && s2Match[1].trim()) {
+    // Only paints after Section One, preserving document order.
+    if (s2Match && painted.has('s1') && !painted.has('s2') && (hasS3 || isDone) && s2Match[1].trim()) {
       reveal();
-      if (painted.has('s1')) sectionsEl.appendChild(makeDivider());
+      sectionsEl.appendChild(makeDivider());
       sectionsEl.appendChild(buildStandardSection(s2Match[1], '02', 'Your picture right now.'));
       painted.add('s2');
+      ensureCue();
     }
 
-    // Section Three heading — paint once the first body marker (or end) proves
-    // the heading line is complete.
-    if (s3Match && !painted.has('s3-head') &&
-        (/\[(?:INTRO|GAP|MORE|CLOSE)\]/.test(s3Match[1]) || hasConv || isDone) &&
-        s3Match[1].trim()) {
+    // Section Three — painted as a SINGLE complete unit (heading + every gap
+    // card, bridge, and closing) only once CONVERSION (or stream end) proves the
+    // whole section is received. Never partial, so gap cards never drop in above
+    // existing content. Only after Sections One and Two, preserving order.
+    if (s3Match && painted.has('s1') && painted.has('s2') && !painted.has('s3') &&
+        (hasConv || isDone) && s3Match[1].trim()) {
       reveal();
-      if (painted.has('s2')) sectionsEl.appendChild(makeDivider());
-      s3El = buildS3Container(s3Match[1]);
-      sectionsEl.appendChild(s3El);
-      painted.add('s3-head');
-    }
-
-    // Section Three blocks — each block is complete once it is no longer the
-    // last match (a following marker arrived), or CONVERSION/end has arrived.
-    if (s3El && s3Match) {
+      sectionsEl.appendChild(makeDivider());
       const content = s3Match[1].replace(/^-{3,}\s*$/gm, '');
-      const re = /\[(INTRO|GAP|MORE|CLOSE)\]([\s\S]*?)(?=\[(?:INTRO|GAP|MORE|CLOSE)\]|$)/g;
-      const matches = [];
-      let m;
-      while ((m = re.exec(content)) !== null) matches.push(m);
+      const s3El = buildS3Container(content);
 
-      for (let i = 0; i < matches.length; i++) {
-        const key = 's3-block-' + i;
-        if (painted.has(key)) continue;
-        const isLast = i === matches.length - 1;
-        const complete = !isLast || hasConv || isDone;
-        if (!complete) continue;
-        const blockText = matches[i][2].trim();
+      const s3State = { gapCount: 0, blocksPainted: 0 };
+      const re = /\[(INTRO|GAP|MORE|CLOSE)\]([\s\S]*?)(?=\[(?:INTRO|GAP|MORE|CLOSE)\]|$)/g;
+      let m;
+      while ((m = re.exec(content)) !== null) {
+        const blockText = m[2].trim();
         if (blockText) {
-          appendGapBlock(s3El, matches[i][1], blockText, s3State);
+          appendGapBlock(s3El, m[1], blockText, s3State);
           s3State.blocksPainted++;
         }
-        painted.add(key);
       }
 
-      // Safety net: Section Three present but emitted no markers at all — render
-      // it as plain prose once the stream ends.
-      if (isDone && s3State.blocksPainted === 0 && matches.length === 0) {
+      // Safety net: Section Three present but emitted no markers — plain prose.
+      if (s3State.blocksPainted === 0) {
         const { paras } = extractParts(content, "What's worth looking at.");
         const body = document.createElement('div');
         body.className = 'output-section-body';
@@ -1122,13 +1132,16 @@ function createStreamRenderer() {
           body.appendChild(el);
         });
         s3El.appendChild(body);
-        s3State.blocksPainted = -1;
       }
+
+      sectionsEl.appendChild(s3El);
+      painted.add('s3');
+      ensureCue();
     }
 
     // Safety net: stream ended with no recognised section delimiters at all —
     // render whatever text we have as plain prose so the user never sees blank.
-    if (isDone && !painted.has('s1') && !painted.has('s2') && !painted.has('s3-head') &&
+    if (isDone && !painted.has('s1') && !painted.has('s2') && !painted.has('s3') &&
         !painted.has('fallback') && text.trim()) {
       reveal();
       const div = document.createElement('div');
@@ -1143,6 +1156,7 @@ function createStreamRenderer() {
       div.appendChild(body);
       sectionsEl.appendChild(div);
       painted.add('fallback');
+      ensureCue();
     }
   }
 
@@ -1150,10 +1164,16 @@ function createStreamRenderer() {
 }
 
 // ─── Final CTA pass ─────────────────────────────────────────────────────────
-// Runs once after the stream completes: personalises the conversion copy and
-// CTA headline, then reveals the email-capture box. Output sections themselves
-// are already painted by the stream renderer.
+// Runs once after the stream completes — and ONLY here is anything below the
+// content revealed. Removes the "still assembling" cue, personalises the
+// conversion copy and CTA headline, then reveals the email-capture box and the
+// forest CTA block as the genuine final element. Nothing below the content is
+// ever shown before this point, so the CTA can never signal a false completion.
 function finalizeOutput(text, answersObj) {
+  // Drop the persistent loading cue — generation is now fully complete.
+  const cue = document.querySelector('.assembling-cue');
+  if (cue) cue.remove();
+
   const convMatch = text.match(/===CONVERSION===([\s\S]*?)$/);
   if (convMatch) {
     const convText = convMatch[1].trim().split('\n').filter(l => l.trim()).join(' ');
@@ -1163,6 +1183,10 @@ function finalizeOutput(text, answersObj) {
 
   document.getElementById('email-capture').classList.add('show');
   document.getElementById('email-divider').style.display = 'block';
+  // Reveal the CTA cluster (divider + forest box + legal) — the final elements.
+  document.getElementById('cta-divider').style.display = 'block';
+  document.getElementById('cta-box').style.display = 'block';
+  document.getElementById('legal').style.display = 'block';
   fbq('track', 'CompleteRegistration');
 
   const asp = (answersObj && answersObj['aspiration']) || '';
