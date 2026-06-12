@@ -211,7 +211,7 @@ footer { padding: 48px 60px; background: var(--dark); display: flex; justify-con
         <li>When you don't know a number, Finn tells you exactly where to find it</li>
         <li>Your whole picture, built with you in one sitting — and yours to keep</li>
       </ul>
-      <a href="/ready" class="btn-cta" onclick="fbq('track', 'InitiateCheckout')">Join the waitlist — $97 at launch →</a>
+      <a href="/ready" id="waitlist-cta" class="btn-cta" onclick="fbq('track', 'InitiateCheckout')">Join the waitlist — $97 at launch →</a>
     </div>
 
     <div class="legal">This snapshot is for general financial education and organisational purposes only. It does not constitute personal financial advice. Any cost estimates are based on general patterns observed in Australian households and do not reflect specific circumstances. Finn is not a licensed financial advisor, mortgage broker, or financial planner. Before making any financial decisions, please seek advice from a qualified professional. meetfinn.com.au<br><br><a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="/terms">Terms of Use</a></div>
@@ -255,6 +255,10 @@ function showNotFound() {
 function showOutput() {
   document.getElementById('state-loading').style.display = 'none';
   document.getElementById('output-area').style.display = 'block';
+  // Carry this snapshot's id through to /ready so a waitlist signup from here
+  // graduates into Snapshot Completers with a working result link-back.
+  const wl = document.getElementById('waitlist-cta');
+  if (wl) wl.href = `/ready?from=snapshot&id=${snapshotId}`;
 }
 
 // ─── Fetch and render ───

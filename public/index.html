@@ -655,6 +655,15 @@ function submitForm() {
   const btn = document.querySelector('#cta-form-row button');
   btn.disabled = true;
   btn.textContent = "Joining...";
+
+  // Homepage waitlist (no snapshot done) → Homepage—No Snapshot group, no snapshot_id.
+  // Fire-and-forget; the thank-you UX stays gated on Formspree below.
+  fetch('/api/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'homepage', email })
+  }).catch(() => {});
+
   fetch('https://formspree.io/f/mgodedzl', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },

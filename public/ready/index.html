@@ -184,6 +184,21 @@ function submitForm() {
   const btn = document.querySelector('#form-row button');
   btn.disabled = true;
   btn.textContent = 'Joining...';
+
+  // /ready is a post-snapshot path → Snapshot Completers. When the snapshot CTA
+  // carried ?from=snapshot&id=<uuid>, attach it so the delivery email links back
+  // to this person's result. Fire-and-forget; the thank-you UX stays on Formspree.
+  const params = new URLSearchParams(window.location.search);
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const sid = params.get('id') || '';
+  const subBody = { type: 'snapshot', email };
+  if (params.get('from') === 'snapshot' && UUID_RE.test(sid)) subBody.snapshot_id = sid;
+  fetch('/api/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(subBody)
+  }).catch(() => {});
+
   fetch('https://formspree.io/f/mgodedzl', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },

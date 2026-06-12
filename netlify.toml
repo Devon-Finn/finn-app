@@ -5,6 +5,10 @@
   path = "/api/ask-finn"
   function = "ask-finn"
 
+[[edge_functions]]
+  path = "/api/subscribe"
+  function = "subscribe"
+
 [[headers]]
   for = "/*"
   [headers.values]

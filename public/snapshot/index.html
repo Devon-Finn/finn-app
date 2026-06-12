@@ -293,7 +293,7 @@ main { max-width: 680px; margin: 0 auto; padding: 120px 24px 80px; }
         <li>When you don't know a number, Finn tells you exactly where to find it</li>
         <li>Your whole picture, built with you in one sitting — and yours to keep</li>
       </ul>
-      <a href="/ready" class="btn-cta" onclick="fbq('track', 'InitiateCheckout')">Join the waitlist — $97 at launch →</a>
+      <a href="/ready" id="waitlist-cta" class="btn-cta" onclick="fbq('track', 'InitiateCheckout')">Join the waitlist — $97 at launch →</a>
     </div>
     <div class="legal" id="legal" style="display:none">This session is for general financial education and organisational purposes only. It does not constitute personal financial advice. Any cost estimates are based on general patterns observed in Australian households and do not reflect your specific circumstances. Finn is not a licensed financial advisor, mortgage broker, or financial planner. Before making any financial decisions, please seek advice from a qualified professional. meetfinn.com.au<br><br><a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="/terms">Terms of Use</a></div>
   </div>
@@ -1183,6 +1183,12 @@ function finalizeOutput(text, answersObj) {
 
   document.getElementById('email-capture').classList.add('show');
   document.getElementById('email-divider').style.display = 'block';
+  // Carry the snapshot_id through to /ready so a waitlist-only completer (who
+  // skips the email box but clicks through) still graduates with a result link.
+  if (snapshotId) {
+    const wl = document.getElementById('waitlist-cta');
+    if (wl) wl.href = `/ready?from=snapshot&id=${snapshotId}`;
+  }
   // Reveal the CTA cluster (divider + forest box + legal) — the final elements.
   document.getElementById('cta-divider').style.display = 'block';
   document.getElementById('cta-box').style.display = 'block';
@@ -1220,6 +1226,16 @@ function submitEmailCapture() {
     return `${q.id}: ${Array.isArray(ans) ? ans.join(', ') : (ans || 'Not answered')}`;
   }).join('\n');
 
+  // MailerLite is the source of truth for the email sequences. Fire-and-forget:
+  // the thank-you UX below stays gated on Formspree, so a MailerLite hiccup never
+  // breaks the experience. snapshotId is the Supabase row UUID set after generation.
+  fetch('/api/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'snapshot', email, snapshot_id: snapshotId })
+  }).catch(() => {});
+
+  // Formspree retained as owner notification + backup (carries answers + output).
   fetch('https://formspree.io/f/mgodedzl', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
