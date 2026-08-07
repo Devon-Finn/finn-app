@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finn — Your snapshot</title>
+<meta name="description" content="Answer 19 quick questions in a conversation with Finn and watch a broad picture of your finances build live.">
+<meta name="robots" content="noindex">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://meetfinn.com.au/app/snapshot">
+<meta property="og:title" content="Finn — Your snapshot">
+<meta property="og:description" content="Answer 19 quick questions and watch a broad picture of your finances build live.">
+<meta property="og:image" content="https://meetfinn.com.au/assets/og-image.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500&display=swap" rel="stylesheet">
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '1501463388385490');
+fbq('track', 'PageView');
+fbq('track', 'ViewContent');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=1501463388385490&ev=PageView&noscript=1"/></noscript>
+<!-- End Meta Pixel Code -->
+<script defer src="https://cloud.umami.is/script.js" data-website-id="ef97571f-ecc5-477e-8a40-4c94d9b85e55"></script>
+<style>
+  :root{
+    --parch:#f6f2ec; --parch-deep:#efe9dd; --canvas:#e7e0d3; --surface:#ffffff; --surface-warm:#faf7f2;
+    --dark:#1c1917; --mid:#5c5a55; --light:#9a9a94; --rule:#e6e0d6; --rule-soft:#efeae1; --rule-cool:#d8dfe0;
+    --accent:#2a4a3a; --accent-2:#356048; --accent-deep:#213b2e; --accent-light:#f0f4f1;
+    --steel:#c2d4de; --steel-deep:#8fb0c0; --warm:#c4956a; --warm-deep:#a8703f; --warm-light:#fdf6ee;
+    --clear:#2a4a3a; --look:#c4956a; --none:#c9c4ba;
+    --shadow:0 1px 2px rgba(28,25,23,.04), 0 8px 24px rgba(28,25,23,.05);
+    --shadow-lift:0 2px 4px rgba(28,25,23,.05), 0 14px 34px rgba(33,59,46,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{font-family:'Jost',sans-serif; background:var(--canvas); color:var(--dark); font-weight:500; -webkit-font-smoothing:antialiased; overflow:hidden;}
+  .fr{font-family:'Fraunces',serif; font-style:italic; font-weight:400;}
+  .app{display:flex; height:100vh; height:100dvh;}
+
+  /* ===== NAV RAIL ===== */
+  .rail{width:236px; flex-shrink:0; background:linear-gradient(180deg,var(--accent),var(--accent-deep)); color:#d7e3db; display:flex; flex-direction:column; padding:22px 0;}
+  .rail .brand{padding:4px 22px 24px; font-weight:700; font-size:22px; color:#fff; letter-spacing:-.02em;}
+  .rail .brand a{color:#fff; text-decoration:none;}
+  .rail .brand .dot{color:var(--steel);}
+  .rail .navgroup{padding:0 14px;}
+  .rail a{display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:10px; color:#cadbd1; text-decoration:none; font-size:14.5px; font-weight:500; margin-bottom:2px; transition:all .16s;}
+  .rail a .ic{width:17px; text-align:center; font-size:14px; color:var(--steel);}
+  .rail a.active{background:rgba(255,255,255,.14); color:#fff; cursor:default;} .rail a.active .ic{color:#fff;}
+  .rail a.locked{opacity:.45; cursor:default;} .rail a.locked .lk{margin-left:auto; font-size:10px; opacity:.85; letter-spacing:.04em;}
+  .rail .spacer{flex:1;}
+  .rail .user{margin:8px 14px 0; padding:12px; border-radius:12px; background:rgba(0,0,0,.16); display:flex; align-items:center; gap:10px;}
+  .rail .avatar{width:32px;height:32px;border-radius:9px;background:var(--steel);color:var(--accent-deep);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;}
+  .rail .user .nm{font-size:13px;color:#fff;font-weight:500;line-height:1.2;} .rail .user .pl{font-size:10.5px;color:var(--steel);}
+
+  /* ===== MAIN / HEADER ===== */
+  .main{flex:1; display:flex; flex-direction:column; min-width:0;}
+  .header{height:60px; background:#fffdfa; border-bottom:1px solid var(--rule); display:flex; align-items:center; justify-content:space-between; padding:0 24px; flex-shrink:0; box-shadow:0 1px 0 rgba(28,25,23,.03), 0 6px 16px -10px rgba(28,25,23,.12); position:relative; z-index:5;}
+  .header .left{display:flex; align-items:center; gap:16px; min-width:0;}
+  .header .crumb .k{font-size:10.5px; text-transform:uppercase; letter-spacing:.12em; color:var(--steel-deep); font-weight:600; display:block;}
+  .header .crumb .t{font-size:16px; font-weight:600; letter-spacing:-.01em; white-space:nowrap;}
+  .mode-chip{display:flex; align-items:center; gap:7px; font-size:12px; font-weight:600; padding:6px 12px; border-radius:20px; background:var(--warm-light); color:var(--warm-deep); border:1px solid #ecd9c4; white-space:nowrap;}
+  .mode-chip .md{width:7px;height:7px;border-radius:50%;background:var(--warm);}
+  .header .about{font-size:13px; color:var(--mid); text-decoration:none; font-weight:500;}
+  .header .about:hover{color:var(--accent);}
+
+  .stage{flex:1; display:flex; min-height:0; position:relative;}
+
+  /* ===== CONVERSATION ===== */
+  .convo{width:48%; background:var(--parch); display:flex; flex-direction:column; transition:width .42s cubic-bezier(.4,0,.2,1); min-width:0; position:relative;}
+  .convo-head{padding:20px 34px 10px; display:flex; align-items:center; justify-content:space-between;}
+  .convo-title{font-size:11.5px; text-transform:uppercase; letter-spacing:.14em; color:var(--steel-deep); font-weight:600;}
+  .collapse-btn{font-family:inherit; font-size:12px; font-weight:500; color:var(--accent); background:var(--surface); border:1px solid var(--rule); border-radius:9px; padding:7px 12px; cursor:pointer; transition:all .16s;}
+  .collapse-btn:hover{border-color:var(--accent); background:var(--accent-light);}
+  .session-prog{margin:0 34px 8px; display:flex; align-items:center; gap:11px;}
+  .session-prog .pt{flex:1; height:4px; background:var(--rule); border-radius:6px; overflow:hidden;}
+  .session-prog .pf{height:100%; width:0%; background:var(--accent-2); border-radius:6px; transition:width .4s;}
+  .session-prog .pl{font-size:11px; color:var(--mid); white-space:nowrap; font-weight:500;}
+  .snap-note{margin:0 34px 12px; background:var(--warm-light); border:1px solid #ecd9c4; border-radius:10px; padding:10px 13px; font-size:12.5px; color:#9a7550; line-height:1.45;}
+  .messages{flex:1; overflow-y:auto; padding:6px 34px 22px; display:flex; flex-direction:column; gap:20px;}
+  .messages::-webkit-scrollbar{width:7px;} .messages::-webkit-scrollbar-thumb{background:var(--rule);border-radius:8px;}
+  .msg{max-width:92%; font-size:15.5px; line-height:1.6; animation:msgIn .3s ease;}
+  @keyframes msgIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+  .msg.finn .who{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); font-weight:600; margin-bottom:6px;}
+  .msg.finn p{margin-bottom:9px;} .msg.finn p:last-child{margin-bottom:0;}
+  .msg.finn .q-ctx{font-size:13px; color:var(--mid); background:var(--parch-deep); border-left:2px solid var(--steel); padding:8px 12px; border-radius:0 8px 8px 0; margin-top:8px; line-height:1.5;}
+  .msg.user{align-self:flex-end; background:var(--accent); color:#fff; padding:11px 16px; border-radius:15px 15px 4px 15px; font-size:14.5px; line-height:1.5; box-shadow:var(--shadow);}
+  .finn-inline{margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;}
+  .chip-inline{font-family:inherit; font-size:13.5px; font-weight:500; color:var(--accent); background:var(--surface); border:1px solid var(--rule); border-radius:10px; padding:9px 14px; cursor:pointer; transition:all .16s; box-shadow:var(--shadow); text-align:left; line-height:1.4;}
+  .chip-inline:hover{border-color:var(--accent); background:var(--accent-light);}
+  .chip-inline.selected{border-color:var(--accent); background:var(--accent-light); color:var(--accent); font-weight:600;}
+  .chip-inline.primary{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .chip-inline.primary:hover{background:var(--accent-deep);}
+  .chip-inline:disabled{opacity:.45; cursor:default; pointer-events:none;}
+  .chip-skip{font-family:inherit; font-size:12.5px; color:var(--light); background:none; border:none; padding:9px 6px; cursor:pointer; text-decoration:underline; text-decoration-color:var(--rule); text-underline-offset:3px;}
+  .chip-skip:hover{color:var(--mid);}
+  .typing{display:flex; gap:5px; padding:4px 0;}
+  .typing .td{width:7px;height:7px;border-radius:50%;background:var(--steel-deep);animation:tdp 1.2s ease infinite;}
+  .typing .td:nth-child(2){animation-delay:.15s;} .typing .td:nth-child(3){animation-delay:.3s;}
+  @keyframes tdp{0%,80%,100%{opacity:.25;transform:scale(.85);}40%{opacity:1;transform:scale(1);}}
+  .composer{padding:14px 34px 18px; border-top:1px solid var(--rule);}
+  .composer-inner{display:flex; align-items:flex-end; gap:10px; background:var(--surface); border:1px solid var(--rule); border-radius:14px; padding:10px 10px 10px 16px; box-shadow:var(--shadow);}
+  .composer textarea{flex:1; border:none; outline:none; resize:none; font-family:inherit; font-size:15px; color:var(--dark); background:none; line-height:1.5; max-height:76px; padding:5px 0;}
+  .composer textarea::placeholder{color:var(--light);}
+  .send{background:var(--accent); color:#fff; border:none; width:36px; height:36px; border-radius:10px; cursor:pointer; font-size:15px; flex-shrink:0; transition:opacity .15s;}
+  .send:disabled{opacity:.4; cursor:default;}
+  .convo-collapsed{display:none; position:absolute; inset:0; flex-direction:column; align-items:center; padding-top:18px; gap:12px; cursor:pointer; background:var(--parch);}
+  .convo-collapsed .em{width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;}
+  .convo-collapsed .vl{writing-mode:vertical-rl; transform:rotate(180deg); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--steel-deep); font-weight:600;}
+  body.review .convo{width:50px;}
+  body.review .convo-head, body.review .messages, body.review .composer, body.review .snap-note, body.review .session-prog{opacity:0; pointer-events:none;}
+  body.review .convo-collapsed{display:flex;}
+
+  /* ===== DASHBOARD ===== */
+  .dash{flex:1; background:var(--canvas); overflow-y:auto; min-width:0; border-left:1px solid var(--rule-cool); box-shadow:inset 16px 0 26px -20px rgba(28,25,23,.16);}
+  .dash::-webkit-scrollbar{width:7px;} .dash::-webkit-scrollbar-thumb{background:var(--rule);border-radius:8px;}
+  .dash-inner{padding:20px 26px 36px;}
+  .dash-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; gap:10px; flex-wrap:wrap;}
+  .view-toggle{display:flex; background:var(--surface); border:1px solid var(--rule); border-radius:10px; padding:3px; box-shadow:var(--shadow);}
+  .view-toggle button{font-family:inherit; font-size:12px; font-weight:500; color:var(--mid); background:none; border:none; padding:7px 13px; border-radius:8px; cursor:pointer; transition:all .16s; white-space:nowrap;}
+  .view-toggle button.on{background:var(--accent); color:#fff;}
+
+  .hero{background:linear-gradient(145deg,var(--accent),var(--accent-deep)); color:#fff; border-radius:15px; padding:20px 22px; margin-bottom:12px; box-shadow:var(--shadow-lift);}
+  .hero .lead{font-size:11.5px; text-transform:uppercase; letter-spacing:.13em; color:var(--steel); font-weight:600; margin-bottom:8px;}
+  .hero .headline{font-size:24px; font-weight:600; letter-spacing:-.01em; line-height:1.2; color:#fff;}
+  .hero .headline .fr{color:var(--steel);}
+  .hero .demo-tag{display:inline-block; margin-top:12px; font-size:11px; color:var(--steel); background:rgba(255,255,255,.1); padding:4px 10px; border-radius:20px;}
+  .hero .hero-actions{display:none; margin-top:14px; gap:9px; flex-wrap:wrap;}
+  .hero .hero-actions.show{display:flex;}
+  .hero-btn{font-family:inherit; font-size:13px; font-weight:600; border-radius:9px; padding:9px 15px; cursor:pointer; transition:all .16s; border:none;}
+  .hero-btn.solid{background:#fff; color:var(--accent);}
+  .hero-btn.solid:hover{opacity:.9;}
+  .hero-btn.ghost{background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.3);}
+  .hero-btn.ghost:hover{background:rgba(255,255,255,.2);}
+
+  .tiles{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .tile{background:var(--surface); border:1px solid var(--rule); border-radius:13px; padding:15px 15px 14px; cursor:pointer; transition:all .18s; box-shadow:var(--shadow); position:relative; overflow:hidden;}
+  .tile::before{content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--none);}
+  .tile.s-clear::before{background:var(--clear);}
+  .tile.s-look::before{background:var(--look);}
+  .tile.s-none::before{background:var(--none);}
+  .tile:hover{border-color:var(--accent); box-shadow:var(--shadow-lift);}
+  .tile.pulse{animation:tilePulse .7s ease;}
+  @keyframes tilePulse{0%{box-shadow:0 0 0 0 rgba(42,74,58,.28);}100%{box-shadow:0 0 0 14px rgba(42,74,58,0);}}
+  .tile .status-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;}
+  .badge{display:inline-flex; align-items:center; gap:5px; font-size:10px; text-transform:uppercase; letter-spacing:.06em; font-weight:600; padding:3px 8px; border-radius:20px;}
+  .badge.clear{background:var(--accent-light); color:var(--accent);}
+  .badge.look{background:var(--warm-light); color:var(--warm-deep);}
+  .badge.none{background:#f0eee9; color:var(--light);}
+  .badge .d{width:6px;height:6px;border-radius:50%;} .d.clear{background:var(--clear);} .d.look{background:var(--look);} .d.none{background:var(--none);}
+  .tile .ico{font-size:14px; color:var(--steel-deep);}
+  .tile .name{font-size:14.5px; font-weight:600; margin-bottom:6px;}
+  .tile .metric{font-size:19px; font-weight:600; letter-spacing:-.01em; color:var(--accent); line-height:1.15;}
+  .tile .metric.empty{color:var(--light); font-size:15px;}
+  .tile .ctx{display:block; font-size:11.5px; color:var(--light); font-weight:500; margin-top:4px; line-height:1.35;}
+  .tile .complete{margin-top:11px; height:3px; background:var(--rule-soft); border-radius:4px; overflow:hidden;}
+  .tile .complete .cf{height:100%; width:0%; background:var(--steel-deep); border-radius:4px; transition:width .5s;}
+  .tile.done .complete{display:none;}
+
+  .gapcard{background:var(--warm-light); border:1px solid var(--warm); border-radius:13px; padding:16px 17px; margin-bottom:10px; box-shadow:var(--shadow); cursor:pointer;}
+  .gapcard .gh{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;}
+  .gapcard .gt{font-size:15px; font-weight:600;}
+  .gapcard .tag{font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--warm-deep); font-weight:700;}
+  .gapcard .body{font-size:13.5px; line-height:1.5; color:var(--dark); margin-bottom:12px;}
+  .gapcard .find{display:inline-flex; align-items:center; gap:8px; font-family:inherit; font-size:13px; font-weight:600; color:#fff; background:var(--accent); border:none; border-radius:9px; padding:9px 14px; cursor:pointer; transition:all .16s;}
+  .gapcard .find:hover{background:var(--accent-deep);}
+  .gaps-empty{background:var(--surface); border:1px solid var(--rule); border-radius:13px; padding:20px; font-size:14px; color:var(--mid); line-height:1.6; box-shadow:var(--shadow);}
+  .view-panel{display:none;} .view-panel.on{display:block;}
+
+  /* ===== DETAIL PANEL ===== */
+  .detail-panel{position:absolute; inset:0; background:var(--canvas); z-index:30; display:none; flex-direction:column; animation:slideIn .28s cubic-bezier(.4,0,.2,1);}
+  .detail-panel.on{display:flex;}
+  @keyframes slideIn{from{opacity:0;transform:translateX(18px);}to{opacity:1;transform:translateX(0);}}
+  .dp-head{display:flex; align-items:center; gap:12px; padding:20px 26px 16px; border-bottom:1px solid var(--rule-cool); flex-wrap:wrap;}
+  .dp-back{font-family:inherit; font-size:13px; font-weight:500; color:var(--accent); background:var(--surface); border:1px solid var(--rule); border-radius:9px; padding:8px 13px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all .16s;}
+  .dp-back:hover{border-color:var(--accent); background:var(--accent-light);}
+  .dp-title{font-size:19px; font-weight:600; letter-spacing:-.01em;}
+  .dp-badge{margin-left:auto;}
+  .dp-body{flex:1; overflow-y:auto; padding:26px 40px 36px;}
+  .dp-body::-webkit-scrollbar{width:7px;} .dp-body::-webkit-scrollbar-thumb{background:var(--rule);border-radius:8px;}
+  .dp-inner{max-width:920px; margin:0 auto;}
+  .dp-hero-num{font-size:30px; font-weight:600; letter-spacing:-.02em; color:var(--accent); line-height:1.1;}
+  .dp-context{font-size:14px; color:var(--mid); margin-top:8px; line-height:1.5;}
+  .dp-section{margin-top:22px;}
+  .dp-section .lbl{font-size:10.5px; text-transform:uppercase; letter-spacing:.1em; color:var(--steel-deep); font-weight:600; margin-bottom:9px;}
+  .dp-read{font-size:14.5px; line-height:1.6; color:var(--dark);}
+  .dp-grid{display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:22px;}
+  .dp-grid .dp-section{margin-top:0;}
+  @media(max-width:900px){.dp-grid{grid-template-columns:1fr;}}
+  .dp-figures{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:6px 16px; box-shadow:var(--shadow);}
+  .dp-figrow{display:flex; justify-content:space-between; gap:14px; padding:11px 0; border-bottom:1px solid var(--rule-soft); font-size:13.5px;}
+  .dp-figrow:last-child{border-bottom:none;}
+  .dp-figrow .k{color:var(--mid); flex-shrink:0;} .dp-figrow .v{font-weight:600; text-align:right;}
+  .dp-context-box{background:var(--accent-light); border-radius:12px; padding:14px 16px; font-size:13.5px; line-height:1.55; color:var(--dark);}
+  .dp-context-box b{color:var(--accent);}
+  .dp-points{display:flex; align-items:flex-start; gap:11px; background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:15px 16px; box-shadow:var(--shadow);}
+  .dp-points .ic{width:30px;height:30px;border-radius:8px;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;}
+  .dp-points .txt{font-size:13.5px; line-height:1.5;} .dp-points .txt b{color:var(--accent);}
+  .dp-clarity{margin-top:14px; background:var(--warm-light); border:1px solid #ecd9c4; border-radius:12px; padding:14px 16px; font-size:13.5px; line-height:1.55; color:#7d5c3c;}
+  .dp-clarity a{color:var(--accent); font-weight:600;}
+
+  /* ===== COMPLETION MODAL ===== */
+  .overlay{position:fixed; inset:0; background:rgba(28,25,23,.45); z-index:60; display:none; align-items:center; justify-content:center; padding:20px;}
+  .overlay.on{display:flex;}
+  .modal{background:var(--surface-warm); border-radius:18px; max-width:520px; width:100%; max-height:92vh; overflow-y:auto; padding:30px 32px 26px; box-shadow:0 24px 60px rgba(28,25,23,.3); animation:msgIn .3s ease;}
+  .modal .m-eyebrow{font-size:10.5px; text-transform:uppercase; letter-spacing:.14em; color:var(--steel-deep); font-weight:600; margin-bottom:10px;}
+  .modal h2{font-size:24px; font-weight:600; letter-spacing:-.01em; line-height:1.25; margin-bottom:10px;}
+  .modal h2 .fr{color:var(--accent-2);}
+  .modal .m-sub{font-size:14px; color:var(--mid); line-height:1.6; margin-bottom:20px;}
+  .m-block{background:var(--surface); border:1px solid var(--rule); border-radius:13px; padding:18px; margin-bottom:12px; box-shadow:var(--shadow);}
+  .m-block .mb-title{font-size:15px; font-weight:600; margin-bottom:5px;}
+  .m-block .mb-body{font-size:13px; color:var(--mid); line-height:1.55; margin-bottom:12px;}
+  .m-row{display:flex; gap:8px;}
+  .m-input{flex:1; padding:11px 14px; border:1px solid var(--rule); border-radius:9px; font-family:inherit; font-size:14px; color:var(--dark); background:var(--parch); outline:none; min-width:0;}
+  .m-input:focus{border-color:var(--accent);}
+  .m-btn{font-family:inherit; font-size:13.5px; font-weight:600; border:none; border-radius:9px; padding:11px 16px; cursor:pointer; transition:all .16s; white-space:nowrap;}
+  .m-btn.solid{background:var(--accent); color:#fff;}
+  .m-btn.solid:hover{background:var(--accent-deep);}
+  .m-btn.solid:disabled{opacity:.5; cursor:default;}
+  .m-btn.warm{background:var(--warm); color:#fff; width:100%;}
+  .m-btn.warm:hover{background:var(--warm-deep);}
+  .m-thanks{display:none; font-size:13.5px; color:var(--accent); font-weight:600; margin-top:10px;}
+  .m-note{font-size:11px; color:var(--light); margin-top:8px;}
+  .m-dismiss{display:block; margin:6px auto 0; font-family:inherit; font-size:13px; color:var(--mid); background:none; border:none; cursor:pointer; text-decoration:underline; text-decoration-color:var(--rule); text-underline-offset:3px; padding:8px;}
+  .m-dismiss:hover{color:var(--dark);}
+
+  .legal{margin-top:28px; font-size:11px; color:var(--light); line-height:1.7; padding-top:18px; border-top:1px solid var(--rule);}
+  .legal a{color:var(--light); text-decoration:underline; text-decoration-color:var(--rule); text-underline-offset:2px;}
+  .legal a:hover{color:var(--mid);}
+
+  *:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+
+  /* ===== MOBILE ===== */
+  .mobile-tabs{display:none;}
+  @media(max-width:880px){
+    .rail{display:none;}
+    .header{padding:0 16px; gap:8px;}
+    .header .crumb .t{font-size:14.5px;}
+    .header .about{display:none;}
+    .stage{flex-direction:column;}
+    .convo{width:100%; flex:1; display:none;}
+    .dash{display:none; border-left:none; box-shadow:none;}
+    body.tab-chat .convo{display:flex;}
+    body.tab-picture .dash{display:block; flex:1;}
+    .collapse-btn{display:none;}
+    .convo-head{padding:14px 18px 8px;}
+    .session-prog{margin:0 18px 8px;}
+    .snap-note{margin:0 18px 10px;}
+    .messages{padding:6px 18px 16px;}
+    .composer{padding:10px 14px calc(12px + env(safe-area-inset-bottom));}
+    .dash-inner{padding:16px 14px 90px;}
+    .tiles{grid-template-columns:1fr;}
+    .dp-body{padding:20px 16px 90px;}
+    .dp-head{padding:14px 16px 12px;}
+    .mobile-tabs{display:flex; position:fixed; bottom:0; left:0; right:0; z-index:40; background:#fffdfa; border-top:1px solid var(--rule); padding:8px 10px calc(8px + env(safe-area-inset-bottom)); gap:8px;}
+    .mobile-tabs button{flex:1; font-family:inherit; font-size:13px; font-weight:600; padding:11px; border-radius:10px; border:1px solid var(--rule); background:var(--surface); color:var(--mid); cursor:pointer; position:relative;}
+    .mobile-tabs button.on{background:var(--accent); color:#fff; border-color:var(--accent);}
+    .mobile-tabs button .nd{position:absolute; top:7px; right:10px; width:8px; height:8px; border-radius:50%; background:var(--warm); display:none;}
+    .mobile-tabs button .nd.show{display:block;}
+    body.tab-chat .convo{padding-bottom:56px;}
+    .detail-panel{z-index:45;}
+  }
+</style>
+</head>
+<body class="tab-chat">
+<div class="app">
+  <nav class="rail">
+    <div class="brand"><a href="https://meetfinn.com.au">Finn<span class="dot">.</span></a></div>
+    <div class="navgroup">
+      <a class="active"><span class="ic">◈</span> Your picture</a>
+      <a class="locked" title="Part of the full app"><span class="ic">◇</span> Find a professional <span class="lk">Soon</span></a>
+      <a class="locked" title="Part of the full app"><span class="ic">▤</span> Documents <span class="lk">Soon</span></a>
+    </div>
+    <div class="spacer"></div>
+    <div class="navgroup">
+      <a class="locked" title="Part of the full app"><span class="ic">◳</span> Advice-Ready Pack <span class="lk">🔒</span></a>
+      <a class="locked" title="Part of the full app"><span class="ic">⚙</span> Settings <span class="lk">Soon</span></a>
+    </div>
+    <div class="user"><div class="avatar">F</div><div><div class="nm">Your snapshot</div><div class="pl">Free · no account needed</div></div></div>
+  </nav>
+
+  <div class="main">
+    <div class="header">
+      <div class="left">
+        <div class="crumb"><span class="k">Your snapshot</span><span class="t" id="hdrT">Building your picture</span></div>
+        <div class="mode-chip"><span class="md"></span><span>Snapshot mode</span></div>
+      </div>
+      <a class="about" href="https://meetfinn.com.au">About Finn</a>
+    </div>
+
+    <div class="stage">
+      <div class="convo">
+        <div class="convo-head"><span class="convo-title">Talking with Finn</span><button class="collapse-btn" onclick="setReview(true)">‹ Minimise chat</button></div>
+        <div class="session-prog" id="sessProg"><div class="pt"><div class="pf" id="progFill"></div></div><span class="pl" id="progLabel">19 questions · about five minutes</span></div>
+        <div class="snap-note">You're in <b>snapshot mode</b> — a fixed set of questions that builds a broad picture. In the full Clarity Session, Finn chats freely and builds your exact position with real figures.</div>
+        <div class="messages" id="messages"></div>
+        <div class="composer"><div class="composer-inner"><textarea id="composerInput" placeholder="Type an answer, or ask what a question means…" rows="1"></textarea><button class="send" id="sendBtn" aria-label="Send">↑</button></div></div>
+        <div class="convo-collapsed" onclick="setReview(false)"><div class="em">F</div><div class="vl">Open chat</div></div>
+      </div>
+
+      <div class="dash">
+        <div class="dash-inner">
+          <div class="dash-head">
+            <span class="convo-title">Your picture</span>
+            <div class="view-toggle"><button class="on" id="vOver" onclick="setView('overview')">Overview</button><button id="vGap" onclick="setView('gaps')">Worth a look</button></div>
+          </div>
+
+          <div class="hero">
+            <div class="lead">Where things stand</div>
+            <div class="headline" id="heroLine">Your picture's <span class="fr">taking shape</span>.</div>
+            <span class="demo-tag">Broad view · your real figures come in the Clarity Session</span>
+            <div class="hero-actions" id="heroActions">
+              <button class="hero-btn solid" onclick="openDone()">Email me my snapshot</button>
+              <button class="hero-btn ghost" onclick="goClarity()">The Clarity Session →</button>
+            </div>
+          </div>
+
+          <div class="view-panel on" id="panelOverview"><div class="tiles" id="tilesGrid"></div></div>
+          <div class="view-panel" id="panelGaps"><div id="gapsList"></div></div>
+
+          <div class="legal">This snapshot is for general financial education and organisational purposes only. It does not constitute personal financial advice. Finn is not a licensed financial advisor, mortgage broker, or financial planner. Before making any financial decisions, please seek advice from a qualified professional. meetfinn.com.au<br><br><a href="https://meetfinn.com.au/privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="https://meetfinn.com.au/terms">Terms of Use</a></div>
+        </div>
+      </div>
+
+      <div class="detail-panel" id="detailPanel">
+        <div class="dp-head">
+          <button class="dp-back" onclick="closeDetail()">‹ Back to your picture</button>
+          <span class="dp-title" id="dpTitle"></span>
+          <span class="dp-badge badge none" id="dpBadge"></span>
+        </div>
+        <div class="dp-body" id="dpBody"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mobile-tabs">
+  <button id="tabChat" class="on" onclick="setTab('chat')">Talking with Finn</button>
+  <button id="tabPicture" onclick="setTab('picture')">Your picture <span class="nd" id="pictureDot"></span></button>
+</div>
+
+<div class="overlay" id="doneOverlay">
+  <div class="modal">
+    <div class="m-eyebrow">Snapshot complete</div>
+    <h2>That's all nineteen. Your picture's <span class="fr">ready</span>.</h2>
+    <p class="m-sub">It's a broad view — the general shape of things, and the areas worth a look. Two ways to take it further, and both are optional.</p>
+    <div class="m-block">
+      <div class="mb-title">Want your snapshot emailed to you?</div>
+      <div class="mb-body">So you've got it to come back to whenever you're ready.</div>
+      <div class="m-row" id="emailRow">
+        <input type="email" class="m-input" id="emailInput" placeholder="your@email.com" autocomplete="email" aria-label="Your email address">
+        <button class="m-btn solid" id="emailBtn" onclick="submitEmail()">Send it</button>
+      </div>
+      <div class="m-thanks" id="emailThanks">Done — it's on its way.</div>
+      <div class="m-note" id="emailNote">No spam. Unsubscribe any time.</div>
+    </div>
+    <div class="m-block">
+      <div class="mb-title">Want your exact position?</div>
+      <div class="mb-body">The Clarity Session uses your real figures. Finn guides you through it step by step — no spreadsheets, no homework — and the picture you build is yours to keep.</div>
+      <button class="m-btn warm" onclick="goClarity()">The Clarity Session →</button>
+    </div>
+    <button class="m-dismiss" onclick="closeDone()">Let me look around my picture first</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ═════════════════════════ THE 19 QUESTIONS ═════════════════════════
+   Carried over VERBATIM from the existing /snapshot page. Do not edit
+   question text or options without updating both pages. */
+const questions = [
+  {
+    id: 'age', multi: false,
+    text: 'Which age bracket are you in?',
+    context: null,
+    options: ['Under 30','30 to 35','36 to 40','41 to 45','46 to 50','51 to 55','Over 55']
+  },
+  {
+    id: 'gender', multi: false,
+    text: 'How do you identify?',
+    context: 'This helps Finn give you a more accurate picture of where you stand — particularly around superannuation, where there are real differences between men and women in Australia.',
+    options: ['Male','Female','Non-binary','Prefer not to say']
+  },
+  {
+    id: 'household', multi: false,
+    text: 'Which best describes your household right now?',
+    context: null,
+    options: ['Couple — with kids','Couple — no kids','Single parent','Single — no dependants','One of us works, one doesn\'t or earns irregularly']
+  },
+  {
+    id: 'income_type', multi: false,
+    text: 'How does your household earn its income?',
+    context: null,
+    options: ['Employed — regular salary or wages','Self employed or running a business','A mix — employed plus a business or side income','One employed, one self employed']
+  },
+  {
+    id: 'social_media', multi: true,
+    text: 'When it comes to financial content online — which of these applies to you?',
+    context: 'Think Instagram, TikTok, YouTube, podcasts — anything you\'ve come across trying to get on top of your money.',
+    options: [
+      'I follow finance people but end up more confused than when I started',
+      'I\'ve done a lot of research but can\'t figure out what actually applies to me',
+      'I\'ve seriously considered engaging someone I found online — a broker, advisor, or property person',
+      'I avoid financial content — it makes me feel worse not better',
+      'I don\'t really follow financial content at all'
+    ]
+  },
+  {
+    id: 'feeling', multi: true,
+    text: 'When you think about your finances right now — which of these feel true for you?',
+    context: null,
+    options: [
+      'I feel like I should be further ahead than I am',
+      'I know I should do more but I don\'t know where to start',
+      'There\'s so much information out there I can\'t tell what applies to me',
+      'I avoid thinking about it because it stresses me out',
+      'I feel OK but want to make sure I\'m not missing something'
+    ]
+  },
+  {
+    id: 'ownership', multi: false,
+    text: 'Do you own your home or are you renting?',
+    context: 'If you have a home loan — roughly how much do you think is still owed? A ballpark is completely fine.',
+    options: [
+      'Renting — not a homeowner yet',
+      'Own with a home loan — honestly not sure what we owe or how it all works',
+      'Own with a home loan — roughly under $400,000 still owed',
+      'Own with a home loan — roughly $400,000 to $700,000 still owed',
+      'Own with a home loan — roughly over $700,000 still owed',
+      'Own outright — fully paid off'
+    ]
+  },
+  {
+    id: 'other_debts', multi: true,
+    text: 'Outside of a home loan — do you have any other money owing?',
+    context: 'Select everything that applies. No need for exact amounts.',
+    options: [
+      'No — the home loan is our only debt',
+      'Credit card balances we carry from month to month',
+      'Car loan or car finance',
+      'Personal loan',
+      'Study debt — sometimes called HECS — still being paid off',
+      'No home loan but I have some of the above'
+    ]
+  },
+  {
+    id: 'savings', multi: false,
+    text: 'Do you have savings or other money set aside — outside of your retirement fund?',
+    context: 'Think money in a bank account, shares, or anything else you\'d consider a financial asset. A rough range is completely fine.',
+    options: [
+      'Not much — little to no savings right now',
+      'Some savings — roughly under $30,000',
+      'Savings between $30,000 and $100,000 sitting in a bank account',
+      'Savings over $100,000 sitting in a bank account',
+      'Savings in a dedicated account linked directly to our home loan',
+      'We also invest in shares or managed funds',
+      'I have savings but I\'m not sure if they\'re set up in the best way'
+    ]
+  },
+  {
+    id: 'investments', multi: true,
+    text: 'Do you have any investments or assets outside of your home and retirement fund?',
+    context: null,
+    options: [
+      'No — the home is our only major asset',
+      'Shares or managed funds',
+      'An investment property',
+      'Business ownership or equity in a business',
+      'Some investments but not sure they\'re set up correctly',
+      'No idea — never really looked at this properly'
+    ]
+  },
+  {
+    id: 'income', multi: false,
+    text: 'Roughly what does your household bring in each month after tax?',
+    context: 'What actually lands in your bank account across all income — just a ballpark.',
+    options: [
+      'Under $5,000 per month',
+      '$5,000 to $8,000 per month',
+      '$8,000 to $12,000 per month',
+      '$12,000 to $18,000 per month',
+      'Over $18,000 per month'
+    ]
+  },
+  {
+    id: 'cashflow', multi: false,
+    text: 'At the end of a typical month — what best describes where your money goes?',
+    context: null,
+    options: [
+      'It disappears — we\'re genuinely not sure where it all goes',
+      'We cover everything but there\'s not much left over',
+      'We usually have something left but it just sits there',
+      'We have money left over and are actively putting it somewhere useful',
+      'Our income varies a lot so it\'s hard to say'
+    ]
+  },
+  {
+    id: 'super', multi: false,
+    text: 'How on top of your super would you say you are?',
+    context: 'In Australia, your employer puts money aside for your retirement throughout your working life — most people have this but very few actively manage it.',
+    options: [
+      'On top of it — I know my balance and review it regularly',
+      'I know roughly what I have but haven\'t looked properly in a while',
+      'I think I might have more than one account from different jobs but haven\'t checked',
+      'I honestly don\'t know much about it at all',
+      'I\'m not really sure what this means or how it works',
+      'My partner manages ours — I\'m not across the detail'
+    ]
+  },
+  {
+    id: 'insurance', multi: false,
+    text: 'Do you know what cover you have if you got seriously ill or injured and couldn\'t work?',
+    context: 'Think about whether you have any income protection or life cover — either through your employer, your retirement fund, or a separate policy.',
+    options: [
+      'Yes — I know exactly what I have and I\'m comfortable with it',
+      'I think I have some cover through my retirement fund but I\'m not sure how much',
+      'I honestly have no idea what cover I have',
+      'I know I\'m probably underprotected but haven\'t done anything about it',
+      'I have a financial advisor who manages this for me'
+    ]
+  },
+  {
+    id: 'professionals', multi: true,
+    text: 'Do you currently work with any financial professionals?',
+    context: null,
+    options: [
+      'No — never engaged anyone formally',
+      'We use an accountant for tax',
+      'We have a mortgage broker we\'ve used',
+      'We have a financial advisor or planner',
+      'We\'ve seen someone before but nothing really came of it',
+      'I\'m not sure what professionals we actually need'
+    ]
+  },
+  {
+    id: 'protection', multi: false,
+    text: 'If your household income stopped tomorrow — how long could you keep going on what you have accessible right now?',
+    context: 'Think about money you could get to quickly — savings, anything in the bank.',
+    options: [
+      'Less than a month — we\'d be in real trouble quickly',
+      'A couple of months — it would be very stressful',
+      'Around six months — we\'d manage but it would hurt',
+      'Over a year — we\'re reasonably well covered',
+      'Honestly I\'ve never thought about it this way before'
+    ]
+  },
+  {
+    id: 'wills', multi: false,
+    text: 'Have you set out legally what should happen to your money, your home, and your family if something happened to you?',
+    context: 'This means having a current legal document — a will — that makes sure your wishes are carried out and your family is looked after.',
+    options: [
+      'Yes — both of us have current, up to date ones',
+      'We have something but it\'s old and probably needs updating',
+      'One of us has one — the other doesn\'t',
+      'No — we know we need to but haven\'t got around to it',
+      'Not applicable — no partner or dependants to consider'
+    ]
+  },
+  {
+    id: 'goals', multi: true,
+    text: 'When you think about the next five to ten years — what matters most to you financially?',
+    context: 'Select everything that resonates.',
+    options: [
+      'Pay off the home faster',
+      'Buy an investment property',
+      'Build a share portfolio or grow our investments',
+      'Retire earlier than expected',
+      'Set our kids up financially',
+      'Just build a bigger buffer — feel more secure',
+      'Honestly I\'m not sure — I just want to feel like we\'re on the right track'
+    ]
+  },
+  {
+    id: 'aspiration', multi: false,
+    text: 'Last one. What would actually getting on top of your finances feel like for you?',
+    context: null,
+    options: [
+      'Peace of mind — knowing we\'re not missing something obvious',
+      'Getting ahead — feeling like we\'re actually moving forward',
+      'Confidence — making money decisions without second-guessing everything',
+      'Security — knowing my family is protected if something goes wrong',
+      'Being in control — understanding what we have and what it\'s doing for us',
+      'Just knowing where to start'
+    ]
+  }
+];
+
+/* ═════════════════════ SNAPSHOT SYSTEM PROMPT ═════════════════════
+   Devon's scoping prompt, VERBATIM. This is the safety boundary — it keeps
+   the question-helper away from advice, free chat, and specific figures.
+   Do not loosen it. The chat must never call ask-finn without it. */
+const SNAPSHOT_SYSTEM_PROMPT = `You are Finn, a warm, calm financial clarity guide. You are running a free "snapshot" — a set of 19 quick questions that builds a broad picture of someone's finances. You are NOT a financial adviser, and this is NOT financial advice.
+
+**Your job right now is narrow and specific: guide the person through the 19 snapshot questions, one at a time, and help them answer accurately so they complete the snapshot.** That is the whole job. Completion is what matters.
+
+**How you behave:**
+- Ask the questions one at a time, in a warm, plain, unhurried way. Reassure that rough estimates are fine and anything can be skipped.
+- Keep your messages short and human. No jargon. Never use the phrase "plain English" — just be plain. No em-dashes.
+- Use sentence case. Only capitalise the first word, names, and named products ("Clarity Session").
+
+**When someone is confused about a question, HELP — this is allowed and encouraged:**
+- Clarify what a question means, what to include, or how to estimate. (e.g. "Does investment income count in household monthly income?" → "Yes, include any regular income from investments — rental, dividends, interest. A rough monthly figure is fine.")
+- Rephrase a confusing question more simply.
+- Reassure them when they're unsure ("a ballpark is completely fine").
+This kind of help improves their snapshot and is exactly what you're here for.
+
+**HARD BOUNDARIES — never cross these:**
+
+1. **Never give financial advice or opinions on what they should DO with their money.** You clarify the *questions*; you never advise on their *finances*. If they ask something like "should I sell shares to pay off my mortgage?" or "is my super any good?" or "what should I do about X?", do NOT answer it. Warmly deflect: "That's exactly the kind of thing the full Clarity Session and a professional can help with. For now, let's just capture the broad picture — [next question]." This is a firm legal line. Clarify questions; never evaluate their situation or recommend actions.
+
+2. **Never become open-ended chat.** Free-flowing conversation is part of the paid experience, not the free snapshot. If someone tries to turn this into a general finance discussion, help briefly if it's a genuine question about the snapshot, otherwise steer back warmly: "Great question — that's what the full Clarity Session is for. For now, let's finish your snapshot — [next question]." You are a question-helper, not a chatbot.
+
+3. **Never compute or reveal specific personal figures, and never evaluate specific holdings or products.** The snapshot builds a BROAD, general picture only. Do not tell them their exact equity, whether their fees are high, whether they're on track, or how they compare to others. If they push for specifics, explain warmly that the broad snapshot shows general areas worth a look, and the full Clarity Session builds their exact position.
+
+**Your tone throughout:** calm, capable, warm but not fluffy, never pressuring. You're the reassuring guide who makes something intimidating feel easy. You make people feel understood, never judged, never studied. If they seem anxious about their finances, be gentle and normalise it — but still don't advise; just help them through the questions and point to the full experience for the deeper help.
+
+Remember: your success is measured by whether they finish the snapshot feeling calm and helped — not by how much you tell them. Help them answer; never advise them; keep it to the snapshot.`;
+
+/* ═════════════════════════ STATE ═════════════════════════ */
+let phase = 'intro';        // intro | asking | done
+let currentQ = 0;           // index of the question currently being asked
+let answers = {};           // { id: string | string[] | null (skipped) }
+let multiSel = [];          // in-progress multi-select choices
+let sessionId = null;       // snapshot_sessions row UUID
+let aiHistory = [];         // typed exchanges sent to the helper
+let aiBusy = false;
+let saveTimer = null;
+
+const LEADINS = ['Next one —','Okay —','Thanks. Next —','Got it —','Lovely. Next —','Right —','Noted. Next one —'];
+
+const messagesEl = document.getElementById('messages');
+const inputEl = document.getElementById('composerInput');
+const sendBtn = document.getElementById('sendBtn');
+
+/* ═════════════════════ SESSION PERSISTENCE ═════════════════════
+   All writes go through /api/snapshot-session (service key, server-side).
+   Every call is fire-and-forget — persistence never blocks the experience. */
+async function sessionCall(body) {
+  try {
+    const res = await fetch('/api/snapshot-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) return null;
+    return await res.json().catch(() => null);
+  } catch { return null; }
+}
+
+function createSession() {
+  const src = [location.search.replace(/^\?/, ''), document.referrer].filter(Boolean).join(' | ').slice(0, 500) || null;
+  sessionCall({ action: 'create', source: src }).then(d => {
+    if (d && d.id) {
+      sessionId = d.id;
+      sessionStorage.setItem('finn_demo_session', sessionId);
+      scheduleSave();
+    }
+  });
+}
+
+function scheduleSave(immediate) {
+  clearTimeout(saveTimer);
+  const run = () => { if (sessionId) sessionCall({ action: 'update', id: sessionId, answers }); };
+  if (immediate) run(); else saveTimer = setTimeout(run, 900);
+}
+
+function completeSession() {
+  clearTimeout(saveTimer);
+  if (sessionId) sessionCall({ action: 'complete', id: sessionId, answers });
+}
+
+// Last-gasp save on tab close/navigation so drop-offs still keep their answers.
+window.addEventListener('pagehide', () => {
+  if (!sessionId || phase === 'done') return;
+  try {
+    navigator.sendBeacon('/api/snapshot-session',
+      new Blob([JSON.stringify({ action: 'update', id: sessionId, answers })], { type: 'application/json' }));
+  } catch {}
+});
+
+/* ═════════════════════════ CHAT UI ═════════════════════════ */
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function scrollChat() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+function addFinn(html) {
+  const div = document.createElement('div');
+  div.className = 'msg finn';
+  div.innerHTML = '<div class="who">Finn</div>' + html;
+  messagesEl.appendChild(div);
+  scrollChat();
+  return div;
+}
+
+function addUser(text) {
+  const div = document.createElement('div');
+  div.className = 'msg user';
+  div.textContent = text;
+  messagesEl.appendChild(div);
+  scrollChat();
+}
+
+function addTyping() {
+  const div = document.createElement('div');
+  div.className = 'msg finn';
+  div.innerHTML = '<div class="who">Finn</div><div class="typing"><span class="td"></span><span class="td"></span><span class="td"></span></div>';
+  messagesEl.appendChild(div);
+  scrollChat();
+  return div;
+}
+
+// Remove chips from earlier questions so only the current question is actionable.
+function retireChips() {
+  messagesEl.querySelectorAll('.finn-inline').forEach(el => el.remove());
+}
+
+function updateProgress() {
+  const n = Math.min(currentQ, questions.length);
+  document.getElementById('progLabel').textContent =
+    phase === 'done' ? 'All 19 answered' : `${n} of 19 questions`;
+  document.getElementById('progFill').style.width = (n / questions.length * 100) + '%';
+}
+
+/* ═════════════════════ QUESTION FLOW ═════════════════════ */
+function askCurrent(leadin) {
+  const q = questions[currentQ];
+  multiSel = [];
+  let html = '<p>' + (leadin ? esc(leadin) + ' ' : '') + esc(q.text) + '</p>';
+  if (q.context) html += '<div class="q-ctx">' + esc(q.context) + '</div>';
+  html += '<div class="finn-inline">' +
+    q.options.map((o, i) => `<button class="chip-inline" data-opt="${i}" onclick="pickOption(${i}, this)">${esc(o)}</button>`).join('') +
+    (q.multi ? `<button class="chip-inline primary" id="multiDone" style="display:none" onclick="confirmMulti()">That's everything →</button>` : '') +
+    `<button class="chip-skip" onclick="skipQuestion()">Skip this one</button></div>`;
+  addFinn(html);
+  if (q.multi) {
+    const hint = document.createElement('p');
+    hint.style.cssText = 'font-size:12px;color:var(--light);margin-top:6px;';
+    hint.textContent = 'Pick as many as apply.';
+    messagesEl.lastChild.querySelector('.finn-inline').before(hint);
+  }
+  updateProgress();
+}
+
+function pickOption(i, btn) {
+  const q = questions[currentQ];
+  const opt = q.options[i];
+  if (q.multi) {
+    const idx = multiSel.indexOf(opt);
+    if (idx > -1) { multiSel.splice(idx, 1); btn.classList.remove('selected'); }
+    else { multiSel.push(opt); btn.classList.add('selected'); }
+    const done = document.getElementById('multiDone');
+    if (done) done.style.display = multiSel.length ? 'inline-block' : 'none';
+  } else {
+    captureAnswer(opt);
+  }
+}
+
+function confirmMulti() {
+  if (multiSel.length) captureAnswer(multiSel.slice());
+}
+
+function skipQuestion() {
+  retireChips();
+  addUser('Skip this one');
+  answers[questions[currentQ].id] = null;
+  persistLocal();
+  scheduleSave();
+  advance('No worries.');
+}
+
+function captureAnswer(val) {
+  retireChips();
+  addUser(Array.isArray(val) ? val.join(' · ') : val);
+  answers[questions[currentQ].id] = val;
+  persistLocal();
+  scheduleSave();
+  updateTiles(questions[currentQ].id);
+  advance();
+}
+
+function advance(prefix) {
+  currentQ++;
+  updateProgress();
+  if (currentQ >= questions.length) { finish(); return; }
+  const lead = (prefix ? prefix + ' ' : '') + (currentQ === 0 ? 'First one —' : LEADINS[currentQ % LEADINS.length]);
+  setTimeout(() => askCurrent(lead), 420);
+}
+
+function finish() {
+  phase = 'done';
+  persistLocal();
+  completeSession();
+  updateProgress();
+  document.getElementById('hdrT').textContent = 'Your broad picture, built';
+  document.getElementById('heroLine').innerHTML = 'Your snapshot’s <span class="fr">ready</span>.';
+  document.getElementById('heroActions').classList.add('show');
+  updateTiles();
+  addFinn('<p>That’s all nineteen. Your broad picture is built — it’s on the right, and every tile opens up if you want a closer look.</p><p>It’s the general shape of things, not your exact position. That’s what the full Clarity Session builds, with your real figures.</p>');
+  try { fbq('track', 'CompleteRegistration'); } catch {}
+  notifyPictureTab();
+  setTimeout(openDone, 1200);
+}
+
+/* ═════════════════════ INTRO + RESTORE ═════════════════════ */
+function persistLocal() {
+  try {
+    sessionStorage.setItem('finn_demo_answers', JSON.stringify(answers));
+    sessionStorage.setItem('finn_demo_q', String(currentQ));
+    sessionStorage.setItem('finn_demo_phase', phase);
+  } catch {}
+}
+
+function beginSnapshot() {
+  phase = 'asking';
+  currentQ = 0;
+  answers = {};
+  retireChips();
+  createSession();
+  persistLocal();
+  askCurrent('Great. First one —');
+}
+
+function init() {
+  let saved = null;
+  let savedPhase = null;
+  try {
+    savedPhase = sessionStorage.getItem('finn_demo_phase');
+    const a = sessionStorage.getItem('finn_demo_answers');
+    const qn = sessionStorage.getItem('finn_demo_q');
+    if ((savedPhase === 'asking' || savedPhase === 'done') && a && qn !== null) {
+      saved = { answers: JSON.parse(a), q: parseInt(qn, 10) || 0 };
+    }
+  } catch {}
+
+  // Reload after completing: bring the finished picture straight back.
+  if (saved && savedPhase === 'done') {
+    answers = saved.answers || {};
+    sessionId = sessionStorage.getItem('finn_demo_session') || null;
+    phase = 'done';
+    currentQ = questions.length;
+    document.getElementById('hdrT').textContent = 'Your broad picture, built';
+    document.getElementById('heroLine').innerHTML = 'Your snapshot’s <span class="fr">ready</span>.';
+    document.getElementById('heroActions').classList.add('show');
+    addFinn('<p>Welcome back — your snapshot’s done, and your broad picture is on the right. Every tile opens up if you want a closer look.</p><p>When you’re ready to go further, the full Clarity Session builds your exact position with real figures.</p>');
+    renderAllTiles();
+    updateProgress();
+    return;
+  }
+
+  if (saved && saved.q > 0 && saved.q < questions.length) {
+    answers = saved.answers || {};
+    sessionId = sessionStorage.getItem('finn_demo_session') || null;
+    addFinn(`<p>Welcome back — you were up to question ${saved.q + 1} of 19. Want to pick up where you left off?</p>` +
+      `<div class="finn-inline"><button class="chip-inline primary" onclick="resumeSaved(${saved.q})">Pick up where I left off</button>` +
+      `<button class="chip-inline" onclick="startFresh()">Start fresh</button></div>`);
+  } else {
+    addFinn('<p>I’m Finn. I’ll ask you 19 quick questions to build a broad snapshot of where things sit. Rough is completely fine, skip anything you’re not sure about — about five minutes, and you’ll see your picture take shape on the right.</p><p>Ready when you are — just say go.</p>' +
+      '<div class="finn-inline"><button class="chip-inline primary" onclick="beginSnapshot()">Let’s go</button></div>');
+  }
+  renderAllTiles();
+}
+
+function resumeSaved(q) {
+  phase = 'asking';
+  currentQ = q;
+  retireChips();
+  addUser('Pick up where I left off');
+  renderAllTiles();
+  updateProgress();
+  setTimeout(() => askCurrent('Good — back into it.'), 400);
+}
+
+function startFresh() {
+  try { ['finn_demo_answers','finn_demo_q','finn_demo_phase','finn_demo_session'].forEach(k => sessionStorage.removeItem(k)); } catch {}
+  sessionId = null;
+  retireChips();
+  addUser('Start fresh');
+  beginSnapshot();
+}
+
+/* ═════════════════════ AI QUESTION-HELPER ═════════════════════
+   Typed input goes to the Anthropic model via the existing ask-finn edge
+   function, always governed by SNAPSHOT_SYSTEM_PROMPT. The envelope below
+   handles mechanics only (answer capture); the system prompt owns the
+   boundaries. save:false stops ask-finn writing a snapshots row per turn. */
+function buildEnvelope(q, text) {
+  let e = `[Snapshot mechanics — the person does not see this part]\n` +
+    `Current question ${currentQ + 1} of 19: "${q.text}"\n` +
+    (q.context ? `Question context: ${q.context}\n` : '') +
+    `Answer options: ${q.options.join(' | ')}\n\n` +
+    `The person typed: "${text}"\n\n` +
+    `If their message answers the current question, reply with the first line exactly:\n` +
+    `ANSWER: <the option text that best matches, or their own words if none match>\n` +
+    (q.multi ? `They can pick several — if they gave several, put them all on the ANSWER line separated by " | ".\n` : '') +
+    `Then on a new line, one short warm acknowledgment sentence (no advice, no evaluation of their situation).\n\n` +
+    `If instead they are confused, unsure, or asking about the question, help them according to your instructions and finish by gently re-asking the question. Never move to a different question. Never start the ANSWER line unless they actually answered.`;
+  return e;
+}
+
+async function askHelper(text) {
+  const q = questions[currentQ];
+  aiBusy = true;
+  sendBtn.disabled = true;
+  const typingEl = addTyping();
+
+  const envelope = buildEnvelope(q, text);
+  const msgs = aiHistory.slice(-6).concat([{ role: 'user', content: envelope }]);
+
+  let fullText = '';
+  try {
+    const res = await fetch('/api/ask-finn', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ system: SNAPSHOT_SYSTEM_PROMPT, max_tokens: 400, save: false, messages: msgs })
+    });
+    if (!res.ok) throw new Error('helper ' + res.status);
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6).trim();
+        if (!raw || raw === '[DONE]') continue;
+        try {
+          const evt = JSON.parse(raw);
+          if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') fullText += evt.delta.text;
+        } catch {}
+      }
+    }
+  } catch (err) {
+    typingEl.remove();
+    aiBusy = false;
+    sendBtn.disabled = false;
+    addFinn('<p>Sorry — I couldn’t get to that just then. Mind trying again, or just tap one of the options above?</p>');
+    return;
+  }
+
+  typingEl.remove();
+  aiBusy = false;
+  sendBtn.disabled = false;
+
+  aiHistory.push({ role: 'user', content: envelope });
+  aiHistory.push({ role: 'assistant', content: fullText || '(no reply)' });
+
+  const m = fullText.match(/^\s*ANSWER:\s*(.+)$/m);
+  if (m && phase === 'asking') {
+    const raw = m[1].trim();
+    const ack = fullText.replace(/^\s*ANSWER:.*$/m, '').trim();
+    const val = q.multi ? raw.split('|').map(s => s.trim()).filter(Boolean) : raw;
+    retireChips();
+    answers[q.id] = val;
+    persistLocal();
+    scheduleSave();
+    updateTiles(q.id);
+    if (ack) addFinn('<p>' + esc(ack) + '</p>');
+    advance();
+  } else {
+    addFinn('<p>' + esc(fullText || 'Sorry, I lost my train of thought — could you try that again?').replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>') + '</p>');
+  }
+}
+
+function handleSend() {
+  const text = inputEl.value.trim();
+  if (!text || aiBusy) return;
+  inputEl.value = '';
+  inputEl.style.height = 'auto';
+
+  if (phase === 'intro') {
+    addUser(text);
+    retireChips();
+    beginSnapshot();
+    return;
+  }
+  if (phase === 'done') {
+    addUser(text);
+    addFinn('<p>Your snapshot’s done — nineteen for nineteen. Going deeper is exactly what the full Clarity Session is for. You can email yourself a copy or join the waitlist from your picture on the right.</p>');
+    return;
+  }
+  addUser(text);
+  askHelper(text);
+}
+
+sendBtn.addEventListener('click', handleSend);
+inputEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+});
+inputEl.addEventListener('input', () => { inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 76) + 'px'; });
+
+/* ═════════════════════════ THE TILES ═════════════════════════
+   Broad and non-specific by design. Metrics only ever reflect the person's
+   own selected answer back — nothing is derived or computed. */
+function ansStr(id) {
+  const a = answers[id];
+  if (!a) return '';
+  return Array.isArray(a) ? a.join(' · ') : String(a);
+}
+function hasAns(id) { return answers[id] !== undefined && answers[id] !== null && ansStr(id) !== ''; }
+function has(id, frag) { return ansStr(id).toLowerCase().includes(frag.toLowerCase()); }
+
+const INCOME_SHORT = {
+  'Under $5,000 per month': 'Under $5k /mo',
+  '$5,000 to $8,000 per month': '$5k–$8k /mo',
+  '$8,000 to $12,000 per month': '$8k–$12k /mo',
+  '$12,000 to $18,000 per month': '$12k–$18k /mo',
+  'Over $18,000 per month': 'Over $18k /mo'
+};
+
+const TILES = [
+  {
+    key: 'equity', name: 'Equity position', sources: ['ownership'],
+    who: 'A <b>mortgage broker</b> can check a loan against the whole market — that’s exactly what they do.',
+    ctxbox: 'How a home loan is set up — the rate, the structure, where savings sit — changes what it costs over time. Lenders don’t always tell existing customers when a better deal exists.',
+    compute() {
+      if (!hasAns('ownership')) return null;
+      if (has('ownership', 'Renting')) return { status: 'clear', metric: 'Renting', ctx: 'no home loan in the picture yet', read: 'You’re renting, so there’s no home loan in the picture yet. If buying is on the horizon, the deposit and borrowing side is exactly where a mortgage broker earns their keep.' };
+      if (has('ownership', 'not sure what we owe')) return { status: 'look', metric: 'Loan unclear', ctx: 'worth getting clear on what’s owed', read: 'You own your home but aren’t sure what’s owed or how the loan works. That’s really common — and the loan is usually the biggest financial commitment there is, so getting clear on it is one of the first things worth doing.' };
+      if (has('ownership', 'outright')) return { status: 'clear', metric: 'Owned outright', ctx: 'no loan against the home', read: 'Your home is paid off — a strong position. The question becomes what the rest of the picture is doing around it.' };
+      let metric = 'Home loan';
+      if (has('ownership', 'under $400,000')) metric = 'Loan under $400k';
+      else if (has('ownership', '$400,000 to $700,000')) metric = 'Loan $400k–$700k';
+      else if (has('ownership', 'over $700,000')) metric = 'Loan over $700k';
+      return { status: 'clear', metric, ctx: 'your rough figure, captured', read: 'You own with a home loan and have a rough handle on what’s owed. How the loan is structured — the rate, and whether savings work against it — is the part most households have never had properly explained.' };
+    },
+    gapBody: 'Not being sure what’s owed or how the loan works is really common — and the loan is usually the biggest financial commitment there is. Getting clear on it is one of the first things worth doing.'
+  },
+  {
+    key: 'surplus', name: 'Monthly surplus', sources: ['income', 'cashflow'],
+    who: 'A <b>financial planner</b> helps people put spare money to work — that’s the bread and butter.',
+    ctxbox: 'What’s left over each month, over time, is what funds most financial goals. How best to use it depends entirely on the situation — which is a conversation for the Clarity Session and a professional.',
+    compute() {
+      if (!hasAns('cashflow')) return null;
+      const inc = INCOME_SHORT[ansStr('income')] || null;
+      const base = inc ? 'on ' + inc.toLowerCase().replace(' /mo', ' a month') : '';
+      if (has('cashflow', 'disappears')) return { status: 'look', metric: 'Hard to say', ctx: 'money’s going somewhere each month ' + base, read: 'Money’s going somewhere each month and it’s genuinely hard to say where. Not knowing what’s left means it can’t be put to work deliberately — one of the most common and most fixable things we see.' };
+      if (has('cashflow', 'not much left over')) return { status: 'look', metric: 'Thin', ctx: 'everything’s covered, not much spare ' + base, read: 'Everything gets covered but there’s not much left at the end of the month. Whether that’s a spending shape or an income shape is exactly the kind of thing a clear picture sorts out.' };
+      if (has('cashflow', 'just sits there')) return { status: 'look', metric: 'Sitting still', ctx: 'money left over that isn’t doing much', read: 'There’s usually money left over, but it just sits there. Money like this is often what a planner helps people put to work — how savings, loans and investments interact is worth understanding.' };
+      if (has('cashflow', 'actively putting')) return { status: 'clear', metric: 'Put to work', ctx: 'leftover money is going somewhere useful', read: 'There’s money left over each month and it’s being put somewhere on purpose. The follow-up question — whether it’s going to the best place — is a real-figures conversation.' };
+      return { status: 'look', metric: 'Varies', ctx: 'income moves around, so what’s spare does too', read: 'Income varies a lot, so what’s spare each month moves around too. Households with variable income usually benefit most from knowing their baseline — the number everything else builds on.' };
+    },
+    gapBody: 'There may be money each month that isn’t doing much, or that’s hard to account for. Getting clear on where it goes is one of the most fixable things we see.'
+  },
+  {
+    key: 'buffer', name: 'Emergency buffer', sources: ['protection'],
+    who: 'A <b>financial planner</b> can help build a buffer at a pace that fits a budget.',
+    ctxbox: 'Many households aim for somewhere around <b>three to six months</b> of expenses as a buffer. Where you land is a personal call — the point is knowing your number.',
+    compute() {
+      if (!hasAns('protection')) return null;
+      if (has('protection', 'Less than a month')) return { status: 'look', metric: 'Under a month', ctx: 'cover if income paused', read: 'If income stopped, things would get hard within a month. Knowing that number is the first step — a buffer is the thing that turns a shock into a pause rather than a crisis.' };
+      if (has('protection', 'couple of months')) return { status: 'look', metric: 'A couple of months', ctx: 'cover if income paused', read: 'A couple of months of cover if income paused. That’s a real buffer, and it would still be a very stressful stretch — worth knowing how it compares to where you’d want it.' };
+      if (has('protection', 'six months')) return { status: 'clear', metric: 'Around six months', ctx: 'cover if income paused', read: 'Around six months of cover if income paused — that’s the kind of buffer many households aim for. It would hurt, but it holds.' };
+      if (has('protection', 'Over a year')) return { status: 'clear', metric: 'Over a year', ctx: 'cover if income paused', read: 'Over a year of cover if income paused — a genuinely strong position. The follow-up is whether that money is set up to work while it waits.' };
+      return { status: 'look', metric: 'Never sized', ctx: 'worth knowing this number', read: 'You’ve never thought about it this way before — and that’s most people. How long the household could keep going if income paused is one of the most grounding numbers there is.' };
+    },
+    gapBody: 'It’s worth knowing how long the household could keep going if income paused. A thin or unknown buffer is the thing that turns a shock into a crisis instead of a pause.'
+  },
+  {
+    key: 'income', name: 'Income structure', sources: ['income_type', 'income'],
+    who: 'An <b>accountant</b> can check the structure still fits as things change.',
+    ctxbox: 'How income is structured — salary, sole trader, company — affects tax. What suits a household depends on the amounts and the plans.',
+    compute() {
+      if (!hasAns('income_type') && !hasAns('income')) return null;
+      const metric = INCOME_SHORT[ansStr('income')] || 'Captured';
+      if (has('income_type', 'Employed — regular')) return { status: 'clear', metric, ctx: 'regular salary or wages', read: 'Household income comes from regular salary or wages — the most straightforward structure there is. That keeps the tax side simple and the picture easy to read.' };
+      if (has('income_type', 'Self employed')) return { status: 'look', metric, ctx: 'self employed — structure worth understanding', read: 'The household income is self employed. How that’s structured — sole trader, company, trust — affects tax, and what suits best changes as the business grows.' };
+      if (has('income_type', 'A mix')) return { status: 'look', metric, ctx: 'salary plus business or side income', read: 'Income is a mix — salary plus a business or side income. As the side income grows, how it’s structured for tax matters more. That’s an accountant conversation, and a good one to have early.' };
+      if (has('income_type', 'One employed, one self employed')) return { status: 'look', metric, ctx: 'one salary, one self employed', read: 'One of you is employed and one self employed. Two income types means two tax pictures — worth making sure the structure suits both.' };
+      return { status: 'clear', metric, ctx: 'income captured', read: 'Your household income is captured — the broad bracket, which is all the snapshot needs.' };
+    },
+    gapBody: 'Part of the household income is self employed or side income. How that’s structured for tax matters more as it grows.'
+  },
+  {
+    key: 'super', name: 'Super', sources: ['super'],
+    who: 'A <b>financial planner</b> can talk through whether consolidating or reviewing makes sense.',
+    ctxbox: 'Every super account charges its own fees, so multiple accounts can mean paying more than once. Consolidating can also affect insurance held inside a fund — worth checking before touching anything.',
+    compute() {
+      if (!hasAns('super')) return null;
+      if (has('super', 'On top of it')) return { status: 'clear', metric: 'On top of it', ctx: 'reviewed regularly', read: 'You know your balance and review it regularly — that alone puts you well ahead of most. Super is most people’s second-biggest asset and the most neglected.' };
+      if (has('super', 'more than one account')) return { status: 'look', metric: 'Multiple accounts?', ctx: 'possibly paying fees more than once', read: 'You might have more than one super account from different jobs. Here’s what a lot of people don’t realise: each account charges its own fees, so multiple accounts can mean paying two or three times over, quietly, for years.' };
+      if (has('super', 'know roughly')) return { status: 'look', metric: 'Due a look', ctx: 'not reviewed in a while', read: 'You know roughly what’s there but haven’t looked properly in a while. Super quietly compounds for decades — a periodic look at fees and settings is one of the highest-leverage habits there is.' };
+      if (has('super', 'partner manages')) return { status: 'look', metric: 'Partner manages', ctx: 'not across the detail', read: 'Your partner manages the super and you’re not across the detail. That works day to day — being roughly across it yourself is mostly about resilience if anything ever changed.' };
+      return { status: 'look', metric: 'Unclear', ctx: 'worth getting across', read: 'Super isn’t something you know much about yet — and that’s genuinely common. It’s most people’s second-biggest asset, and getting even roughly across it pays off for decades.' };
+    },
+    gapBody: 'Super is most people’s second-biggest asset and the most neglected. More than one account, or not knowing what’s there, usually means paying fees for nothing.'
+  },
+  {
+    key: 'protect', name: 'Protection & estate', sources: ['insurance', 'wills'],
+    who: 'A <b>risk (insurance) specialist or estate lawyer</b>, depending on where the gap is.',
+    ctxbox: 'Cover if income stops, and the legal basics — a will, power of attorney, guardianship — are the things that protect a family when something goes wrong. Most households have gaps here and don’t realise.',
+    compute() {
+      if (!hasAns('insurance') && !hasAns('wills')) return null;
+      const insOk = has('insurance', 'know exactly') || has('insurance', 'advisor who manages');
+      const willOk = has('wills', 'current, up to date') || has('wills', 'Not applicable');
+      const insGap = has('insurance', 'no idea') || has('insurance', 'underprotected') || has('insurance', 'not sure how much');
+      const willGap = has('wills', 'old') || has('wills', 'One of us') || has('wills', 'No —');
+      if (hasAns('insurance') && hasAns('wills')) {
+        if (insOk && willOk) return { status: 'clear', metric: 'Looks in order', ctx: 'cover known, paperwork current', read: 'You know your cover and the legal basics are current — genuinely rare, and worth having confirmed properly when you build the full picture.' };
+        if (insGap && willGap) return { status: 'look', metric: 'Gaps likely', ctx: 'cover unclear and paperwork behind', read: 'Cover is unclear and the legal paperwork isn’t current. These are the things that protect a family if something goes wrong — and they’re usually more straightforward to sort than people expect.' };
+        return { status: 'look', metric: 'Worth a look', ctx: insGap || !insOk ? 'cover is the unclear part' : 'the paperwork is the unclear part', read: 'Part of the protection picture looks in order and part is unclear. Worth knowing exactly where each piece stands — that’s what turns “probably fine” into “known”.' };
+      }
+      return { status: 'look', metric: 'Half captured', ctx: 'one more question fills this in', read: 'This area is half captured — the remaining question fills it in.' };
+    },
+    gapBody: 'Cover if income stopped, and the legal basics like a will — these are the things that protect a family if something goes wrong. Unclear here usually means a gap.'
+  }
+];
+
+function renderAllTiles() {
+  const grid = document.getElementById('tilesGrid');
+  grid.innerHTML = '';
+  TILES.forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'tile s-none';
+    el.id = 'tile-' + t.key;
+    el.onclick = () => openDetail(t.key);
+    grid.appendChild(el);
+    paintTile(t, el, false);
+  });
+  renderGaps();
+}
+
+function paintTile(t, el, pulse) {
+  const r = t.compute();
+  const answered = t.sources.filter(hasAns).length;
+  const pct = Math.round(answered / t.sources.length * 100);
+  const status = r ? r.status : 'none';
+  const badgeLabel = r ? (pct < 100 ? 'In progress' : { clear: 'Clear', look: 'Worth a look' }[r.status]) : 'Not yet';
+  el.className = 'tile s-' + status + (pct === 100 && phase === 'done' ? ' done' : '');
+  el.innerHTML =
+    `<div class="status-row"><span class="badge ${status}"><span class="d ${status}"></span>${badgeLabel}</span><span class="ico">▸</span></div>` +
+    `<div class="name">${t.name}</div>` +
+    (r ? `<div class="metric">${esc(r.metric)}<span class="ctx">${esc(r.ctx)}</span></div>`
+       : `<div class="metric empty">Not captured yet<span class="ctx">builds as you answer</span></div>`) +
+    `<div class="complete"><div class="cf" style="width:${pct}%"></div></div>`;
+  if (pulse) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
+}
+
+function updateTiles(changedQid) {
+  TILES.forEach(t => {
+    const el = document.getElementById('tile-' + t.key);
+    if (!el) return;
+    const touched = !changedQid || t.sources.includes(changedQid);
+    if (touched) paintTile(t, el, !!changedQid);
+  });
+  renderGaps();
+  if (changedQid) notifyPictureTab();
+}
+
+function renderGaps() {
+  const list = document.getElementById('gapsList');
+  list.innerHTML = '';
+  const looks = TILES.map(t => ({ t, r: t.compute() })).filter(x => x.r && x.r.status === 'look');
+  if (!looks.length) {
+    list.innerHTML = '<div class="gaps-empty">Nothing flagged yet. As your answers come in, anything worth a look shows up here — broad areas, not verdicts.</div>';
+    return;
+  }
+  looks.forEach(({ t }) => {
+    const card = document.createElement('div');
+    card.className = 'gapcard';
+    card.onclick = () => openDetail(t.key);
+    card.innerHTML = `<div class="gh"><span class="gt">${t.name}</span><span class="tag">Worth a look</span></div>` +
+      `<div class="body">${t.gapBody}</div>` +
+      `<button class="find">See the broad picture →</button>`;
+    list.appendChild(card);
+  });
+}
+
+function setView(v) {
+  document.getElementById('panelOverview').classList.toggle('on', v === 'overview');
+  document.getElementById('panelGaps').classList.toggle('on', v === 'gaps');
+  document.getElementById('vOver').classList.toggle('on', v === 'overview');
+  document.getElementById('vGap').classList.toggle('on', v === 'gaps');
+}
+
+/* ═════════════════════ DETAIL PANEL ═════════════════════ */
+const QUESTION_BY_ID = Object.fromEntries(questions.map(q => [q.id, q]));
+
+function openDetail(key) {
+  const t = TILES.find(x => x.key === key);
+  if (!t) return;
+  const r = t.compute();
+  const status = r ? r.status : 'none';
+  const badgeLabel = r ? { clear: 'Clear', look: 'Worth a look' }[r.status] : 'Not yet';
+  document.getElementById('dpTitle').textContent = t.name;
+  const badge = document.getElementById('dpBadge');
+  badge.className = 'dp-badge badge ' + status;
+  badge.innerHTML = `<span class="d ${status}"></span>${badgeLabel}`;
+
+  let html = '<div class="dp-inner">';
+  if (r) {
+    html += `<div class="dp-hero-num">${esc(r.metric)}</div><div class="dp-context">${esc(r.ctx)}</div>`;
+    html += `<div class="dp-section"><div class="lbl">What this means</div><div class="dp-read">${esc(r.read)}</div></div>`;
+  } else {
+    html += `<div class="dp-section"><div class="lbl">What this means</div><div class="dp-read">We haven’t covered this area yet — it builds as you answer the questions on the left.</div></div>`;
+  }
+  const told = t.sources.filter(hasAns).map(id => {
+    const q = QUESTION_BY_ID[id];
+    return `<div class="dp-figrow"><span class="k">${esc(q.text)}</span><span class="v">${esc(ansStr(id))}</span></div>`;
+  }).join('');
+  html += '<div class="dp-grid">';
+  if (told) html += `<div class="dp-section"><div class="lbl">What you told me</div><div class="dp-figures">${told}</div></div>`;
+  html += `<div class="dp-section"><div class="lbl">Context</div><div class="dp-context-box">${t.ctxbox}</div></div>`;
+  html += '</div>';
+  html += `<div class="dp-section"><div class="lbl">Who can help</div><div class="dp-points"><div class="ic">◇</div><div class="txt">${t.who}</div></div>` +
+    `<div class="dp-clarity">This is the broad version. The full <b>Clarity Session</b> builds this area with your real figures — <a href="https://meetfinn.com.au/ready?from=snapshot-demo" onclick="try{fbq('track','InitiateCheckout')}catch(e){}">join the waitlist →</a></div></div>`;
+  html += '</div>';
+  document.getElementById('dpBody').innerHTML = html;
+  document.getElementById('detailPanel').classList.add('on');
+}
+
+function closeDetail() { document.getElementById('detailPanel').classList.remove('on'); }
+
+/* ═════════════════════ COMPLETION + EMAIL ═════════════════════ */
+function openDone() { document.getElementById('doneOverlay').classList.add('on'); }
+function closeDone() { document.getElementById('doneOverlay').classList.remove('on'); }
+function goClarity() {
+  try { fbq('track', 'InitiateCheckout'); } catch {}
+  window.location.href = 'https://meetfinn.com.au/ready?from=snapshot-demo';
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function submitEmail() {
+  const input = document.getElementById('emailInput');
+  const btn = document.getElementById('emailBtn');
+  const email = input.value.trim();
+  if (!EMAIL_RE.test(email)) {
+    input.style.borderColor = 'var(--warm)';
+    setTimeout(() => { input.style.borderColor = ''; }, 2000);
+    input.focus();
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+
+  // 1. Attach to the session row (the durable record).
+  if (sessionId) sessionCall({ action: 'email', id: sessionId, email });
+
+  // 2. MailerLite — same graduation flow as the classic snapshot.
+  fetch('/api/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'snapshot', email })
+  }).catch(() => {});
+
+  // 3. Formspree — owner notification + backup, carrying the answers.
+  const answersText = questions.map(q => `${q.id}: ${ansStr(q.id) || 'Not answered'}`).join('\n');
+  fetch('https://formspree.io/f/mgodedzl', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ email, _replyto: email, source: 'snapshot-demo', session_id: sessionId, answers: answersText })
+  })
+  .then(r => { if (!r.ok) throw new Error('formspree failed'); onEmailDone(); })
+  .catch(() => {
+    // Session + MailerLite may still have captured it — don't punish the user.
+    onEmailDone();
+  });
+}
+
+function onEmailDone() {
+  document.getElementById('emailRow').style.display = 'none';
+  document.getElementById('emailNote').style.display = 'none';
+  document.getElementById('emailThanks').style.display = 'block';
+}
+
+/* ═════════════════════ SHELL BEHAVIOUR ═════════════════════ */
+function setReview(on) { document.body.classList.toggle('review', on); }
+
+function setTab(t) {
+  document.body.classList.toggle('tab-chat', t === 'chat');
+  document.body.classList.toggle('tab-picture', t === 'picture');
+  document.getElementById('tabChat').classList.toggle('on', t === 'chat');
+  document.getElementById('tabPicture').classList.toggle('on', t === 'picture');
+  if (t === 'picture') document.getElementById('pictureDot').classList.remove('show');
+}
+
+function notifyPictureTab() {
+  if (document.body.classList.contains('tab-chat')) document.getElementById('pictureDot').classList.add('show');
+}
+
+init();
+</script>
+</body>
+</html>
