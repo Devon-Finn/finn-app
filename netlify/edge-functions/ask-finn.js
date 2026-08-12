@@ -1,10 +1,13 @@
-// In-memory rate limiter: 10 requests per IP per hour
+// In-memory rate limiter: 10 requests per IP per hour.
+// Chat-mode calls (save === false, the /app/snapshot question-helper) get a
+// higher ceiling — a single snapshot can involve many short helper turns.
 const rateLimitMap = new Map();
 const RATE_LIMIT = 10;
+const CHAT_RATE_LIMIT = 40;
 const WINDOW_MS = 60 * 60 * 1000;
 const TIMEOUT_MS = 25000;
 
-function checkRateLimit(ip) {
+function checkRateLimit(ip, limit = RATE_LIMIT) {
   const now = Date.now();
   const entry = rateLimitMap.get(ip) ?? { count: 0, windowStart: now };
   if (now - entry.windowStart > WINDOW_MS) {
@@ -13,7 +16,7 @@ function checkRateLimit(ip) {
   }
   entry.count++;
   rateLimitMap.set(ip, entry);
-  return entry.count <= RATE_LIMIT;
+  return entry.count <= limit;
 }
 
 // Parse Anthropic SSE stream bytes and accumulate the full text output.
@@ -124,14 +127,6 @@ export default async function handler(request, context) {
     return new Response("Method Not Allowed", { status: 405 });
   }
 
-  const ip = context.ip ?? request.headers.get("x-forwarded-for") ?? "unknown";
-  if (!checkRateLimit(ip)) {
-    return new Response(
-      JSON.stringify({ error: "Too many requests. Please try again later." }),
-      { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders() } }
-    );
-  }
-
   const apiKey = Deno.env.get("ANTHROPIC_KEY");
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "API key not configured" }), {
@@ -148,6 +143,16 @@ export default async function handler(request, context) {
       status: 400,
       headers: { "Content-Type": "application/json", ...corsHeaders() },
     });
+  }
+
+  // Rate limit runs after parsing so chat-mode calls can use their own ceiling.
+  const isChatMode = payload.save === false;
+  const ip = context.ip ?? request.headers.get("x-forwarded-for") ?? "unknown";
+  if (!checkRateLimit(ip, isChatMode ? CHAT_RATE_LIMIT : RATE_LIMIT)) {
+    return new Response(
+      JSON.stringify({ error: "Too many requests. Please try again later." }),
+      { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders() } }
+    );
   }
 
   if (!Array.isArray(payload.messages) || payload.messages.length === 0) {
@@ -207,11 +212,18 @@ export default async function handler(request, context) {
 
   // Background task: accumulate text then save. context.waitUntil keeps the
   // edge function alive after the HTTP response is returned until this resolves.
-  context.waitUntil(
-    accumulateStreamText(saveStream).then((output) =>
-      saveSnapshot(snapshotId, output, payload.answers ?? null)
-    )
-  );
+  // Chat-mode calls (save === false) skip the save entirely — helper turns from
+  // /app/snapshot must not create rows in public.snapshots.
+  if (!isChatMode) {
+    context.waitUntil(
+      accumulateStreamText(saveStream).then((output) =>
+        saveSnapshot(snapshotId, output, payload.answers ?? null)
+      )
+    );
+  } else {
+    // Still drain the tee'd copy so it never backs up the client stream.
+    context.waitUntil(saveStream.cancel().catch(() => {}));
+  }
 
   return new Response(clientStream, {
     headers: {

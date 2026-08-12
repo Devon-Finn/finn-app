@@ -9,6 +9,10 @@
   path = "/api/subscribe"
   function = "subscribe"
 
+[[edge_functions]]
+  path = "/api/snapshot-session"
+  function = "snapshot-session"
+
 [[headers]]
   for = "/*"
   [headers.values]
