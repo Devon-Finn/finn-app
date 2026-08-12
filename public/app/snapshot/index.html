@@ -51,7 +51,11 @@ src="https://www.facebook.com/tr?id=1501463388385490&ev=PageView&noscript=1"/></
   /* ===== NAV RAIL ===== */
   .rail{width:236px; flex-shrink:0; background:linear-gradient(180deg,var(--accent),var(--accent-deep)); color:#d7e3db; display:flex; flex-direction:column; padding:22px 0;}
   .rail .brand{padding:4px 22px 24px; font-weight:700; font-size:22px; color:#fff; letter-spacing:-.02em;}
-  .rail .brand a{color:#fff; text-decoration:none;}
+  /* Neutralise the .rail a nav-link rule (flex+gap+padding+14.5px) on the brand
+     anchor so the wordmark renders exactly like the mockup's plain div:
+     22px/700 from .brand, steel dot flush against the "n". */
+  .rail .brand a{color:#fff; text-decoration:none; display:inline; gap:0; padding:0; margin:0; font-size:inherit; font-weight:inherit; border-radius:0;}
+  .rail .brand a:hover{background:none; color:#fff;}
   .rail .brand .dot{color:var(--steel);}
   .rail .navgroup{padding:0 14px;}
   .rail a{display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:10px; color:#cadbd1; text-decoration:none; font-size:14.5px; font-weight:500; margin-bottom:2px; transition:all .16s;}
