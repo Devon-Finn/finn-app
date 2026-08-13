@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finn — Reset your password</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/shared/finn-auth.css">
+</head>
+<body>
+
+<div class="auth-top">
+  <div class="brand"><a href="https://meetfinn.com.au">Finn<span class="dot">.</span></a></div>
+  <div class="aside">Remembered it? <a href="/app/login/">Log in</a></div>
+</div>
+
+<div class="auth-wrap">
+  <!-- Request a reset email -->
+  <div class="card" id="requestCard">
+    <div class="eyebrow">Your account</div>
+    <h1>Reset your <span class="fr">password</span>.</h1>
+    <p class="sub">Enter your email and we'll send you a link to set a new one.</p>
+    <div class="form-msg" id="reqMsg"></div>
+    <form id="requestForm" novalidate>
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" autocomplete="email" required>
+      </div>
+      <button class="btn" id="reqBtn" type="submit">Send the reset link</button>
+    </form>
+    <div class="below"><a href="/app/login/">Back to log in</a></div>
+  </div>
+
+  <!-- Set the new password (shown when arriving from the email link) -->
+  <div class="card" id="newCard" style="display:none">
+    <div class="eyebrow">Your account</div>
+    <h1>Choose a new <span class="fr">password</span>.</h1>
+    <p class="sub">Set a new password for your account and you're back in.</p>
+    <div class="form-msg" id="newMsg"></div>
+    <form id="newForm" novalidate>
+      <div class="field">
+        <label for="newPassword">New password</label>
+        <input type="password" id="newPassword" autocomplete="new-password" required>
+        <div class="hint">At least 8 characters.</div>
+      </div>
+      <button class="btn" id="newBtn" type="submit">Set new password</button>
+    </form>
+  </div>
+</div>
+
+<div class="auth-legal">Finn is not a licensed financial advisor. <a href="https://meetfinn.com.au/privacy">Privacy Policy</a> · <a href="https://meetfinn.com.au/terms">Terms of Use</a></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/app/shared/finn-supabase.js"></script>
+<script>
+'use strict';
+const reqMsg = document.getElementById('reqMsg');
+const newMsg = document.getElementById('newMsg');
+
+function show(el, kind, text) { el.className = 'form-msg ' + kind; el.textContent = text; }
+
+// Arriving from the recovery email: supabase-js picks the session out of the
+// URL and fires PASSWORD_RECOVERY — switch to the set-new-password card.
+finnSupabase.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    document.getElementById('requestCard').style.display = 'none';
+    document.getElementById('newCard').style.display = 'block';
+  }
+});
+
+document.getElementById('requestForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  if (!email) { show(reqMsg, 'err', 'Enter your email first.'); return; }
+  const btn = document.getElementById('reqBtn');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  const { error } = await finnSupabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/app/reset/'
+  });
+  btn.disabled = false;
+  btn.textContent = 'Send the reset link';
+  if (error) {
+    show(reqMsg, 'err', 'We couldn’t send the link just then. Please try again in a minute.');
+    return;
+  }
+  show(reqMsg, 'ok', 'Done — if that email has an account, a reset link is on its way. Check your inbox.');
+});
+
+document.getElementById('newForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const password = document.getElementById('newPassword').value;
+  if (password.length < 8) { show(newMsg, 'err', 'Use at least 8 characters.'); return; }
+  const btn = document.getElementById('newBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  const { error } = await finnSupabase.auth.updateUser({ password });
+  if (error) {
+    btn.disabled = false;
+    btn.textContent = 'Set new password';
+    show(newMsg, 'err', 'That didn’t save. The link may have expired — request a fresh one from the log in page.');
+    return;
+  }
+  show(newMsg, 'ok', 'New password saved. Taking you to your picture…');
+  setTimeout(() => window.location.replace('/app/home/'), 900);
+});
+</script>
+</body>
+</html>

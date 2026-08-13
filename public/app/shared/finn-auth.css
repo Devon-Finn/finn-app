@@ -1,0 +1,52 @@
+/* Shared styles for the Finn auth screens (build step 2).
+   Matches the v10 mockup brand: forest/steel/parchment, Jost + Fraunces,
+   sentence case, calm and uncluttered. */
+:root{
+  --parch:#f6f2ec; --parch-deep:#efe9dd; --canvas:#e7e0d3; --surface:#ffffff; --surface-warm:#faf7f2;
+  --dark:#1c1917; --mid:#5c5a55; --light:#9a9a94; --rule:#e6e0d6; --rule-soft:#efeae1;
+  --accent:#2a4a3a; --accent-2:#356048; --accent-deep:#213b2e; --accent-light:#f0f4f1;
+  --steel:#c2d4de; --steel-deep:#8fb0c0; --warm:#c4956a; --warm-deep:#a8703f; --warm-light:#fdf6ee;
+  --shadow:0 1px 2px rgba(28,25,23,.04), 0 8px 24px rgba(28,25,23,.05);
+  --shadow-lift:0 2px 4px rgba(28,25,23,.05), 0 14px 34px rgba(33,59,46,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{min-height:100%;}
+body{font-family:'Jost',sans-serif; background:var(--parch); color:var(--dark); font-weight:500; -webkit-font-smoothing:antialiased; display:flex; flex-direction:column; min-height:100vh; min-height:100dvh;}
+.fr{font-family:'Fraunces',serif; font-style:italic; font-weight:400;}
+
+.auth-top{padding:26px 30px; display:flex; justify-content:space-between; align-items:center;}
+.brand{font-weight:700; font-size:22px; color:var(--accent); letter-spacing:-.02em;}
+.brand a{color:var(--accent); text-decoration:none;}
+.brand .dot{color:var(--steel-deep);}
+.auth-top .aside{font-size:13px; color:var(--mid);}
+.auth-top .aside a{color:var(--accent); font-weight:600; text-decoration:none;}
+.auth-top .aside a:hover{text-decoration:underline;}
+
+.auth-wrap{flex:1; display:flex; align-items:center; justify-content:center; padding:24px 16px 60px;}
+.card{width:100%; max-width:420px; background:var(--surface-warm); border:1px solid var(--rule); border-radius:18px; padding:34px 34px 30px; box-shadow:var(--shadow-lift);}
+.card .eyebrow{font-size:10.5px; text-transform:uppercase; letter-spacing:.14em; color:var(--steel-deep); font-weight:600; margin-bottom:10px;}
+.card h1{font-size:25px; font-weight:600; letter-spacing:-.01em; line-height:1.25; margin-bottom:8px;}
+.card h1 .fr{color:var(--accent-2);}
+.card .sub{font-size:14px; color:var(--mid); line-height:1.6; margin-bottom:22px;}
+.field{margin-bottom:14px;}
+.field label{display:block; font-size:12.5px; font-weight:600; color:var(--mid); margin-bottom:6px;}
+.field input{width:100%; padding:12px 14px; border:1px solid var(--rule); border-radius:10px; font-family:inherit; font-size:15px; color:var(--dark); background:var(--surface); outline:none; transition:border-color .15s;}
+.field input:focus{border-color:var(--accent);}
+.field .hint{font-size:11.5px; color:var(--light); margin-top:5px;}
+.btn{width:100%; font-family:inherit; font-size:15px; font-weight:600; color:#fff; background:var(--accent); border:none; border-radius:11px; padding:13px; cursor:pointer; transition:background .16s, opacity .16s; margin-top:6px;}
+.btn:hover{background:var(--accent-deep);}
+.btn:disabled{opacity:.5; cursor:default;}
+.form-msg{display:none; font-size:13.5px; line-height:1.5; border-radius:10px; padding:11px 13px; margin-bottom:14px;}
+.form-msg.err{display:block; background:var(--warm-light); border:1px solid #ecd9c4; color:#8a6038;}
+.form-msg.ok{display:block; background:var(--accent-light); border:1px solid #d5e3d9; color:var(--accent);}
+.card .below{margin-top:18px; text-align:center; font-size:13px; color:var(--mid);}
+.card .below a{color:var(--accent); font-weight:600; text-decoration:none;}
+.card .below a:hover{text-decoration:underline;}
+.auth-legal{text-align:center; font-size:11px; color:var(--light); padding:0 20px 26px; line-height:1.6;}
+.auth-legal a{color:var(--light);}
+
+.temp-banner{background:var(--warm-light); border:1px solid var(--warm); color:#8a6038; border-radius:12px; padding:12px 15px; font-size:12.5px; line-height:1.5; margin-bottom:18px;}
+.temp-banner b{color:var(--warm-deep);}
+
+*:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+@media(max-width:480px){ .card{padding:26px 22px 24px;} .auth-top{padding:20px 20px;} }

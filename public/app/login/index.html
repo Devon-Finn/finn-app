@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finn — Log in</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/shared/finn-auth.css">
+</head>
+<body>
+
+<div class="auth-top">
+  <div class="brand"><a href="https://meetfinn.com.au">Finn<span class="dot">.</span></a></div>
+  <div class="aside">New here? <a href="https://meetfinn.com.au/snapshot">Start with the free snapshot</a></div>
+</div>
+
+<div class="auth-wrap">
+  <div class="card">
+    <div class="eyebrow">Your account</div>
+    <h1>Welcome <span class="fr">back</span>.</h1>
+    <p class="sub">Log in to pick up your picture where you left it.</p>
+    <div class="form-msg" id="msg"></div>
+    <form id="loginForm" novalidate>
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" autocomplete="email" required>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn" id="submitBtn" type="submit">Log in</button>
+    </form>
+    <div class="below"><a href="/app/reset/">Forgot your password?</a></div>
+  </div>
+</div>
+
+<div class="auth-legal">Finn is not a licensed financial advisor. <a href="https://meetfinn.com.au/privacy">Privacy Policy</a> · <a href="https://meetfinn.com.au/terms">Terms of Use</a></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/app/shared/finn-supabase.js"></script>
+<script>
+'use strict';
+const msg = document.getElementById('msg');
+const btn = document.getElementById('submitBtn');
+
+function showErr(text) { msg.className = 'form-msg err'; msg.textContent = text; }
+
+// Already logged in? Straight to the app.
+finnSupabase.auth.getSession().then(({ data }) => {
+  if (data.session) window.location.replace('/app/home/');
+});
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  if (!email || !password) { showErr('Enter your email and password.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Logging in…';
+  const { error } = await finnSupabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    btn.disabled = false;
+    btn.textContent = 'Log in';
+    showErr(error.message === 'Invalid login credentials'
+      ? 'That email and password don’t match. Have another go, or reset your password below.'
+      : 'Something went wrong logging you in. Please try again.');
+    return;
+  }
+  window.location.replace('/app/home/');
+});
+</script>
+</body>
+</html>
