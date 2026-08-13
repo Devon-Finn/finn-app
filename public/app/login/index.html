@@ -30,7 +30,10 @@
       </div>
       <div class="field">
         <label for="password">Password</label>
-        <input type="password" id="password" autocomplete="current-password" required>
+        <div class="pw-wrap">
+          <input type="password" id="password" autocomplete="current-password" required>
+          <button type="button" class="pw-toggle" data-for="password" aria-pressed="false" aria-label="Show password">Show</button>
+        </div>
       </div>
       <button class="btn" id="submitBtn" type="submit">Log in</button>
     </form>
@@ -48,6 +51,17 @@ const msg = document.getElementById('msg');
 const btn = document.getElementById('submitBtn');
 
 function showErr(text) { msg.className = 'form-msg err'; msg.textContent = text; }
+
+// Show/hide password — one tap to check what was typed.
+document.querySelectorAll('.pw-toggle').forEach(t => t.addEventListener('click', () => {
+  const input = document.getElementById(t.dataset.for);
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  t.textContent = show ? 'Hide' : 'Show';
+  t.setAttribute('aria-pressed', String(show));
+  t.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+  input.focus();
+}));
 
 // Already logged in? Straight to the app.
 finnSupabase.auth.getSession().then(({ data }) => {

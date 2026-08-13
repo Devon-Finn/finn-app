@@ -43,8 +43,11 @@
     <form id="newForm" novalidate>
       <div class="field">
         <label for="newPassword">New password</label>
-        <input type="password" id="newPassword" autocomplete="new-password" required>
-        <div class="hint">At least 8 characters.</div>
+        <div class="pw-wrap">
+          <input type="password" id="newPassword" autocomplete="new-password" required>
+          <button type="button" class="pw-toggle" data-for="newPassword" aria-pressed="false" aria-label="Show password">Show</button>
+        </div>
+        <div class="hint">At least 8 characters. Tap "Show" to check it.</div>
       </div>
       <button class="btn" id="newBtn" type="submit">Set new password</button>
     </form>
@@ -61,6 +64,17 @@ const reqMsg = document.getElementById('reqMsg');
 const newMsg = document.getElementById('newMsg');
 
 function show(el, kind, text) { el.className = 'form-msg ' + kind; el.textContent = text; }
+
+// Show/hide password — one tap to check the new password before saving it.
+document.querySelectorAll('.pw-toggle').forEach(t => t.addEventListener('click', () => {
+  const input = document.getElementById(t.dataset.for);
+  const showPw = input.type === 'password';
+  input.type = showPw ? 'text' : 'password';
+  t.textContent = showPw ? 'Hide' : 'Show';
+  t.setAttribute('aria-pressed', String(showPw));
+  t.setAttribute('aria-label', showPw ? 'Hide password' : 'Show password');
+  input.focus();
+}));
 
 // Arriving from the recovery email: supabase-js picks the session out of the
 // URL and fires PASSWORD_RECOVERY — switch to the set-new-password card.
