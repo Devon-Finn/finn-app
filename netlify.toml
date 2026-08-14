@@ -20,6 +20,12 @@
   path = "/api/create-account"
   function = "create-account"
 
+# Clarity Session conversation (3a). JWT-gated to clarity-depth members;
+# system prompt lives server-side in the function.
+[[edge_functions]]
+  path = "/api/clarity-chat"
+  function = "clarity-chat"
+
 [[headers]]
   for = "/*"
   [headers.values]

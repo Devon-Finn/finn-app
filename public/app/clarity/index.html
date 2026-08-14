@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finn — Your Clarity Session</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --parch:#f6f2ec; --parch-deep:#efe9dd; --canvas:#e7e0d3; --surface:#ffffff; --surface-warm:#faf7f2;
+    --dark:#1c1917; --mid:#5c5a55; --light:#9a9a94; --rule:#e6e0d6; --rule-soft:#efeae1; --rule-cool:#d8dfe0;
+    --accent:#2a4a3a; --accent-2:#356048; --accent-deep:#213b2e; --accent-light:#f0f4f1;
+    --steel:#c2d4de; --steel-deep:#8fb0c0; --warm:#c4956a; --warm-deep:#a8703f; --warm-light:#fdf6ee;
+    --shadow:0 1px 2px rgba(28,25,23,.04), 0 8px 24px rgba(28,25,23,.05);
+    --shadow-lift:0 2px 4px rgba(28,25,23,.05), 0 14px 34px rgba(33,59,46,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{font-family:'Jost',sans-serif; background:var(--canvas); color:var(--dark); font-weight:500; -webkit-font-smoothing:antialiased; overflow:hidden;}
+  .fr{font-family:'Fraunces',serif; font-style:italic; font-weight:400;}
+  .app{display:flex; height:100vh; height:100dvh;}
+
+  .rail{width:236px; flex-shrink:0; background:linear-gradient(180deg,var(--accent),var(--accent-deep)); color:#d7e3db; display:flex; flex-direction:column; padding:22px 0;}
+  .rail .brand{padding:4px 22px 24px; font-weight:700; font-size:22px; color:#fff; letter-spacing:-.02em;}
+  .rail .brand .dot{color:var(--steel);}
+  .rail .navgroup{padding:0 14px;}
+  .rail a{display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:10px; color:#cadbd1; text-decoration:none; font-size:14.5px; font-weight:500; margin-bottom:2px; transition:all .16s;}
+  .rail a .ic{width:17px; display:inline-flex; align-items:center; justify-content:center; color:var(--steel); flex-shrink:0;}
+  .rail a .ic svg{width:16px; height:16px; display:block;}
+  .rail a:hover{background:rgba(255,255,255,.08); color:#fff;}
+  .rail a.active{background:rgba(255,255,255,.14); color:#fff;} .rail a.active .ic{color:#fff;}
+  .rail .spacer{flex:1;}
+  .rail .user{margin:8px 14px 0; padding:12px; border-radius:12px; background:rgba(0,0,0,.16); display:flex; align-items:center; gap:10px;}
+  .rail .avatar{width:32px;height:32px;border-radius:9px;background:var(--steel);color:var(--accent-deep);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;}
+  .rail .user .nm{font-size:13px;color:#fff;font-weight:500;line-height:1.2;} .rail .user .pl{font-size:10.5px;color:var(--steel);}
+  .rail .logout{margin:10px 14px 0; font-family:inherit; font-size:12.5px; font-weight:500; color:#cadbd1; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); border-radius:9px; padding:9px; cursor:pointer; transition:all .16s;}
+  .rail .logout:hover{background:rgba(255,255,255,.16); color:#fff;}
+
+  .main{flex:1; display:flex; flex-direction:column; min-width:0;}
+  .header{height:60px; background:#fffdfa; border-bottom:1px solid var(--rule); display:flex; align-items:center; justify-content:space-between; padding:0 24px; flex-shrink:0; box-shadow:0 1px 0 rgba(28,25,23,.03), 0 6px 16px -10px rgba(28,25,23,.12); position:relative; z-index:5;}
+  .header .left{display:flex; align-items:center; gap:16px; min-width:0;}
+  .header .crumb .k{font-size:10.5px; text-transform:uppercase; letter-spacing:.12em; color:var(--steel-deep); font-weight:600; display:block;}
+  .header .crumb .t{font-size:16px; font-weight:600; letter-spacing:-.01em; white-space:nowrap;}
+  .mode-chip{display:flex; align-items:center; gap:7px; font-size:12px; font-weight:600; padding:6px 12px; border-radius:20px; background:var(--accent-light); color:var(--accent); border:1px solid #d5e3d9; white-space:nowrap;}
+  .mode-chip .md{width:7px;height:7px;border-radius:50%;background:var(--accent);}
+  .fam-pill{display:flex; align-items:center; gap:9px; background:var(--surface); border:1px solid var(--rule); border-radius:22px; padding:6px 8px 6px 14px; box-shadow:var(--shadow);}
+  .fam-pill .fam-name{font-size:14px; color:var(--dark); font-weight:600; text-align:right; line-height:1.15;}
+  .fam-pill .fam-name .sub{color:var(--light); font-size:11px; display:block; font-weight:500;}
+  .fam-pill .fav{width:30px;height:30px;border-radius:8px;background:var(--steel);color:var(--accent-deep);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;}
+
+  .stage{flex:1; display:flex; min-height:0;}
+
+  /* Conversation pane */
+  .convo{width:55%; background:var(--parch); display:flex; flex-direction:column; min-width:0;}
+  .convo-head{padding:20px 34px 10px; display:flex; align-items:center; justify-content:space-between;}
+  .convo-title{font-size:11.5px; text-transform:uppercase; letter-spacing:.14em; color:var(--steel-deep); font-weight:600;}
+  .messages{flex:1; overflow-y:auto; padding:6px 34px 22px; display:flex; flex-direction:column; gap:20px;}
+  .messages::-webkit-scrollbar{width:7px;} .messages::-webkit-scrollbar-thumb{background:var(--rule);border-radius:8px;}
+  .msg{max-width:92%; font-size:15.5px; line-height:1.6; animation:msgIn .3s ease;}
+  @keyframes msgIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+  .msg.finn .who{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); font-weight:600; margin-bottom:6px;}
+  .msg.finn p{margin-bottom:9px;} .msg.finn p:last-child{margin-bottom:0;}
+  .msg.user{align-self:flex-end; background:var(--accent); color:#fff; padding:11px 16px; border-radius:15px 15px 4px 15px; font-size:14.5px; line-height:1.5; box-shadow:var(--shadow);}
+  .typing{display:flex; gap:5px; padding:4px 0;}
+  .typing .td{width:7px;height:7px;border-radius:50%;background:var(--steel-deep);animation:tdp 1.2s ease infinite;}
+  .typing .td:nth-child(2){animation-delay:.15s;} .typing .td:nth-child(3){animation-delay:.3s;}
+  @keyframes tdp{0%,80%,100%{opacity:.25;transform:scale(.85);}40%{opacity:1;transform:scale(1);}}
+  .composer{padding:14px 34px 18px; border-top:1px solid var(--rule);}
+  .composer-inner{display:flex; align-items:flex-end; gap:10px; background:var(--surface); border:1px solid var(--rule); border-radius:14px; padding:10px 10px 10px 16px; box-shadow:var(--shadow);}
+  .composer textarea{flex:1; border:none; outline:none; resize:none; font-family:inherit; font-size:15px; color:var(--dark); background:none; line-height:1.5; max-height:96px; padding:5px 0;}
+  .composer textarea::placeholder{color:var(--light);}
+  .send{background:var(--accent); color:#fff; border:none; width:36px; height:36px; border-radius:10px; cursor:pointer; font-size:15px; flex-shrink:0; transition:opacity .15s;}
+  .send:disabled{opacity:.4; cursor:default;}
+
+  /* Progress pane (3a: simple build-progress; real tiles land in 3b) */
+  .dash{flex:1; background:var(--canvas); overflow-y:auto; min-width:0; border-left:1px solid var(--rule-cool); box-shadow:inset 16px 0 26px -20px rgba(28,25,23,.16);}
+  .dash-inner{padding:20px 26px 36px;}
+  .hero{background:linear-gradient(145deg,var(--accent),var(--accent-deep)); color:#fff; border-radius:15px; padding:20px 22px; margin-bottom:14px; box-shadow:var(--shadow-lift);}
+  .hero .lead{font-size:11.5px; text-transform:uppercase; letter-spacing:.13em; color:var(--steel); font-weight:600; margin-bottom:8px;}
+  .hero .headline{font-size:24px; font-weight:600; letter-spacing:-.01em; line-height:1.2; color:#fff;}
+  .hero .headline .fr{color:var(--steel);}
+  .prog-wrap{margin-top:14px;}
+  .prog-track{height:6px; background:rgba(255,255,255,.18); border-radius:6px; overflow:hidden;}
+  .prog-fill{height:100%; width:0%; background:var(--steel); border-radius:6px; transition:width .5s;}
+  .prog-label{font-size:12px; color:var(--steel); margin-top:8px;}
+  .areas{display:flex; flex-direction:column; gap:8px;}
+  .area{display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:13px 15px; box-shadow:var(--shadow); font-size:14px; font-weight:500; color:var(--mid);}
+  .area .tick{width:22px; height:22px; border-radius:50%; border:1.5px solid var(--rule); display:flex; align-items:center; justify-content:center; flex-shrink:0; color:transparent; transition:all .3s;}
+  .area.done{color:var(--dark);}
+  .area.done .tick{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .area .tick svg{width:12px; height:12px;}
+  .dash-note{margin-top:14px; background:var(--accent-light); border-radius:12px; padding:13px 15px; font-size:12.5px; line-height:1.55; color:var(--mid);}
+  .dash-note b{color:var(--accent);}
+
+  .loading-veil{position:fixed; inset:0; background:var(--canvas); z-index:50; display:flex; align-items:center; justify-content:center; transition:opacity .3s;}
+  .loading-veil.gone{opacity:0; pointer-events:none;}
+  .loading-veil .dots{display:flex; gap:8px;}
+  .loading-veil .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);animation:dp 1.3s ease infinite;}
+  .loading-veil .dot:nth-child(2){animation-delay:.18s;} .loading-veil .dot:nth-child(3){animation-delay:.36s;}
+  @keyframes dp{0%,80%,100%{opacity:.25;transform:scale(.85);}40%{opacity:1;transform:scale(1);}}
+
+  .gate{max-width:460px; margin:80px auto; background:var(--surface-warm); border:1px solid var(--rule); border-radius:16px; padding:30px; text-align:center; box-shadow:var(--shadow-lift);}
+  .gate h2{font-size:21px; font-weight:600; margin-bottom:10px;}
+  .gate p{font-size:14px; color:var(--mid); line-height:1.6;}
+  .gate a{color:var(--accent); font-weight:600;}
+
+  .mobile-tabs{display:none;}
+  @media(max-width:880px){
+    .rail{display:none;}
+    .header{padding:0 16px;}
+    .stage{flex-direction:column;}
+    .convo{width:100%; flex:1; display:none;}
+    .dash{display:none; border-left:none; box-shadow:none;}
+    body.tab-chat .convo{display:flex; padding-bottom:56px;}
+    body.tab-picture .dash{display:block; flex:1;}
+    .convo-head{padding:14px 18px 8px;}
+    .messages{padding:6px 18px 16px;}
+    .composer{padding:10px 14px calc(12px + env(safe-area-inset-bottom));}
+    .dash-inner{padding:16px 14px 90px;}
+    .mobile-tabs{display:flex; position:fixed; bottom:0; left:0; right:0; z-index:40; background:#fffdfa; border-top:1px solid var(--rule); padding:8px 10px calc(8px + env(safe-area-inset-bottom)); gap:8px;}
+    .mobile-tabs button{flex:1; font-family:inherit; font-size:13px; font-weight:600; padding:11px; border-radius:10px; border:1px solid var(--rule); background:var(--surface); color:var(--mid); cursor:pointer;}
+    .mobile-tabs button.on{background:var(--accent); color:#fff; border-color:var(--accent);}
+  }
+  *:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+</style>
+</head>
+<body class="tab-chat">
+
+<div class="loading-veil" id="veil"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>
+
+<div class="app" id="appShell" style="display:none">
+  <nav class="rail">
+    <div class="brand">Finn<span class="dot">.</span></div>
+    <div class="navgroup">
+      <a href="/app/home/"><span class="ic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg></span> Your picture</a>
+      <a class="active"><span class="ic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 8.5-8.5 8.38 8.38 0 0 1 8.5 8.5z"/></svg></span> Clarity Session</a>
+    </div>
+    <div class="spacer"></div>
+    <div class="user"><div class="avatar" id="railAvatar">·</div><div><div class="nm" id="railName">Loading…</div><div class="pl">Clarity Session</div></div></div>
+    <button class="logout" id="logoutBtn">Log out</button>
+  </nav>
+
+  <div class="main">
+    <div class="header">
+      <div class="left">
+        <div class="crumb"><span class="k">Your Clarity Session</span><span class="t" id="hdrT">Building your picture</span></div>
+        <div class="mode-chip"><span class="md"></span><span>Clarity Session</span></div>
+      </div>
+      <div class="fam-pill">
+        <span class="fam-name" id="famName">—<span class="sub" id="famSub"></span></span>
+        <span class="fav" id="famAvatar">·</span>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="convo">
+        <div class="convo-head"><span class="convo-title">Talking with Finn</span></div>
+        <div class="messages" id="messages"></div>
+        <div class="composer"><div class="composer-inner"><textarea id="composerInput" placeholder="Type your answer…" rows="1"></textarea><button class="send" id="sendBtn" aria-label="Send">↑</button></div></div>
+      </div>
+
+      <div class="dash">
+        <div class="dash-inner">
+          <div class="hero">
+            <div class="lead">Your Clarity Session</div>
+            <div class="headline" id="heroLine">Your picture's <span class="fr">being built</span>.</div>
+            <div class="prog-wrap">
+              <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+              <div class="prog-label" id="progLabel">0 of 8 areas built</div>
+            </div>
+          </div>
+          <div class="areas" id="areasList"></div>
+          <div class="dash-note"><b>Your figures are being captured as you talk.</b> When the picture's complete, this pane becomes your full dashboard, every area opened up with your real numbers.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mobile-tabs">
+  <button id="tabChat" class="on" onclick="setTab('chat')">Talking with Finn</button>
+  <button id="tabPicture" onclick="setTab('picture')">Progress</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/app/shared/finn-supabase.js"></script>
+<script>
+'use strict';
+/* Clarity Session conversation (build 3a — Layer 1: collection).
+   The conversation captures real figures; all extraction and saving happens
+   SERVER-SIDE in the clarity-chat edge function. This page renders the
+   stream (minus the [CAPTURE] machine block) and shows build progress. */
+
+const AREAS = [
+  ['income', 'Income and cashflow'],
+  ['assets', 'Assets'],
+  ['liabilities', 'Debts and loans'],
+  ['buffer', 'Emergency buffer'],
+  ['protection', 'Protection'],
+  ['estate', 'Estate basics'],
+  ['super', 'Super'],
+  ['goals', 'Goals and direction']
+];
+const TICK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+
+const messagesEl = document.getElementById('messages');
+const inputEl = document.getElementById('composerInput');
+const sendBtn = document.getElementById('sendBtn');
+
+let session = null;
+let history = [];      // visible conversation, sent to the edge function
+let busy = false;
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function scrollChat() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+// Strip the machine block from display. The capture is applied server-side;
+// the visible reply ends where [CAPTURE] begins.
+function visibleText(fullText) {
+  const idx = fullText.indexOf('[CAPTURE]');
+  return (idx === -1 ? fullText : fullText.slice(0, idx)).trim();
+}
+
+function renderFinn(el, text) {
+  el.innerHTML = '<div class="who">Finn</div>' +
+    '<p>' + esc(visibleText(text)).replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
+  scrollChat();
+}
+
+function addUser(text) {
+  const div = document.createElement('div');
+  div.className = 'msg user';
+  div.textContent = text;
+  messagesEl.appendChild(div);
+  scrollChat();
+}
+
+function addTyping() {
+  const div = document.createElement('div');
+  div.className = 'msg finn';
+  div.innerHTML = '<div class="who">Finn</div><div class="typing"><span class="td"></span><span class="td"></span><span class="td"></span></div>';
+  messagesEl.appendChild(div);
+  scrollChat();
+  return div;
+}
+
+/* ── progress pane ── */
+function renderAreas(completed) {
+  const list = document.getElementById('areasList');
+  list.innerHTML = '';
+  AREAS.forEach(([key, label]) => {
+    const done = completed.includes(key);
+    const row = document.createElement('div');
+    row.className = 'area' + (done ? ' done' : '');
+    row.innerHTML = '<span class="tick">' + TICK + '</span>' + label;
+    list.appendChild(row);
+  });
+  const n = completed.filter(k => AREAS.some(([key]) => key === k)).length;
+  document.getElementById('progLabel').textContent = n + ' of 8 areas built';
+  document.getElementById('progFill').style.width = (n / 8 * 100) + '%';
+  if (n === 8) {
+    document.getElementById('heroLine').innerHTML = 'Your picture’s <span class="fr">complete</span>.';
+    document.getElementById('hdrT').textContent = 'Your picture, captured';
+  }
+}
+
+async function refreshProgress() {
+  const { data } = await finnSupabase.from('picture').select('completed_domains').limit(1);
+  const completed = (data && data[0] && Array.isArray(data[0].completed_domains)) ? data[0].completed_domains : [];
+  renderAreas(completed);
+}
+
+/* ── conversation ── */
+async function talk(userText, hidden) {
+  busy = true;
+  sendBtn.disabled = true;
+  if (!hidden) addUser(userText);
+  history.push({ role: 'user', content: userText });
+
+  const typingEl = addTyping();
+  let fullText = '';
+
+  try {
+    const { data: { session: s } } = await finnSupabase.auth.getSession();
+    const res = await fetch('/api/clarity-chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + s.access_token
+      },
+      body: JSON.stringify({ messages: history })
+    });
+    if (!res.ok) throw new Error('clarity-chat ' + res.status);
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let started = false;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6).trim();
+        if (!raw || raw === '[DONE]') continue;
+        try {
+          const evt = JSON.parse(raw);
+          if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+            fullText += evt.delta.text;
+            if (!started) { started = true; }
+            renderFinn(typingEl, fullText);
+          }
+        } catch {}
+      }
+    }
+    if (!fullText) throw new Error('empty reply');
+  } catch (err) {
+    typingEl.remove();
+    history.pop();
+    busy = false;
+    sendBtn.disabled = false;
+    const div = document.createElement('div');
+    div.className = 'msg finn';
+    div.innerHTML = '<div class="who">Finn</div><p>Sorry, I lost the thread for a moment there. Mind sending that again?</p>';
+    messagesEl.appendChild(div);
+    scrollChat();
+    return;
+  }
+
+  history.push({ role: 'assistant', content: fullText });
+  busy = false;
+  sendBtn.disabled = false;
+  // Server has merged this turn's capture; give it a beat, then refresh.
+  setTimeout(refreshProgress, 900);
+}
+
+function handleSend() {
+  const text = inputEl.value.trim();
+  if (!text || busy) return;
+  inputEl.value = '';
+  inputEl.style.height = 'auto';
+  talk(text, false);
+}
+sendBtn.addEventListener('click', handleSend);
+inputEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+});
+inputEl.addEventListener('input', () => { inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 96) + 'px'; });
+
+/* ── boot ── */
+function initials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  return parts.length ? parts.slice(0, 2).map(p => p[0].toUpperCase()).join('') : 'F';
+}
+
+function setTab(t) {
+  document.body.classList.toggle('tab-chat', t === 'chat');
+  document.body.classList.toggle('tab-picture', t === 'picture');
+  document.getElementById('tabChat').classList.toggle('on', t === 'chat');
+  document.getElementById('tabPicture').classList.toggle('on', t === 'picture');
+}
+
+function showGate(html) {
+  document.getElementById('veil').classList.add('gone');
+  document.getElementById('appShell').style.display = 'none';
+  const gate = document.createElement('div');
+  gate.className = 'gate';
+  gate.innerHTML = html;
+  document.body.appendChild(gate);
+}
+
+async function main() {
+  const { data: { session: s } } = await finnSupabase.auth.getSession();
+  if (!s) { window.location.replace('/app/login/'); return; }
+  session = s;
+
+  const [{ data: me }, { data: households }, { data: access }] = await Promise.all([
+    finnSupabase.from('members').select('display_name, email').eq('id', s.user.id).maybeSingle(),
+    finnSupabase.from('households').select('display_name').limit(1),
+    finnSupabase.from('access').select('depth').limit(1)
+  ]);
+  const depth = access && access[0] && access[0].depth;
+  if (depth !== 'clarity' && depth !== 'subscription') {
+    showGate('<h2>Your Clarity Session isn’t open yet.</h2><p>This is where your full picture gets built, with your real figures. It opens with the Clarity Session.</p><p><a href="/app/home/">Back to your picture</a></p>');
+    return;
+  }
+
+  const famName = (households && households[0] && households[0].display_name) || 'Your household';
+  document.getElementById('famName').childNodes[0].textContent = famName;
+  document.getElementById('famSub').textContent = (me && me.email) || '';
+  document.getElementById('famAvatar').textContent = initials(famName);
+  document.getElementById('railAvatar').textContent = initials(famName);
+  document.getElementById('railName').textContent = famName;
+
+  document.getElementById('appShell').style.display = 'flex';
+  document.getElementById('veil').classList.add('gone');
+  await refreshProgress();
+
+  // Bootstrap: a hidden marker turn lets the server-side prompt decide
+  // whether to greet fresh or resume from the captured picture.
+  talk('[Session start]', true);
+}
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await finnSupabase.auth.signOut();
+  window.location.replace('/app/login/');
+});
+
+main().catch(() => { window.location.replace('/app/login/'); });
+</script>
+</body>
+</html>
