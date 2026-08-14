@@ -13,6 +13,13 @@
   path = "/api/snapshot-session"
   function = "snapshot-session"
 
+# TEMPORARY (step 2): token-gated account creation standing in for the
+# Stripe "payment succeeded" event. Step 4 replaces the gate with real
+# Stripe verification.
+[[edge_functions]]
+  path = "/api/create-account"
+  function = "create-account"
+
 [[headers]]
   for = "/*"
   [headers.values]

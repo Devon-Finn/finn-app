@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finn — Finish setting up your account</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/shared/finn-auth.css">
+</head>
+<body>
+
+<div class="auth-top">
+  <div class="brand"><a href="https://meetfinn.com.au">Finn<span class="dot">.</span></a></div>
+  <div class="aside">Already set up? <a href="/app/login/">Log in</a></div>
+</div>
+
+<div class="auth-wrap">
+  <div class="card">
+    <div class="eyebrow">One last step</div>
+    <h1>Finish setting up your <span class="fr">account</span>.</h1>
+    <p class="sub">Payment's sorted. Choose a password and you're straight into your Clarity Session.</p>
+    <div class="form-msg" id="msg"></div>
+    <form id="finishForm" novalidate>
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" autocomplete="email" required>
+        <div class="hint">The email you used at checkout.</div>
+      </div>
+      <div class="field">
+        <label for="password">Choose a password</label>
+        <div class="pw-wrap">
+          <input type="password" id="password" autocomplete="new-password" required>
+          <button type="button" class="pw-toggle" data-for="password" aria-pressed="false" aria-label="Show password">Show</button>
+        </div>
+        <div class="hint">At least 8 characters. Tap "Show" to check it before you create your account.</div>
+      </div>
+      <button class="btn" id="submitBtn" type="submit">Create my account</button>
+    </form>
+    <div class="below">That's everything we ask for — you can name your household and add a partner later, in settings.</div>
+  </div>
+</div>
+
+<div class="auth-legal">Finn is not a licensed financial advisor. <a href="https://meetfinn.com.au/privacy">Privacy Policy</a> · <a href="https://meetfinn.com.au/terms">Terms of Use</a></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/app/shared/finn-supabase.js"></script>
+<script>
+'use strict';
+/* Set-password / finish-account screen (build step 2).
+   In the real flow this page appears immediately after successful payment —
+   the account that payment created just needs a password. Until Stripe
+   exists (step 4), the page is reached from /app/test-checkout/, which
+   stashes the checkout context (email, test token, optional snapshot_id)
+   in sessionStorage. */
+const msg = document.getElementById('msg');
+const btn = document.getElementById('submitBtn');
+function showErr(t) { msg.className = 'form-msg err'; msg.textContent = t; }
+
+// Show/hide password — this is a first-time password being chosen, so the
+// toggle matters most here: one tap to verify it before the account exists.
+document.querySelectorAll('.pw-toggle').forEach(t => t.addEventListener('click', () => {
+  const input = document.getElementById(t.dataset.for);
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  t.textContent = show ? 'Hide' : 'Show';
+  t.setAttribute('aria-pressed', String(show));
+  t.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+  input.focus();
+}));
+
+// Checkout context from the (temporary) test-checkout page.
+let ctx = {};
+try { ctx = JSON.parse(sessionStorage.getItem('finn_checkout_ctx') || '{}'); } catch {}
+if (ctx.email) {
+  const em = document.getElementById('email');
+  em.value = ctx.email;
+  em.readOnly = true;
+}
+if (!ctx.test_token) {
+  showErr('This page follows checkout. Until payment is built, start from the test checkout page.');
+  btn.disabled = true;
+}
+
+document.getElementById('finishForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  if (!email) { showErr('Enter the email you used at checkout.'); return; }
+  if (password.length < 8) { showErr('Use at least 8 characters for your password.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Setting up…';
+
+  let res, body;
+  try {
+    res = await fetch('/api/create-account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        test_token: ctx.test_token,
+        email,
+        password,
+        snapshot_id: ctx.snapshot_id || undefined
+      })
+    });
+    body = await res.json().catch(() => ({}));
+  } catch {
+    btn.disabled = false;
+    btn.textContent = 'Create my account';
+    showErr('We couldn’t reach the server. Please try again.');
+    return;
+  }
+
+  if (!res.ok) {
+    btn.disabled = false;
+    btn.textContent = 'Create my account';
+    if (body.error === 'email_exists') {
+      showErr('There’s already an account with that email — head to log in instead.');
+    } else if (body.error === 'forbidden' || body.error === 'trigger_disabled') {
+      showErr('Account creation isn’t open on this environment. (Test trigger token missing or wrong.)');
+    } else {
+      showErr('Something went wrong setting up your account. Please try again.');
+    }
+    return;
+  }
+
+  // Account exists — sign them in with the password they just chose.
+  const { error } = await finnSupabase.auth.signInWithPassword({ email, password });
+  sessionStorage.removeItem('finn_checkout_ctx');
+  if (error) {
+    // Account was created; the login just hiccuped. Send them to log in.
+    window.location.replace('/app/login/');
+    return;
+  }
+  window.location.replace('/app/home/');
+});
+</script>
+</body>
+</html>

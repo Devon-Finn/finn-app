@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finn — Test checkout (temporary)</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/shared/finn-auth.css">
+</head>
+<body>
+
+<div class="auth-top">
+  <div class="brand"><a href="https://meetfinn.com.au">Finn<span class="dot">.</span></a></div>
+  <div class="aside"><a href="/app/login/">Log in</a></div>
+</div>
+
+<div class="auth-wrap">
+  <div class="card">
+    <div class="temp-banner"><b>Temporary test page (build step 2).</b> This stands in for the Stripe checkout that step 4 builds. It simulates "payment succeeded" and hands off to the real finish-account screen. It requires the test trigger token and will be removed when Stripe replaces it.</div>
+    <div class="eyebrow">Simulated checkout</div>
+    <h1>Pretend the payment just <span class="fr">succeeded</span>.</h1>
+    <p class="sub">Enter the details Stripe would hand back and continue to the set-password screen — exactly the flow a real customer will follow.</p>
+    <div class="form-msg" id="msg"></div>
+    <form id="tcForm" novalidate>
+      <div class="field">
+        <label for="email">Customer email (from "checkout")</label>
+        <input type="email" id="email" autocomplete="off" required>
+      </div>
+      <div class="field">
+        <label for="token">Test trigger token</label>
+        <input type="password" id="token" autocomplete="off" required>
+        <div class="hint">FINN_TEST_TRIGGER_TOKEN from Netlify env — keeps this endpoint closed to the public.</div>
+      </div>
+      <div class="field">
+        <label for="snapshotId">Snapshot id to carry over (optional)</label>
+        <input type="text" id="snapshotId" autocomplete="off" placeholder="uuid from a completed demo snapshot">
+        <div class="hint">Links the anonymous snapshot session to the new household.</div>
+      </div>
+      <button class="btn" type="submit">Payment succeeded → finish account</button>
+    </form>
+  </div>
+</div>
+
+<div class="auth-legal">Internal test page — not linked from anywhere.</div>
+
+<script>
+'use strict';
+const msg = document.getElementById('msg');
+document.getElementById('tcForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim().toLowerCase();
+  const token = document.getElementById('token').value.trim();
+  const snapshotId = document.getElementById('snapshotId').value.trim();
+  if (!email || !token) {
+    msg.className = 'form-msg err';
+    msg.textContent = 'Email and test token are both needed.';
+    return;
+  }
+  sessionStorage.setItem('finn_checkout_ctx', JSON.stringify({
+    email,
+    test_token: token,
+    snapshot_id: snapshotId || null
+  }));
+  window.location.href = '/app/finish/';
+});
+</script>
+</body>
+</html>
