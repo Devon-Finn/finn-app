@@ -439,7 +439,8 @@ const TILES = [
       const multi = funds.length > 1 || s.multiple_accounts === true;
       if (total === null && !funds.length) return { state: 'building', pct: s.multiple_accounts !== undefined ? 40 : 0 };
       const n = funds.length;
-      const bits = [n + (n === 1 ? ' fund' : ' funds')];
+      const bits = [];
+      if (total === null) bits.push(n + (n === 1 ? ' fund' : ' funds'));
       if (s.extra_contributions === true) bits.push('extra contributions');
       if (s.notes && /insurance/i.test(s.notes)) bits.push('insurance held inside');
       // Router: more than one account is a structural fact that makes
