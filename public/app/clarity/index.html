@@ -69,7 +69,17 @@
   .typing .td:nth-child(2){animation-delay:.15s;} .typing .td:nth-child(3){animation-delay:.3s;}
   @keyframes tdp{0%,80%,100%{opacity:.25;transform:scale(.85);}40%{opacity:1;transform:scale(1);}}
   .composer{padding:14px 34px 18px; border-top:1px solid var(--rule);}
-  .composer-inner{display:flex; align-items:flex-end; gap:10px; background:var(--surface); border:1px solid var(--rule); border-radius:14px; padding:10px 10px 10px 16px; box-shadow:var(--shadow);}
+  .composer-inner{display:flex; align-items:flex-end; gap:10px; background:var(--surface); border:1px solid var(--rule); border-radius:14px; padding:10px 10px 10px 12px; box-shadow:var(--shadow);}
+  .attach{background:none; color:var(--steel-deep); border:none; width:34px; height:36px; border-radius:9px; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:all .15s;}
+  .attach:hover{color:var(--accent); background:var(--accent-light);}
+  .attach svg{width:17px; height:17px;}
+  .attach-chip{display:none; align-items:center; gap:9px; margin-bottom:8px; background:var(--surface); border:1px solid var(--rule); border-radius:10px; padding:8px 12px; font-size:12.5px; font-weight:500; color:var(--mid); box-shadow:var(--shadow); width:fit-content; max-width:100%;}
+  .attach-chip.on{display:flex;}
+  .attach-chip svg{width:13px; height:13px; color:var(--steel-deep); flex-shrink:0;}
+  .attach-chip .an{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .attach-chip .ax{font-family:inherit; border:none; background:none; color:var(--light); cursor:pointer; font-size:15px; line-height:1; padding:0 2px;}
+  .attach-chip .ax:hover{color:var(--dark);}
+  .msg.user .file-tag{display:block; background:rgba(255,255,255,.16); border-radius:7px; padding:4px 10px; font-size:12px; margin-bottom:7px; width:fit-content;}
   .composer textarea{flex:1; border:none; outline:none; resize:none; font-family:inherit; font-size:15px; color:var(--dark); background:none; line-height:1.5; max-height:96px; padding:5px 0;}
   .composer textarea::placeholder{color:var(--light);}
   .send{background:var(--accent); color:#fff; border:none; width:36px; height:36px; border-radius:10px; cursor:pointer; font-size:15px; flex-shrink:0; transition:opacity .15s;}
@@ -159,7 +169,15 @@
       <div class="convo">
         <div class="convo-head"><span class="convo-title">Talking with Finn</span></div>
         <div class="messages" id="messages"></div>
-        <div class="composer"><div class="composer-inner"><textarea id="composerInput" placeholder="Type your answer…" rows="1"></textarea><button class="send" id="sendBtn" aria-label="Send">↑</button></div></div>
+        <div class="composer">
+          <div class="attach-chip" id="attachChip"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="an" id="attachName"></span><button class="ax" id="attachRemove" aria-label="Remove attachment" title="Remove">×</button></div>
+          <div class="composer-inner">
+            <button class="attach" id="attachBtn" type="button" aria-label="Add a statement or screenshot" title="Add a statement or screenshot"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+            <textarea id="composerInput" placeholder="Type your answer, or add a statement or screenshot…" rows="1"></textarea>
+            <button class="send" id="sendBtn" aria-label="Send">↑</button>
+          </div>
+        </div>
+        <input type="file" id="fileInput" accept="application/pdf,image/png,image/jpeg,image/webp" style="display:none">
       </div>
 
       <div class="dash">
@@ -230,12 +248,68 @@ function renderFinn(el, text) {
   scrollChat();
 }
 
-function addUser(text) {
+function addUser(text, fileName) {
   const div = document.createElement('div');
   div.className = 'msg user';
-  div.textContent = text;
+  if (fileName) {
+    const tag = document.createElement('span');
+    tag.className = 'file-tag';
+    tag.textContent = fileName;
+    div.appendChild(tag);
+  }
+  if (text) div.appendChild(document.createTextNode(text));
   messagesEl.appendChild(div);
   scrollChat();
+}
+
+/* ── attachments (PDF / image) ──
+   Read-and-discard: the file is base64'd in memory, sent to the clarity-chat
+   edge function for the model to read, and never persisted anywhere — the
+   extracted figures land in picture.domains like any other captured answer.
+   After the turn completes, the heavy file block is dropped from the local
+   history (replaced with a text note) so it is never re-sent. */
+const MAX_FILE_BYTES = 8 * 1024 * 1024;
+const FILE_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
+let pendingFile = null;
+
+const attachBtn = document.getElementById('attachBtn');
+const fileInput = document.getElementById('fileInput');
+const attachChip = document.getElementById('attachChip');
+
+attachBtn.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); fileInput.value = ''; });
+document.getElementById('attachRemove').addEventListener('click', clearAttachment);
+
+function clearAttachment() {
+  pendingFile = null;
+  attachChip.classList.remove('on');
+}
+
+function attachNote(text) {
+  const div = document.createElement('div');
+  div.className = 'msg finn';
+  div.innerHTML = '<div class="who">Finn</div><p>' + esc(text) + '</p>';
+  messagesEl.appendChild(div);
+  scrollChat();
+}
+
+function handleFile(f) {
+  if (!FILE_TYPES.includes(f.type)) {
+    attachNote('I can read a PDF or an image (PNG or JPG) — a statement or a screenshot works perfectly.');
+    return;
+  }
+  if (f.size > MAX_FILE_BYTES) {
+    attachNote('That file is a bit big for me (over 8 MB). A screenshot of the page you need usually does the trick.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    pendingFile = { name: f.name, media_type: f.type, data: String(reader.result).split(',')[1] };
+    document.getElementById('attachName').textContent = f.name;
+    attachChip.classList.add('on');
+    inputEl.focus();
+  };
+  reader.readAsDataURL(f);
 }
 
 function addTyping() {
@@ -274,11 +348,19 @@ async function refreshProgress() {
 }
 
 /* ── conversation ── */
-async function talk(userText, hidden) {
+async function talk(userText, hidden, file) {
   busy = true;
   sendBtn.disabled = true;
-  if (!hidden) addUser(userText);
-  history.push({ role: 'user', content: userText });
+  if (!hidden) addUser(userText, file && file.name);
+
+  let content = userText;
+  if (file) {
+    const block = file.media_type === 'application/pdf'
+      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: file.data } }
+      : { type: 'image', source: { type: 'base64', media_type: file.media_type, data: file.data } };
+    content = [block, { type: 'text', text: userText || "Here you go, I've attached it." }];
+  }
+  history.push({ role: 'user', content });
 
   const typingEl = addTyping();
   let fullText = '';
@@ -334,6 +416,13 @@ async function talk(userText, hidden) {
   }
 
   history.push({ role: 'assistant', content: fullText });
+  // Drop the heavy file block from history — read once, never re-sent.
+  if (file) {
+    history[history.length - 2] = {
+      role: 'user',
+      content: '[they attached ' + file.name + ' — you have already read it above] ' + (userText || '')
+    };
+  }
   busy = false;
   sendBtn.disabled = false;
   // Server has merged this turn's capture; give it a beat, then refresh.
@@ -342,10 +431,12 @@ async function talk(userText, hidden) {
 
 function handleSend() {
   const text = inputEl.value.trim();
-  if (!text || busy) return;
+  if ((!text && !pendingFile) || busy) return;
+  const file = pendingFile;
+  clearAttachment();
   inputEl.value = '';
   inputEl.style.height = 'auto';
-  talk(text, false);
+  talk(text, false, file);
 }
 sendBtn.addEventListener('click', handleSend);
 inputEl.addEventListener('keydown', e => {

@@ -23,7 +23,56 @@
 const rateLimitMap = new Map();
 const RATE_LIMIT = 60; // per IP per hour — a session is many short turns
 const WINDOW_MS = 60 * 60 * 1000;
-const TIMEOUT_MS = 25000;
+// First-byte timeout. PDFs are parsed before streaming starts, so this is
+// longer than the text-only functions.
+const TIMEOUT_MS = 45000;
+
+// ── Uploaded documents (PDF / image content blocks) ──
+// READ-AND-DISCARD: uploaded statements and screenshots pass through this
+// function to the Anthropic API for reading, and the extracted figures are
+// saved to picture.domains. The raw file is NEVER written to Supabase
+// storage, logs, or anywhere persistent — the Documents vault is a later,
+// deliberately-designed feature. Do not add file persistence here.
+// GATE (Devon): real customer documents must NOT be processed until the
+// Anthropic API data/retention terms are confirmed. Mock documents only.
+const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const MAX_B64_CHARS = 11_500_000; // ~8 MB file, base64-inflated
+const MAX_FILE_BLOCKS_PER_MESSAGE = 2;
+
+// Rebuild client content strictly: plain strings pass through; arrays are
+// reconstructed field-by-field so nothing unexpected reaches the API.
+// Returns null when a message should be rejected.
+function cleanContent(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content) || !content.length) return null;
+  const blocks = [];
+  let fileBlocks = 0;
+  for (const b of content) {
+    if (!b || typeof b !== "object") return null;
+    if (b.type === "text" && typeof b.text === "string") {
+      blocks.push({ type: "text", text: b.text });
+    } else if (
+      b.type === "image" &&
+      b.source && b.source.type === "base64" &&
+      ALLOWED_IMAGE_TYPES.includes(b.source.media_type) &&
+      typeof b.source.data === "string" && b.source.data.length <= MAX_B64_CHARS
+    ) {
+      if (++fileBlocks > MAX_FILE_BLOCKS_PER_MESSAGE) return null;
+      blocks.push({ type: "image", source: { type: "base64", media_type: b.source.media_type, data: b.source.data } });
+    } else if (
+      b.type === "document" &&
+      b.source && b.source.type === "base64" &&
+      b.source.media_type === "application/pdf" &&
+      typeof b.source.data === "string" && b.source.data.length <= MAX_B64_CHARS
+    ) {
+      if (++fileBlocks > MAX_FILE_BLOCKS_PER_MESSAGE) return null;
+      blocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: b.source.data } });
+    } else {
+      return null;
+    }
+  }
+  return blocks;
+}
 
 function checkRateLimit(ip) {
   const now = Date.now();
@@ -84,7 +133,7 @@ The snapshot was estimates. The Clarity Session is where the picture gets accura
 
 1. You help them find the real figure. You are a resourceful, patient gathering partner: whatever real figure is needed, you help them find it, whoever their bank, super fund, or provider is. This is a general capability, not a fixed script — whatever stands between them and an accurate number, you help them get past it:
    - Guide them to where a figure usually lives ("in most banking apps, look for a transactions or statements section") — guide by concept, since apps change, and lean on what they show you when your guidance doesn't match their screen.
-   - Read what they show you — if they paste a statement, categorise every line, flag what you're unsure about, and land the real number (their actual surplus, not a guess). If they share a balance, read it off.
+   - Read what they show you — they can paste the text, upload the statement PDF, or share a screenshot, whatever's easiest, and you should actively offer those options ("paste it, upload the PDF, or screenshot it — whatever's easiest"). Whatever arrives, read it properly: categorise every line of a statement, flag what you're unsure about, and land the real number (their actual surplus, not a guess). If it's a screenshot of a balance or a rate, read the figure off it.
    - Help them uncover things they may not know to check (insurance held inside their super — many people have no idea; forgotten accounts from old jobs).
    - Work around it patiently when they're stuck — there's always another way; never let them hit a dead end alone.
 
@@ -97,7 +146,7 @@ The spirit: you gather WITH them, you explain WHY it's worth it, and you hold th
 Two absolute boundaries, always:
 
 1. You help them find the number; you NEVER decide what to do with it. Gathering is active; advising stays forbidden.
-2. You NEVER ask for, handle, or touch their login credentials. Guide them to log in themselves, privately, and find or read off the figure. Never a password, never logging in for them. Absolute — for their security and their trust. "Finn never asks for your bank login — you stay in control" is a feature, not a limitation. If they ever start to share a password with you, stop them kindly and remind them never to share it with you or anyone.
+2. You NEVER ask for, handle, or touch their login credentials. Guide them to log in themselves, privately, and find or read off the figure. Never a password, never logging in for them. Absolute — for their security and their trust. "Finn never asks for your bank login — you stay in control" is a feature, not a limitation. If they ever start to share a password with you, stop them kindly and remind them never to share it with you or anyone. If something they upload happens to show login details, read only the figure you need, never repeat the credentials back, and gently remind them they never need to share those.
 
 Tone requirement throughout: never a bare instruction. Always pair the ask with the why and the reassurance. Never "go get your super balance." Always "let's find your super balance together — here's the easy way, and here's why it's worth it."
 
@@ -324,9 +373,13 @@ export default async function handler(request, context) {
   if (!Array.isArray(payload.messages) || payload.messages.length === 0) {
     return json({ error: "messages_required" }, 400);
   }
-  const messages = payload.messages
-    .filter(m => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
-    .slice(-40);
+  const messages = [];
+  for (const m of payload.messages.slice(-40)) {
+    if (!m || (m.role !== "user" && m.role !== "assistant")) continue;
+    const content = cleanContent(m.content);
+    if (content === null) continue;
+    messages.push({ role: m.role, content });
+  }
   if (!messages.length) return json({ error: "messages_required" }, 400);
 
   // ── Server-side context: picture state + snapshot carry-over. ──
