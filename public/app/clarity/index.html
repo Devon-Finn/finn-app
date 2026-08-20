@@ -96,12 +96,34 @@
   .prog-track{height:6px; background:rgba(255,255,255,.18); border-radius:6px; overflow:hidden;}
   .prog-fill{height:100%; width:0%; background:var(--steel); border-radius:6px; transition:width .5s;}
   .prog-label{font-size:12px; color:var(--steel); margin-top:8px;}
-  .areas{display:flex; flex-direction:column; gap:8px;}
-  .area{display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:13px 15px; box-shadow:var(--shadow); font-size:14px; font-weight:500; color:var(--mid);}
-  .area .tick{width:22px; height:22px; border-radius:50%; border:1.5px solid var(--rule); display:flex; align-items:center; justify-content:center; flex-shrink:0; color:transparent; transition:all .3s;}
-  .area.done{color:var(--dark);}
-  .area.done .tick{background:var(--accent); border-color:var(--accent); color:#fff;}
-  .area .tick svg{width:12px; height:12px;}
+  /* ===== INSIGHT TILES (3b — Layer 2, per the locked v10 mockup) =====
+     Status is a ROUTER, never a verdict: warm edge = worth a conversation,
+     forest edge = nothing flagged, neutral = still building. No red, no
+     traffic-light, no grading of any number. */
+  .tiles{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  @media(max-width:1180px){.tiles{grid-template-columns:1fr;}}
+  .tile{background:var(--surface); border:1px solid var(--rule); border-radius:13px; padding:15px 15px 14px; cursor:pointer; transition:all .18s; box-shadow:var(--shadow); position:relative; overflow:hidden;}
+  .tile::before{content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--none, #c9c4ba);}
+  .tile.s-calm::before{background:var(--accent);}
+  .tile.s-flag::before{background:var(--warm);}
+  .tile.s-building::before{background:#c9c4ba;}
+  .tile:hover{border-color:var(--accent); box-shadow:var(--shadow-lift);}
+  .tile .status-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;}
+  .badge{display:inline-flex; align-items:center; gap:5px; font-size:10px; text-transform:uppercase; letter-spacing:.06em; font-weight:600; padding:3px 8px; border-radius:20px;}
+  .badge.calm{background:var(--accent-light); color:var(--accent);}
+  .badge.flag{background:var(--warm-light); color:var(--warm-deep);}
+  .badge.building{background:#f0eee9; color:var(--light);}
+  .badge .d{width:6px;height:6px;border-radius:50%;}
+  .badge.calm .d{background:var(--accent);} .badge.flag .d{background:var(--warm);} .badge.building .d{background:#c9c4ba;}
+  .tile .ico{color:var(--steel-deep); display:inline-flex;}
+  .tile .ico svg{width:13px; height:13px;}
+  .tile .name{font-size:14.5px; font-weight:600; margin-bottom:6px;}
+  .tile .metric{font-size:20px; font-weight:600; letter-spacing:-.01em; color:var(--accent); line-height:1.15;}
+  .tile .metric.empty{color:var(--light); font-size:15px; font-weight:500;}
+  .tile .ctx{display:block; font-size:11.5px; color:var(--light); font-weight:500; margin-top:4px; line-height:1.4;}
+  .tile .complete{margin-top:11px; height:3px; background:var(--rule-soft); border-radius:4px; overflow:hidden;}
+  .tile .complete .cf{height:100%; background:var(--steel-deep); border-radius:4px; transition:width .5s;}
+  .tile.done .complete{display:none;}
   .dash-note{margin-top:14px; background:var(--accent-light); border-radius:12px; padding:13px 15px; font-size:12.5px; line-height:1.55; color:var(--mid);}
   .dash-note b{color:var(--accent);}
 
@@ -190,8 +212,8 @@
               <div class="prog-label" id="progLabel">0 of 8 areas built</div>
             </div>
           </div>
-          <div class="areas" id="areasList"></div>
-          <div class="dash-note"><b>Your figures are being captured as you talk.</b> When the picture's complete, this pane becomes your full dashboard, every area opened up with your real numbers.</div>
+          <div class="tiles" id="tilesGrid"></div>
+          <div class="dash-note"><b>Built from your real figures as you talk.</b> A warm edge means an area is worth a conversation with the right professional — it's never a judgment of your numbers. Every tile opens up in full detail soon.</div>
         </div>
       </div>
     </div>
@@ -212,17 +234,8 @@
    SERVER-SIDE in the clarity-chat edge function. This page renders the
    stream (minus the [CAPTURE] machine block) and shows build progress. */
 
-const AREAS = [
-  ['income', 'Income and cashflow'],
-  ['assets', 'Assets'],
-  ['liabilities', 'Debts and loans'],
-  ['buffer', 'Emergency buffer'],
-  ['protection', 'Protection'],
-  ['estate', 'Estate basics'],
-  ['super', 'Super'],
-  ['goals', 'Goals and direction']
-];
-const TICK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+const VALID_AREAS = ['income', 'assets', 'liabilities', 'buffer', 'protection', 'estate', 'super', 'goals'];
+const CHEV = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
 const messagesEl = document.getElementById('messages');
 const inputEl = document.getElementById('composerInput');
@@ -321,18 +334,177 @@ function addTyping() {
   return div;
 }
 
-/* ── progress pane ── */
-function renderAreas(completed) {
-  const list = document.getElementById('areasList');
-  list.innerHTML = '';
-  AREAS.forEach(([key, label]) => {
-    const done = completed.includes(key);
-    const row = document.createElement('div');
-    row.className = 'area' + (done ? ' done' : '');
-    row.innerHTML = '<span class="tick">' + TICK + '</span>' + label;
-    list.appendChild(row);
+/* ══════════ INSIGHT TILES (3b — Layer 2) ══════════
+   Displays DERIVED insights, never raw collection buckets. All derivation
+   happens here over the member's own RLS-scoped picture read — this page
+   never writes to picture (3a captures; 3b displays).
+
+   THE LOCKED LINE: every status is a ROUTER, never a verdict.
+   Allowed labels: "Worth a conversation" / "Nothing flagged" / "Still
+   building". A flag means "this area is discussable with a professional",
+   decided ONLY from structural facts (a mortgage exists; more than one
+   super account; a document is absent) — NEVER from whether a number is
+   big or small, and never against any benchmark. No wording that grades:
+   no low/high/behind/healthy/on track/needs attention, no comparisons. */
+
+function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
+function fmt$(n) { return '$' + Math.round(n).toLocaleString('en-AU'); }
+function sumArr(arr, field) {
+  if (!Array.isArray(arr)) return null;
+  let s = 0, any = false;
+  for (const it of arr) { const v = num(it && it[field]); if (v !== null) { s += v; any = true; } }
+  return any ? s : null;
+}
+
+function deriveMonthlyIncome(inc) {
+  const parts = [num(inc.salary_annual), num(inc.partner_salary_annual), num(inc.side_income_annual), num(inc.other_income_annual)].filter(v => v !== null);
+  return parts.length ? parts.reduce((a, b) => a + b, 0) / 12 : null;
+}
+
+/* Each derive() returns { state:'flag'|'calm'|'building', metric, unit, ctx, pct }
+   metric is ALWAYS the real figure once derivable — never hidden. */
+const TILES = [
+  { key: 'equity', name: 'Equity position', derive(d, done) {
+      const a = d.assets || {}, l = d.liabilities || {};
+      const assetParts = [num(a.home_value), num(a.investment_property_value), num(a.savings), num(a.shares_value), num(a.business_value), sumArr(a.other, 'value')].filter(v => v !== null);
+      const liabParts = [num(l.mortgage_balance), num(l.hecs_balance), sumArr(l.expensive_debts, 'balance')].filter(v => v !== null);
+      const haveAssets = assetParts.length > 0;
+      const haveLiabs = liabParts.length > 0 || done.includes('liabilities');
+      const pct = (haveAssets ? 50 : 0) + (haveLiabs ? 50 : 0);
+      if (!haveAssets || !haveLiabs) return { state: 'building', pct };
+      const netEquity = assetParts.reduce((x, y) => x + y, 0) - liabParts.reduce((x, y) => x + y, 0);
+      const mortgage = num(l.mortgage_balance);
+      const bits = [];
+      if (mortgage !== null) {
+        const rate = num(l.mortgage_rate_percent);
+        bits.push('mortgage ' + fmt$(mortgage) + (rate !== null ? ' at ' + rate + '%' : ''));
+        const off = num(l.offset_balance);
+        if (off !== null) bits.push('offset ' + fmt$(off));
+      }
+      // Router: a mortgage's rate and structure are checkable facts — broker
+      // territory. No mortgage → nothing here needs a conversation.
+      return mortgage !== null
+        ? { state: 'flag', metric: fmt$(netEquity), unit: ' net position', ctx: bits.join(' · ') + ' · rate and structure are a broker conversation', pct: 100 }
+        : { state: 'calm', metric: fmt$(netEquity), unit: ' net position', ctx: 'what you own minus what you owe' + (bits.length ? ' · ' + bits.join(' · ') : ''), pct: 100 };
+    } },
+  { key: 'surplus', name: 'Monthly surplus', derive(d) {
+      const inc = d.income || {};
+      const mIn = deriveMonthlyIncome(inc);
+      const mOut = num(inc.monthly_expenses);
+      const pct = ((mIn !== null ? 1 : 0) + (mOut !== null ? 1 : 0)) * 50;
+      if (mIn === null || mOut === null) return { state: 'building', pct };
+      const s = mIn - mOut;
+      // Router: what spare money does next — or how the cashflow fits
+      // together — is exactly what a planner works through. The figure is
+      // stated; its size is never graded.
+      return { state: 'flag', metric: fmt$(s), unit: ' /month',
+        ctx: fmt$(mIn) + ' in − ' + fmt$(mOut) + ' out · where it goes next is a planner conversation', pct: 100 };
+    } },
+  { key: 'buffer', name: 'Emergency buffer', derive(d) {
+      const b = d.buffer || {}, inc = d.income || {};
+      let months = num(b.months_cover);
+      const sav = num(b.accessible_savings);
+      const mOut = num(inc.monthly_expenses);
+      if (months === null && sav !== null && mOut !== null && mOut > 0) months = sav / mOut;
+      const pct = months !== null ? 100 : (sav !== null ? 50 : 0);
+      if (months === null) return { state: 'building', pct };
+      const m = Math.round(months * 10) / 10;
+      // Router: how a buffer should sit — size, where it's parked — is a
+      // personal call worked out with a planner. Stated, never graded.
+      return { state: 'flag', metric: m + (m === 1 ? ' month' : ' months'), unit: ' cover if income paused',
+        ctx: (sav !== null ? 'accessible ' + fmt$(sav) + ' · ' : '') + 'how a buffer should sit is a planner conversation', pct: 100 };
+    } },
+  { key: 'income', name: 'Income structure', derive(d) {
+      const inc = d.income || {};
+      const sal = num(inc.salary_annual), psal = num(inc.partner_salary_annual), side = num(inc.side_income_annual), oth = num(inc.other_income_annual);
+      const parts = [sal, psal, side, oth].filter(v => v !== null);
+      if (!parts.length) return { state: 'building', pct: 0 };
+      const total = parts.reduce((a, b) => a + b, 0);
+      const shape = [];
+      if (sal !== null) shape.push('salary');
+      if (psal !== null) shape.push('partner salary');
+      if (side !== null && side > 0) shape.push('side income');
+      if (oth !== null && oth > 0) shape.push('other income');
+      // Router: side or business income makes structure an accountant
+      // question. Salary-only → nothing here needs a conversation.
+      const hasNonSalary = (side !== null && side > 0) || (oth !== null && oth > 0);
+      return hasNonSalary
+        ? { state: 'flag', metric: fmt$(total), unit: ' /yr household', ctx: shape.join(' + ') + ' · how it’s structured is an accountant conversation', pct: 100 }
+        : { state: 'calm', metric: fmt$(total), unit: ' /yr household', ctx: shape.join(' + '), pct: 100 };
+    } },
+  { key: 'super', name: 'Super', derive(d) {
+      const s = d.super || {};
+      const funds = Array.isArray(s.funds) ? s.funds : [];
+      const total = sumArr(funds, 'balance');
+      const multi = funds.length > 1 || s.multiple_accounts === true;
+      if (total === null && !funds.length) return { state: 'building', pct: s.multiple_accounts !== undefined ? 40 : 0 };
+      const n = funds.length;
+      const bits = [n + (n === 1 ? ' fund' : ' funds')];
+      if (s.extra_contributions === true) bits.push('extra contributions');
+      if (s.notes && /insurance/i.test(s.notes)) bits.push('insurance held inside');
+      // Router: more than one account is a structural fact that makes
+      // consolidation a planner question. One fund → nothing flagged.
+      return multi
+        ? { state: 'flag', metric: total !== null ? fmt$(total) : n + ' funds', unit: total !== null ? ' across ' + n + ' funds' : '', ctx: bits.join(' · ') + ' · more than one account is a planner conversation', pct: 100 }
+        : { state: 'calm', metric: total !== null ? fmt$(total) : '1 fund', unit: total !== null ? ' in one fund' : '', ctx: bits.join(' · '), pct: 100 };
+    } },
+  { key: 'protect', name: 'Protection & estate', derive(d, done) {
+      const p = d.protection || {}, e = d.estate || {};
+      const items = [
+        ['life cover', p.life_cover_amount], ['income protection', p.income_protection],
+        ['TPD', p.tpd_amount], ['trauma', p.trauma_amount],
+        ['will', e.will], ['power of attorney', e.poa],
+        ['guardianship', e.guardianship], ['super nomination', e.super_nomination]
+      ];
+      let present = 0, absent = 0, unsure = 0, captured = 0;
+      const absentNames = [];
+      for (const [label, v] of items) {
+        if (v === undefined || v === null) continue;
+        captured++;
+        if (v === 'na') continue;
+        if (v === false) { absent++; absentNames.push(label); }
+        else if (v === 'unsure') { unsure++; absentNames.push(label + '?'); }
+        else present++;
+      }
+      const bothDone = done.includes('protection') && done.includes('estate');
+      const pct = bothDone ? 100 : Math.round(captured / 8 * 100);
+      if (!captured) return { state: 'building', pct };
+      if (!bothDone && captured < 3) return { state: 'building', pct };
+      const metric = present + ' in place' + (absent ? ' · ' + absent + ' absent' : '') + (unsure ? ' · ' + unsure + ' unsure' : '');
+      // Router: an absent or unknown document is a fact. Absences point to a
+      // conversation; everything in place → nothing flagged.
+      return (absent || unsure)
+        ? { state: 'flag', metric, unit: '', ctx: absentNames.slice(0, 4).join(', ') + ' · worth a conversation about cover and paperwork', pct }
+        : { state: 'calm', metric, unit: '', ctx: 'cover and paperwork all captured as in place', pct };
+    } }
+];
+
+const BADGE_LABEL = { flag: 'Worth a conversation', calm: 'Nothing flagged', building: 'Still building' };
+
+function renderTiles(picture) {
+  const grid = document.getElementById('tilesGrid');
+  const d = picture.domains || {};
+  const done = Array.isArray(picture.completed_domains) ? picture.completed_domains : [];
+  grid.innerHTML = '';
+  TILES.forEach(t => {
+    const r = t.derive(d, done) || { state: 'building', pct: 0 };
+    const el = document.createElement('div');
+    el.className = 'tile s-' + (r.state === 'flag' ? 'flag' : r.state === 'calm' ? 'calm' : 'building') + (r.pct >= 100 ? ' done' : '');
+    // Clickable-ready for 3c's detail panel — no panel exists yet.
+    el.setAttribute('data-tile', t.key);
+    el.innerHTML =
+      '<div class="status-row"><span class="badge ' + r.state + '"><span class="d"></span>' + BADGE_LABEL[r.state] + '</span><span class="ico">' + CHEV + '</span></div>' +
+      '<div class="name">' + t.name + '</div>' +
+      (r.metric !== undefined
+        ? '<div class="metric">' + esc(r.metric) + '<span class="ctx">' + esc((r.unit || '').trim()) + (r.ctx ? (r.unit ? ' · ' : '') + esc(r.ctx) : '') + '</span></div>'
+        : '<div class="metric empty">Still building<span class="ctx">fills in as you talk with Finn</span></div>') +
+      '<div class="complete"><div class="cf" style="width:' + (r.pct || 0) + '%"></div></div>';
+    grid.appendChild(el);
   });
-  const n = completed.filter(k => AREAS.some(([key]) => key === k)).length;
+}
+
+function renderHero(completed) {
+  const n = completed.filter(k => VALID_AREAS.includes(k)).length;
   document.getElementById('progLabel').textContent = n + ' of 8 areas built';
   document.getElementById('progFill').style.width = (n / 8 * 100) + '%';
   if (n === 8) {
@@ -342,9 +514,11 @@ function renderAreas(completed) {
 }
 
 async function refreshProgress() {
-  const { data } = await finnSupabase.from('picture').select('completed_domains').limit(1);
-  const completed = (data && data[0] && Array.isArray(data[0].completed_domains)) ? data[0].completed_domains : [];
-  renderAreas(completed);
+  const { data } = await finnSupabase.from('picture').select('domains, goals, completed_domains').limit(1);
+  const picture = (data && data[0]) ? data[0] : { domains: {}, goals: {}, completed_domains: [] };
+  const completed = Array.isArray(picture.completed_domains) ? picture.completed_domains : [];
+  renderHero(completed);
+  renderTiles(picture);
 }
 
 /* ── conversation ── */
