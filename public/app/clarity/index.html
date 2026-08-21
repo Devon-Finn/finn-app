@@ -120,6 +120,13 @@
   .tile .name{font-size:14.5px; font-weight:600; margin-bottom:6px;}
   .tile .metric{font-size:20px; font-weight:600; letter-spacing:-.01em; color:var(--accent); line-height:1.15;}
   .tile .metric.empty{color:var(--light); font-size:15px; font-weight:500;}
+  /* Subtext is three distinct elements, never one run-on line:
+     unit (what the number is) · facts (supporting figures) · route (why
+     it's a conversation — visually distinct, warm, never alarming). */
+  .tile .unit{font-size:12px; color:var(--light); font-weight:500;}
+  .tile .facts{font-size:11.5px; color:var(--light); font-weight:500; margin-top:5px; line-height:1.45;}
+  .tile .route{display:flex; align-items:flex-start; gap:6px; margin-top:8px; font-size:11.5px; font-weight:600; color:var(--warm-deep); line-height:1.4;}
+  .tile .route svg{width:11px; height:11px; flex-shrink:0; margin-top:2px;}
   .tile .ctx{display:block; font-size:11.5px; color:var(--light); font-weight:500; margin-top:4px; line-height:1.4;}
   .tile .complete{margin-top:11px; height:3px; background:var(--rule-soft); border-radius:4px; overflow:hidden;}
   .tile .complete .cf{height:100%; background:var(--steel-deep); border-radius:4px; transition:width .5s;}
@@ -384,8 +391,8 @@ const TILES = [
       // Router: a mortgage's rate and structure are checkable facts — broker
       // territory. No mortgage → nothing here needs a conversation.
       return mortgage !== null
-        ? { state: 'flag', metric: fmt$(netEquity), unit: ' net position', ctx: bits.join(' · ') + ' · rate and structure are a broker conversation', pct: 100 }
-        : { state: 'calm', metric: fmt$(netEquity), unit: ' net position', ctx: 'what you own minus what you owe' + (bits.length ? ' · ' + bits.join(' · ') : ''), pct: 100 };
+        ? { state: 'flag', metric: fmt$(netEquity), unit: 'net position', facts: bits.join(' · '), route: 'Rate and structure are a broker conversation', pct: 100 }
+        : { state: 'calm', metric: fmt$(netEquity), unit: 'net position', facts: 'what you own minus what you owe' + (bits.length ? ' · ' + bits.join(' · ') : ''), pct: 100 };
     } },
   { key: 'surplus', name: 'Monthly surplus', derive(d) {
       const inc = d.income || {};
@@ -397,8 +404,9 @@ const TILES = [
       // Router: what spare money does next — or how the cashflow fits
       // together — is exactly what a planner works through. The figure is
       // stated; its size is never graded.
-      return { state: 'flag', metric: fmt$(s), unit: ' /month',
-        ctx: fmt$(mIn) + ' in − ' + fmt$(mOut) + ' out · where it goes next is a planner conversation', pct: 100 };
+      return { state: 'flag', metric: fmt$(s), unit: '/month',
+        facts: fmt$(mIn) + ' in − ' + fmt$(mOut) + ' out each month',
+        route: 'Where it goes next is a planner conversation', pct: 100 };
     } },
   { key: 'buffer', name: 'Emergency buffer', derive(d) {
       const b = d.buffer || {}, inc = d.income || {};
@@ -411,8 +419,9 @@ const TILES = [
       const m = Math.round(months * 10) / 10;
       // Router: how a buffer should sit — size, where it's parked — is a
       // personal call worked out with a planner. Stated, never graded.
-      return { state: 'flag', metric: m + (m === 1 ? ' month' : ' months'), unit: ' cover if income paused',
-        ctx: (sav !== null ? 'accessible ' + fmt$(sav) + ' · ' : '') + 'how a buffer should sit is a planner conversation', pct: 100 };
+      return { state: 'flag', metric: m + (m === 1 ? ' month' : ' months'), unit: 'cover if income paused',
+        facts: sav !== null ? 'accessible savings ' + fmt$(sav) : '',
+        route: 'How a buffer should sit is a planner conversation', pct: 100 };
     } },
   { key: 'income', name: 'Income structure', derive(d) {
       const inc = d.income || {};
@@ -429,25 +438,66 @@ const TILES = [
       // question. Salary-only → nothing here needs a conversation.
       const hasNonSalary = (side !== null && side > 0) || (oth !== null && oth > 0);
       return hasNonSalary
-        ? { state: 'flag', metric: fmt$(total), unit: ' /yr household', ctx: shape.join(' + ') + ' · how it’s structured is an accountant conversation', pct: 100 }
-        : { state: 'calm', metric: fmt$(total), unit: ' /yr household', ctx: shape.join(' + '), pct: 100 };
+        ? { state: 'flag', metric: fmt$(total), unit: '/yr household', facts: shape.join(' + '), route: 'How it’s structured is an accountant conversation', pct: 100 }
+        : { state: 'calm', metric: fmt$(total), unit: '/yr household', facts: shape.join(' + '), pct: 100 };
     } },
   { key: 'super', name: 'Super', derive(d) {
       const s = d.super || {};
       const funds = Array.isArray(s.funds) ? s.funds : [];
       const total = sumArr(funds, 'balance');
-      const multi = funds.length > 1 || s.multiple_accounts === true;
-      if (total === null && !funds.length) return { state: 'building', pct: s.multiple_accounts !== undefined ? 40 : 0 };
       const n = funds.length;
-      const bits = [];
-      if (total === null) bits.push(n + (n === 1 ? ' fund' : ' funds'));
-      if (s.extra_contributions === true) bits.push('extra contributions');
-      if (s.notes && /insurance/i.test(s.notes)) bits.push('insurance held inside');
-      // Router: more than one account is a structural fact that makes
-      // consolidation a planner question. One fund → nothing flagged.
-      return multi
-        ? { state: 'flag', metric: total !== null ? fmt$(total) : n + ' funds', unit: total !== null ? ' across ' + n + ' funds' : '', ctx: bits.join(' · ') + ' · more than one account is a planner conversation', pct: 100 }
-        : { state: 'calm', metric: total !== null ? fmt$(total) : '1 fund', unit: total !== null ? ' in one fund' : '', ctx: bits.join(' · '), pct: 100 };
+      if (total === null && !n) return { state: 'building', pct: s.multiple_accounts !== undefined ? 40 : 0 };
+
+      // Per-member attribution: consolidation is only a signal when ONE
+      // person holds more than one account. One account each across two
+      // partners is completely normal (super can't merge between spouses).
+      const byOwner = {};
+      let unattributed = 0;
+      funds.forEach(f => {
+        const o = (f && typeof f.owner === 'string') ? f.owner.trim().toLowerCase() : '';
+        if (o) byOwner[o] = (byOwner[o] || 0) + 1; else unattributed++;
+      });
+      const ownerNames = Object.keys(byOwner);
+      const maxPerOwner = ownerNames.length ? Math.max(...ownerNames.map(o => byOwner[o])) : 0;
+      const possess = o => o === 'you' ? 'your' : (o.charAt(0).toUpperCase() + o.slice(1)) + '’s';
+
+      const extras = [];
+      if (s.extra_contributions === true) extras.push('extra contributions');
+      if (s.notes && /insurance/i.test(s.notes)) extras.push('insurance held inside');
+
+      // Single account — no ambiguity, nothing to consolidate.
+      if (n <= 1) {
+        return { state: 'calm', metric: total !== null ? fmt$(total) : '1 account', unit: total !== null ? 'in one account' : '',
+          facts: extras.join(' · '), pct: 100 };
+      }
+
+      const totalMetric = total !== null ? fmt$(total) : n + ' accounts';
+      const totalUnit = total !== null ? 'total across ' + n + ' accounts' : '';
+
+      // One person with more than one account → the real consolidation signal.
+      if (maxPerOwner > 1 || (unattributed === n && s.multiple_accounts === true)) {
+        const whose = ownerNames.length
+          ? ownerNames.map(o => possess(o) + ' ' + byOwner[o]).join(' · ')
+          : 'more than one held by one person';
+        return { state: 'flag', metric: totalMetric, unit: totalUnit,
+          facts: [whose].concat(extras).join(' · '),
+          route: 'More than one account for one person is a planner conversation', pct: 100 };
+      }
+
+      // One account each across partners → completely normal.
+      if (unattributed === 0 && maxPerOwner === 1) {
+        const each = ownerNames.length === 2 && ownerNames.includes('you')
+          ? 'one account each across you and ' + ownerNames.filter(o => o !== 'you').map(o => o === 'partner' ? 'your partner' : o.charAt(0).toUpperCase() + o.slice(1)).join('')
+          : 'one account each';
+        return { state: 'calm', metric: totalMetric, unit: totalUnit,
+          facts: [each].concat(extras).join(' · '), pct: 100 };
+      }
+
+      // Multiple accounts but whose they are isn't pinned down yet — the
+      // insight can't distinguish consolidation from a normal couple, so it
+      // stays building (figure still shown, never hidden).
+      return { state: 'building', metric: totalMetric, unit: totalUnit,
+        facts: 'whose accounts these are is still to pin down' + (extras.length ? ' · ' + extras.join(' · ') : ''), pct: 85 };
     } },
   { key: 'protect', name: 'Protection & estate', derive(d, done) {
       const p = d.protection || {}, e = d.estate || {};
@@ -475,8 +525,8 @@ const TILES = [
       // Router: an absent or unknown document is a fact. Absences point to a
       // conversation; everything in place → nothing flagged.
       return (absent || unsure)
-        ? { state: 'flag', metric, unit: '', ctx: absentNames.slice(0, 4).join(', ') + ' · worth a conversation about cover and paperwork', pct }
-        : { state: 'calm', metric, unit: '', ctx: 'cover and paperwork all captured as in place', pct };
+        ? { state: 'flag', metric, unit: '', facts: 'absent: ' + absentNames.slice(0, 5).join(', '), route: 'Cover and paperwork are worth a conversation', pct }
+        : { state: 'calm', metric, unit: '', facts: 'cover and paperwork all captured as in place', pct };
     } }
 ];
 
@@ -493,11 +543,14 @@ function renderTiles(picture) {
     el.className = 'tile s-' + (r.state === 'flag' ? 'flag' : r.state === 'calm' ? 'calm' : 'building') + (r.pct >= 100 ? ' done' : '');
     // Clickable-ready for 3c's detail panel — no panel exists yet.
     el.setAttribute('data-tile', t.key);
+    const ROUTE_ARROW = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
     el.innerHTML =
       '<div class="status-row"><span class="badge ' + r.state + '"><span class="d"></span>' + BADGE_LABEL[r.state] + '</span><span class="ico">' + CHEV + '</span></div>' +
       '<div class="name">' + t.name + '</div>' +
       (r.metric !== undefined
-        ? '<div class="metric">' + esc(r.metric) + '<span class="ctx">' + esc((r.unit || '').trim()) + (r.ctx ? (r.unit ? ' · ' : '') + esc(r.ctx) : '') + '</span></div>'
+        ? '<div class="metric">' + esc(r.metric) + (r.unit ? ' <span class="unit">' + esc(r.unit) + '</span>' : '') + '</div>' +
+          (r.facts ? '<div class="facts">' + esc(r.facts) + '</div>' : '') +
+          (r.route ? '<div class="route">' + ROUTE_ARROW + '<span>' + esc(r.route) + '</span></div>' : '')
         : '<div class="metric empty">Still building<span class="ctx">fills in as you talk with Finn</span></div>') +
       '<div class="complete"><div class="cf" style="width:' + (r.pct || 0) + '%"></div></div>';
     grid.appendChild(el);
