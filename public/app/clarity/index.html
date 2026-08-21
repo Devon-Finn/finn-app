@@ -477,7 +477,7 @@ const TILES = [
       // One person with more than one account → the real consolidation signal.
       if (maxPerOwner > 1 || (unattributed === n && s.multiple_accounts === true)) {
         const whose = ownerNames.length
-          ? ownerNames.map(o => possess(o) + ' ' + byOwner[o]).join(' · ')
+          ? ownerNames.map(o => possess(o) + ' ' + byOwner[o] + (byOwner[o] === 1 ? ' account' : ' accounts')).join(' · ')
           : 'more than one held by one person';
         return { state: 'flag', metric: totalMetric, unit: totalUnit,
           facts: [whose].concat(extras).join(' · '),
