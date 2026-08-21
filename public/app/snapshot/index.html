@@ -143,13 +143,18 @@ src="https://www.facebook.com/tr?id=1501463388385490&ev=PageView&noscript=1"/></
   .hero .headline{font-size:24px; font-weight:600; letter-spacing:-.01em; line-height:1.2; color:#fff;}
   .hero .headline .fr{color:var(--steel);}
   .hero .demo-tag{display:inline-block; margin-top:12px; font-size:11px; color:var(--steel); background:rgba(255,255,255,.1); padding:4px 10px; border-radius:20px;}
-  .hero .hero-actions{display:none; margin-top:14px; gap:9px; flex-wrap:wrap;}
-  .hero .hero-actions.show{display:flex;}
-  .hero-btn{font-family:inherit; font-size:13px; font-weight:600; border-radius:9px; padding:9px 15px; cursor:pointer; transition:all .16s; border:none;}
-  .hero-btn.solid{background:#fff; color:var(--accent);}
-  .hero-btn.solid:hover{opacity:.9;}
-  .hero-btn.ghost{background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.3);}
-  .hero-btn.ghost:hover{background:rgba(255,255,255,.2);}
+  /* Persistent next-steps offer (shown on completion, never a pop-up,
+     never disappears) */
+  .next-card{display:none; background:var(--surface-warm); border:1px solid var(--rule); border-radius:15px; padding:16px 16px 14px; margin-bottom:12px; box-shadow:var(--shadow);}
+  .next-card.show{display:block; animation:msgIn .4s ease;}
+  .next-card .nc-lead{font-size:11px; text-transform:uppercase; letter-spacing:.13em; color:var(--steel-deep); font-weight:600; margin-bottom:10px;}
+  .nc-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  @media(max-width:1180px){.nc-grid{grid-template-columns:1fr;}}
+  .nc-block{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:14px 15px; min-width:0;}
+  .nc-block.clarity{background:var(--warm-light); border-color:#ecd9c4;}
+  .nc-h{font-size:14px; font-weight:600; margin-bottom:5px;}
+  .nc-b{font-size:12.5px; color:var(--mid); line-height:1.55; margin-bottom:11px;}
+  .nc-block.clarity .nc-b{color:#7d5c3c;}
 
   .tiles{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .tile{background:var(--surface); border:1px solid var(--rule); border-radius:13px; padding:15px 15px 14px; cursor:pointer; transition:all .18s; box-shadow:var(--shadow); position:relative; overflow:hidden;}
@@ -206,9 +211,13 @@ src="https://www.facebook.com/tr?id=1501463388385490&ev=PageView&noscript=1"/></
   .dp-grid .dp-section{margin-top:0;}
   @media(max-width:900px){.dp-grid{grid-template-columns:1fr;}}
   .dp-figures{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:6px 16px; box-shadow:var(--shadow);}
-  .dp-figrow{display:flex; justify-content:space-between; gap:14px; padding:11px 0; border-bottom:1px solid var(--rule-soft); font-size:13.5px;}
+  /* Long question labels wrap; answer values keep readable width (never
+     one-word-per-line). Grid children get min-width:0 so the two columns
+     can't collide or overlap. */
+  .dp-grid > .dp-section{min-width:0;}
+  .dp-figrow{display:flex; justify-content:space-between; align-items:baseline; gap:16px; padding:11px 0; border-bottom:1px solid var(--rule-soft); font-size:13.5px;}
   .dp-figrow:last-child{border-bottom:none;}
-  .dp-figrow .k{color:var(--mid); flex-shrink:0;} .dp-figrow .v{font-weight:600; text-align:right;}
+  .dp-figrow .k{color:var(--mid); flex:1 1 auto; min-width:0; line-height:1.45;} .dp-figrow .v{font-weight:600; text-align:right; flex:0 0 auto; max-width:55%; line-height:1.45;}
   .dp-context-box{background:var(--accent-light); border-radius:12px; padding:14px 16px; font-size:13.5px; line-height:1.55; color:var(--dark);}
   .dp-context-box b{color:var(--accent);}
   .dp-points{display:flex; align-items:flex-start; gap:11px; background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:15px 16px; box-shadow:var(--shadow);}
@@ -327,9 +336,28 @@ src="https://www.facebook.com/tr?id=1501463388385490&ev=PageView&noscript=1"/></
             <div class="lead">Where things stand</div>
             <div class="headline" id="heroLine">Your picture's <span class="fr">taking shape</span>.</div>
             <span class="demo-tag">Broad view · your real figures come in the Clarity Session</span>
-            <div class="hero-actions" id="heroActions">
-              <button class="hero-btn solid" onclick="openDone()">Email me my snapshot</button>
-              <button class="hero-btn ghost" onclick="goClarity()">The Clarity Session →</button>
+          </div>
+
+          <!-- Persistent next-steps offer — appears on completion and stays.
+               Calm and always reachable; never an interrupting pop-up. -->
+          <div class="next-card" id="nextCard">
+            <div class="nc-lead">Take it further — whenever you're ready</div>
+            <div class="nc-grid">
+              <div class="nc-block">
+                <div class="nc-h">Keep a copy of your snapshot</div>
+                <div class="nc-b">Emailed to you, so you've got it to come back to.</div>
+                <div class="m-row" id="emailRow">
+                  <input type="email" class="m-input" id="emailInput" placeholder="your@email.com" autocomplete="email" aria-label="Your email address">
+                  <button class="m-btn solid" id="emailBtn" onclick="submitEmail()">Send it</button>
+                </div>
+                <div class="m-thanks" id="emailThanks">Done — it's on its way.</div>
+                <div class="m-note" id="emailNote">No spam. Unsubscribe any time.</div>
+              </div>
+              <div class="nc-block clarity">
+                <div class="nc-h">Want your true position?</div>
+                <div class="nc-b">This is a broad picture built from rough answers. The Clarity Session walks you through your real figures with Finn — your exact position, built properly, in one sitting, and yours to keep.</div>
+                <button class="m-btn warm" onclick="goClarity()">The Clarity Session →</button>
+              </div>
             </div>
           </div>
 
@@ -357,29 +385,9 @@ src="https://www.facebook.com/tr?id=1501463388385490&ev=PageView&noscript=1"/></
   <button id="tabPicture" onclick="setTab('picture')">Your picture <span class="nd" id="pictureDot"></span></button>
 </div>
 
-<div class="overlay" id="doneOverlay">
-  <div class="modal">
-    <div class="m-eyebrow">Snapshot complete</div>
-    <h2>That's all nineteen. Your picture's <span class="fr">ready</span>.</h2>
-    <p class="m-sub">It's a broad view — the general shape of things, and the areas worth a look. Two ways to take it further, and both are optional.</p>
-    <div class="m-block">
-      <div class="mb-title">Want your snapshot emailed to you?</div>
-      <div class="mb-body">So you've got it to come back to whenever you're ready.</div>
-      <div class="m-row" id="emailRow">
-        <input type="email" class="m-input" id="emailInput" placeholder="your@email.com" autocomplete="email" aria-label="Your email address">
-        <button class="m-btn solid" id="emailBtn" onclick="submitEmail()">Send it</button>
-      </div>
-      <div class="m-thanks" id="emailThanks">Done — it's on its way.</div>
-      <div class="m-note" id="emailNote">No spam. Unsubscribe any time.</div>
-    </div>
-    <div class="m-block">
-      <div class="mb-title">Want your exact position?</div>
-      <div class="mb-body">The Clarity Session uses your real figures. Finn guides you through it step by step — no spreadsheets, no homework — and the picture you build is yours to keep.</div>
-      <button class="m-btn warm" onclick="goClarity()">The Clarity Session →</button>
-    </div>
-    <button class="m-dismiss" onclick="closeDone()">Let me look around my picture first</button>
-  </div>
-</div>
+<!-- The completion pop-up is gone by design: the user lands on their
+     picture uninterrupted, and the dual-path offer lives in the persistent
+     next-card on the dashboard instead. -->
 
 <script>
 'use strict';
@@ -407,9 +415,9 @@ const questions = [
     options: ['Couple — with kids','Couple — no kids','Single parent','Single — no dependants','One of us works, one doesn\'t or earns irregularly']
   },
   {
-    id: 'income_type', multi: false,
+    id: 'income_type', multi: true,
     text: 'How does your household earn its income?',
-    context: null,
+    context: 'Pick everything that applies — households often have a mix (one employed, one self employed, side income on top).',
     options: ['Employed — regular salary or wages','Self employed or running a business','A mix — employed plus a business or side income','One employed, one self employed']
   },
   {
@@ -463,9 +471,9 @@ const questions = [
     ]
   },
   {
-    id: 'savings', multi: false,
+    id: 'savings', multi: true,
     text: 'Do you have savings or other money set aside — outside of your retirement fund?',
-    context: 'Think money in a bank account, shares, or anything else you\'d consider a financial asset. A rough range is completely fine.',
+    context: 'Think money in a bank account, shares, or anything else you\'d consider a financial asset. A rough range is completely fine — pick everything that applies.',
     options: [
       'Not much — little to no savings right now',
       'Some savings — roughly under $30,000',
@@ -741,22 +749,40 @@ function updateProgress() {
 }
 
 /* ═════════════════════ QUESTION FLOW ═════════════════════ */
+// Chips are a RE-ATTACHABLE unit, not a one-shot render welded to the
+// question message. attachChips() can re-append the current question's
+// buttons under any later message (a helper reply, an error note), so a
+// button-question always has its buttons at the bottom of the conversation
+// no matter how far off-script the exchange went. In-progress multi-select
+// choices survive re-attachment.
+function chipsHtml(q) {
+  return '<div class="finn-inline">' +
+    q.options.map((o, i) => `<button class="chip-inline${q.multi && multiSel.includes(o) ? ' selected' : ''}" data-opt="${i}" onclick="pickOption(${i}, this)">${esc(o)}</button>`).join('') +
+    (q.multi ? `<button class="chip-inline primary" id="multiDone" style="display:${multiSel.length ? 'inline-block' : 'none'}" onclick="confirmMulti()">That's everything →</button>` : '') +
+    `<button class="chip-skip" onclick="skipQuestion()">Skip this one</button></div>`;
+}
+
+function attachChips(q, hostDiv) {
+  if (phase !== 'asking') return;
+  retireChips(); // never two live chip sets at once
+  if (q.multi && !hostDiv.querySelector('.multi-hint')) {
+    const hint = document.createElement('p');
+    hint.className = 'multi-hint';
+    hint.style.cssText = 'font-size:12px;color:var(--light);margin-top:6px;';
+    hint.textContent = 'Pick as many as apply, then confirm.';
+    hostDiv.appendChild(hint);
+  }
+  hostDiv.insertAdjacentHTML('beforeend', chipsHtml(q));
+  scrollChat();
+}
+
 function askCurrent(leadin) {
   const q = questions[currentQ];
   multiSel = [];
   let html = '<p>' + (leadin ? esc(leadin) + ' ' : '') + esc(q.text) + '</p>';
   if (q.context) html += '<div class="q-ctx">' + esc(q.context) + '</div>';
-  html += '<div class="finn-inline">' +
-    q.options.map((o, i) => `<button class="chip-inline" data-opt="${i}" onclick="pickOption(${i}, this)">${esc(o)}</button>`).join('') +
-    (q.multi ? `<button class="chip-inline primary" id="multiDone" style="display:none" onclick="confirmMulti()">That's everything →</button>` : '') +
-    `<button class="chip-skip" onclick="skipQuestion()">Skip this one</button></div>`;
-  addFinn(html);
-  if (q.multi) {
-    const hint = document.createElement('p');
-    hint.style.cssText = 'font-size:12px;color:var(--light);margin-top:6px;';
-    hint.textContent = 'Pick as many as apply.';
-    messagesEl.lastChild.querySelector('.finn-inline').before(hint);
-  }
+  const div = addFinn(html);
+  attachChips(q, div);
   updateProgress();
 }
 
@@ -812,12 +838,11 @@ function finish() {
   updateProgress();
   document.getElementById('hdrT').textContent = 'Your broad picture, built';
   document.getElementById('heroLine').innerHTML = 'Your snapshot’s <span class="fr">ready</span>.';
-  document.getElementById('heroActions').classList.add('show');
+  showNextCard();
   updateTiles();
-  addFinn('<p>That’s all nineteen. Your broad picture is built — it’s on the right, and every tile opens up if you want a closer look.</p><p>It’s the general shape of things, not your exact position. That’s what the full Clarity Session builds, with your real figures.</p>');
+  addFinn('<p>That’s all nineteen. Your broad picture is built — it’s on the right, and every tile opens up if you want a closer look.</p><p>It’s the general shape of things, not your exact position. That’s what the full Clarity Session builds, with your real figures. Whenever you’re ready, both next steps sit at the top of your picture — no rush.</p>');
   try { fbq('track', 'CompleteRegistration'); } catch {}
   notifyPictureTab();
-  setTimeout(openDone, 1200);
 }
 
 /* ═════════════════════ INTRO + RESTORE ═════════════════════ */
@@ -859,8 +884,8 @@ function init() {
     currentQ = questions.length;
     document.getElementById('hdrT').textContent = 'Your broad picture, built';
     document.getElementById('heroLine').innerHTML = 'Your snapshot’s <span class="fr">ready</span>.';
-    document.getElementById('heroActions').classList.add('show');
-    addFinn('<p>Welcome back — your snapshot’s done, and your broad picture is on the right. Every tile opens up if you want a closer look.</p><p>When you’re ready to go further, the full Clarity Session builds your exact position with real figures.</p>');
+    showNextCard();
+    addFinn('<p>Welcome back — your snapshot’s done, and your broad picture is on the right. Every tile opens up if you want a closer look.</p><p>When you’re ready to go further, both next steps sit at the top of your picture.</p>');
     renderAllTiles();
     updateProgress();
     return;
@@ -912,7 +937,8 @@ function buildEnvelope(q, text) {
     `ANSWER: <the option text that best matches, or their own words if none match>\n` +
     (q.multi ? `They can pick several — if they gave several, put them all on the ANSWER line separated by " | ".\n` : '') +
     `Then on a new line, one short warm acknowledgment sentence (no advice, no evaluation of their situation).\n\n` +
-    `If instead they are confused, unsure, or asking about the question, help them according to your instructions and finish by gently re-asking the question. Never move to a different question. Never start the ANSWER line unless they actually answered.`;
+    `If instead they are confused, unsure, or asking about the question, help them according to your instructions and finish by gently re-asking the question. When re-asking, do NOT list the answer options in your text — tappable buttons for them are shown automatically beneath your reply. Never move to a different question. Never start the ANSWER line unless they actually answered.\n\n` +
+    `The snapshot flow is FORWARD-ONLY. There is no way to go back, re-show, or change an earlier question or answer, and you must never claim or imply that you can (no "of course, which question did you want to revisit?", no "let me show you that one again"). If they ask to go back or amend a previous answer, do NOT start the ANSWER line. Respond honestly and warmly along these lines: you can't jump back to earlier questions in the snapshot itself, but this is just the broad five minute version, and they'll go through everything properly and can adjust it all in the full Clarity Session; then invite them to keep going from here. Never make them feel stuck, and never promise a correction you cannot perform.`;
   return e;
 }
 
@@ -957,7 +983,9 @@ async function askHelper(text) {
     typingEl.remove();
     aiBusy = false;
     sendBtn.disabled = false;
-    addFinn('<p>Sorry — I couldn’t get to that just then. Mind trying again, or just tap one of the options above?</p>');
+    const errDiv = addFinn('<p>Sorry — I couldn’t get to that just then. Mind trying again, or just tap one of the options below?</p>');
+    // Buttons must survive even the failure path.
+    attachChips(q, errDiv);
     return;
   }
 
@@ -981,7 +1009,11 @@ async function askHelper(text) {
     if (ack) addFinn('<p>' + esc(ack) + '</p>');
     advance();
   } else {
-    addFinn('<p>' + esc(fullText || 'Sorry, I lost my train of thought — could you try that again?').replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>') + '</p>');
+    const div = addFinn('<p>' + esc(fullText || 'Sorry, I lost my train of thought — could you try that again?').replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>') + '</p>');
+    // Off-script turn (a clarification, a side question): the current
+    // question's buttons re-attach under the reply so they are always
+    // present and adjacent, whatever the user typed in between.
+    attachChips(q, div);
   }
 }
 
@@ -1086,10 +1118,13 @@ const TILES = [
     compute() {
       if (!hasAns('income_type') && !hasAns('income')) return null;
       const metric = INCOME_SHORT[ansStr('income')] || 'Captured';
-      if (has('income_type', 'Employed — regular')) return { status: 'clear', metric, ctx: 'regular salary or wages', read: 'Household income comes from regular salary or wages — the most straightforward structure there is. That keeps the tax side simple and the picture easy to read.' };
+      // income_type is multi-select: more than one selection means a mixed
+      // household, so mixed shapes are checked before the salary-only case.
+      const sel = answers['income_type'];
+      const multiMix = Array.isArray(sel) && sel.length > 1;
+      if (multiMix || has('income_type', 'A mix') || has('income_type', 'One employed, one self employed')) return { status: 'look', metric, ctx: 'a mix of income types across the household', read: 'Household income comes in more than one shape — some employed, some self employed or side income. Two income types means two tax pictures, and how the non-salary side is structured matters more as it grows. That’s an accountant conversation, and a good one to have early.' };
       if (has('income_type', 'Self employed')) return { status: 'look', metric, ctx: 'self employed — structure worth understanding', read: 'The household income is self employed. How that’s structured — sole trader, company, trust — affects tax, and what suits best changes as the business grows.' };
-      if (has('income_type', 'A mix')) return { status: 'look', metric, ctx: 'salary plus business or side income', read: 'Income is a mix — salary plus a business or side income. As the side income grows, how it’s structured for tax matters more. That’s an accountant conversation, and a good one to have early.' };
-      if (has('income_type', 'One employed, one self employed')) return { status: 'look', metric, ctx: 'one salary, one self employed', read: 'One of you is employed and one self employed. Two income types means two tax pictures — worth making sure the structure suits both.' };
+      if (has('income_type', 'Employed — regular')) return { status: 'clear', metric, ctx: 'regular salary or wages', read: 'Household income comes from regular salary or wages — the most straightforward structure there is. That keeps the tax side simple and the picture easy to read.' };
       return { status: 'clear', metric, ctx: 'income captured', read: 'Your household income is captured — the broad bracket, which is all the snapshot needs.' };
     },
     gapBody: 'Part of the household income is self employed or side income. How that’s structured for tax matters more as it grows.'
@@ -1235,8 +1270,7 @@ function openDetail(key) {
 function closeDetail() { document.getElementById('detailPanel').classList.remove('on'); }
 
 /* ═════════════════════ COMPLETION + EMAIL ═════════════════════ */
-function openDone() { document.getElementById('doneOverlay').classList.add('on'); }
-function closeDone() { document.getElementById('doneOverlay').classList.remove('on'); }
+function showNextCard() { document.getElementById('nextCard').classList.add('show'); }
 function goClarity() {
   try { fbq('track', 'InitiateCheckout'); } catch {}
   window.location.href = 'https://meetfinn.com.au/ready?from=snapshot-demo';
