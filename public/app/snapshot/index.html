@@ -407,9 +407,9 @@ const questions = [
     options: ['Couple — with kids','Couple — no kids','Single parent','Single — no dependants','One of us works, one doesn\'t or earns irregularly']
   },
   {
-    id: 'income_type', multi: false,
+    id: 'income_type', multi: true,
     text: 'How does your household earn its income?',
-    context: null,
+    context: 'Pick everything that applies — households often have a mix (one employed, one self employed, side income on top).',
     options: ['Employed — regular salary or wages','Self employed or running a business','A mix — employed plus a business or side income','One employed, one self employed']
   },
   {
@@ -463,9 +463,9 @@ const questions = [
     ]
   },
   {
-    id: 'savings', multi: false,
+    id: 'savings', multi: true,
     text: 'Do you have savings or other money set aside — outside of your retirement fund?',
-    context: 'Think money in a bank account, shares, or anything else you\'d consider a financial asset. A rough range is completely fine.',
+    context: 'Think money in a bank account, shares, or anything else you\'d consider a financial asset. A rough range is completely fine — pick everything that applies.',
     options: [
       'Not much — little to no savings right now',
       'Some savings — roughly under $30,000',
@@ -741,22 +741,40 @@ function updateProgress() {
 }
 
 /* ═════════════════════ QUESTION FLOW ═════════════════════ */
+// Chips are a RE-ATTACHABLE unit, not a one-shot render welded to the
+// question message. attachChips() can re-append the current question's
+// buttons under any later message (a helper reply, an error note), so a
+// button-question always has its buttons at the bottom of the conversation
+// no matter how far off-script the exchange went. In-progress multi-select
+// choices survive re-attachment.
+function chipsHtml(q) {
+  return '<div class="finn-inline">' +
+    q.options.map((o, i) => `<button class="chip-inline${q.multi && multiSel.includes(o) ? ' selected' : ''}" data-opt="${i}" onclick="pickOption(${i}, this)">${esc(o)}</button>`).join('') +
+    (q.multi ? `<button class="chip-inline primary" id="multiDone" style="display:${multiSel.length ? 'inline-block' : 'none'}" onclick="confirmMulti()">That's everything →</button>` : '') +
+    `<button class="chip-skip" onclick="skipQuestion()">Skip this one</button></div>`;
+}
+
+function attachChips(q, hostDiv) {
+  if (phase !== 'asking') return;
+  retireChips(); // never two live chip sets at once
+  if (q.multi && !hostDiv.querySelector('.multi-hint')) {
+    const hint = document.createElement('p');
+    hint.className = 'multi-hint';
+    hint.style.cssText = 'font-size:12px;color:var(--light);margin-top:6px;';
+    hint.textContent = 'Pick as many as apply, then confirm.';
+    hostDiv.appendChild(hint);
+  }
+  hostDiv.insertAdjacentHTML('beforeend', chipsHtml(q));
+  scrollChat();
+}
+
 function askCurrent(leadin) {
   const q = questions[currentQ];
   multiSel = [];
   let html = '<p>' + (leadin ? esc(leadin) + ' ' : '') + esc(q.text) + '</p>';
   if (q.context) html += '<div class="q-ctx">' + esc(q.context) + '</div>';
-  html += '<div class="finn-inline">' +
-    q.options.map((o, i) => `<button class="chip-inline" data-opt="${i}" onclick="pickOption(${i}, this)">${esc(o)}</button>`).join('') +
-    (q.multi ? `<button class="chip-inline primary" id="multiDone" style="display:none" onclick="confirmMulti()">That's everything →</button>` : '') +
-    `<button class="chip-skip" onclick="skipQuestion()">Skip this one</button></div>`;
-  addFinn(html);
-  if (q.multi) {
-    const hint = document.createElement('p');
-    hint.style.cssText = 'font-size:12px;color:var(--light);margin-top:6px;';
-    hint.textContent = 'Pick as many as apply.';
-    messagesEl.lastChild.querySelector('.finn-inline').before(hint);
-  }
+  const div = addFinn(html);
+  attachChips(q, div);
   updateProgress();
 }
 
@@ -957,7 +975,9 @@ async function askHelper(text) {
     typingEl.remove();
     aiBusy = false;
     sendBtn.disabled = false;
-    addFinn('<p>Sorry — I couldn’t get to that just then. Mind trying again, or just tap one of the options above?</p>');
+    const errDiv = addFinn('<p>Sorry — I couldn’t get to that just then. Mind trying again, or just tap one of the options below?</p>');
+    // Buttons must survive even the failure path.
+    attachChips(q, errDiv);
     return;
   }
 
@@ -981,7 +1001,11 @@ async function askHelper(text) {
     if (ack) addFinn('<p>' + esc(ack) + '</p>');
     advance();
   } else {
-    addFinn('<p>' + esc(fullText || 'Sorry, I lost my train of thought — could you try that again?').replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>') + '</p>');
+    const div = addFinn('<p>' + esc(fullText || 'Sorry, I lost my train of thought — could you try that again?').replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>') + '</p>');
+    // Off-script turn (a clarification, a side question): the current
+    // question's buttons re-attach under the reply so they are always
+    // present and adjacent, whatever the user typed in between.
+    attachChips(q, div);
   }
 }
 
@@ -1086,10 +1110,13 @@ const TILES = [
     compute() {
       if (!hasAns('income_type') && !hasAns('income')) return null;
       const metric = INCOME_SHORT[ansStr('income')] || 'Captured';
-      if (has('income_type', 'Employed — regular')) return { status: 'clear', metric, ctx: 'regular salary or wages', read: 'Household income comes from regular salary or wages — the most straightforward structure there is. That keeps the tax side simple and the picture easy to read.' };
+      // income_type is multi-select: more than one selection means a mixed
+      // household, so mixed shapes are checked before the salary-only case.
+      const sel = answers['income_type'];
+      const multiMix = Array.isArray(sel) && sel.length > 1;
+      if (multiMix || has('income_type', 'A mix') || has('income_type', 'One employed, one self employed')) return { status: 'look', metric, ctx: 'a mix of income types across the household', read: 'Household income comes in more than one shape — some employed, some self employed or side income. Two income types means two tax pictures, and how the non-salary side is structured matters more as it grows. That’s an accountant conversation, and a good one to have early.' };
       if (has('income_type', 'Self employed')) return { status: 'look', metric, ctx: 'self employed — structure worth understanding', read: 'The household income is self employed. How that’s structured — sole trader, company, trust — affects tax, and what suits best changes as the business grows.' };
-      if (has('income_type', 'A mix')) return { status: 'look', metric, ctx: 'salary plus business or side income', read: 'Income is a mix — salary plus a business or side income. As the side income grows, how it’s structured for tax matters more. That’s an accountant conversation, and a good one to have early.' };
-      if (has('income_type', 'One employed, one self employed')) return { status: 'look', metric, ctx: 'one salary, one self employed', read: 'One of you is employed and one self employed. Two income types means two tax pictures — worth making sure the structure suits both.' };
+      if (has('income_type', 'Employed — regular')) return { status: 'clear', metric, ctx: 'regular salary or wages', read: 'Household income comes from regular salary or wages — the most straightforward structure there is. That keeps the tax side simple and the picture easy to read.' };
       return { status: 'clear', metric, ctx: 'income captured', read: 'Your household income is captured — the broad bracket, which is all the snapshot needs.' };
     },
     gapBody: 'Part of the household income is self employed or side income. How that’s structured for tax matters more as it grows.'
