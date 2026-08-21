@@ -143,13 +143,18 @@ src="https://www.facebook.com/tr?id=1501463388385490&ev=PageView&noscript=1"/></
   .hero .headline{font-size:24px; font-weight:600; letter-spacing:-.01em; line-height:1.2; color:#fff;}
   .hero .headline .fr{color:var(--steel);}
   .hero .demo-tag{display:inline-block; margin-top:12px; font-size:11px; color:var(--steel); background:rgba(255,255,255,.1); padding:4px 10px; border-radius:20px;}
-  .hero .hero-actions{display:none; margin-top:14px; gap:9px; flex-wrap:wrap;}
-  .hero .hero-actions.show{display:flex;}
-  .hero-btn{font-family:inherit; font-size:13px; font-weight:600; border-radius:9px; padding:9px 15px; cursor:pointer; transition:all .16s; border:none;}
-  .hero-btn.solid{background:#fff; color:var(--accent);}
-  .hero-btn.solid:hover{opacity:.9;}
-  .hero-btn.ghost{background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.3);}
-  .hero-btn.ghost:hover{background:rgba(255,255,255,.2);}
+  /* Persistent next-steps offer (shown on completion, never a pop-up,
+     never disappears) */
+  .next-card{display:none; background:var(--surface-warm); border:1px solid var(--rule); border-radius:15px; padding:16px 16px 14px; margin-bottom:12px; box-shadow:var(--shadow);}
+  .next-card.show{display:block; animation:msgIn .4s ease;}
+  .next-card .nc-lead{font-size:11px; text-transform:uppercase; letter-spacing:.13em; color:var(--steel-deep); font-weight:600; margin-bottom:10px;}
+  .nc-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  @media(max-width:1180px){.nc-grid{grid-template-columns:1fr;}}
+  .nc-block{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:14px 15px; min-width:0;}
+  .nc-block.clarity{background:var(--warm-light); border-color:#ecd9c4;}
+  .nc-h{font-size:14px; font-weight:600; margin-bottom:5px;}
+  .nc-b{font-size:12.5px; color:var(--mid); line-height:1.55; margin-bottom:11px;}
+  .nc-block.clarity .nc-b{color:#7d5c3c;}
 
   .tiles{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .tile{background:var(--surface); border:1px solid var(--rule); border-radius:13px; padding:15px 15px 14px; cursor:pointer; transition:all .18s; box-shadow:var(--shadow); position:relative; overflow:hidden;}
@@ -206,9 +211,13 @@ src="https://www.facebook.com/tr?id=1501463388385490&ev=PageView&noscript=1"/></
   .dp-grid .dp-section{margin-top:0;}
   @media(max-width:900px){.dp-grid{grid-template-columns:1fr;}}
   .dp-figures{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:6px 16px; box-shadow:var(--shadow);}
-  .dp-figrow{display:flex; justify-content:space-between; gap:14px; padding:11px 0; border-bottom:1px solid var(--rule-soft); font-size:13.5px;}
+  /* Long question labels wrap; answer values keep readable width (never
+     one-word-per-line). Grid children get min-width:0 so the two columns
+     can't collide or overlap. */
+  .dp-grid > .dp-section{min-width:0;}
+  .dp-figrow{display:flex; justify-content:space-between; align-items:baseline; gap:16px; padding:11px 0; border-bottom:1px solid var(--rule-soft); font-size:13.5px;}
   .dp-figrow:last-child{border-bottom:none;}
-  .dp-figrow .k{color:var(--mid); flex-shrink:0;} .dp-figrow .v{font-weight:600; text-align:right;}
+  .dp-figrow .k{color:var(--mid); flex:1 1 auto; min-width:0; line-height:1.45;} .dp-figrow .v{font-weight:600; text-align:right; flex:0 0 auto; max-width:55%; line-height:1.45;}
   .dp-context-box{background:var(--accent-light); border-radius:12px; padding:14px 16px; font-size:13.5px; line-height:1.55; color:var(--dark);}
   .dp-context-box b{color:var(--accent);}
   .dp-points{display:flex; align-items:flex-start; gap:11px; background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:15px 16px; box-shadow:var(--shadow);}
@@ -327,9 +336,28 @@ src="https://www.facebook.com/tr?id=1501463388385490&ev=PageView&noscript=1"/></
             <div class="lead">Where things stand</div>
             <div class="headline" id="heroLine">Your picture's <span class="fr">taking shape</span>.</div>
             <span class="demo-tag">Broad view · your real figures come in the Clarity Session</span>
-            <div class="hero-actions" id="heroActions">
-              <button class="hero-btn solid" onclick="openDone()">Email me my snapshot</button>
-              <button class="hero-btn ghost" onclick="goClarity()">The Clarity Session →</button>
+          </div>
+
+          <!-- Persistent next-steps offer — appears on completion and stays.
+               Calm and always reachable; never an interrupting pop-up. -->
+          <div class="next-card" id="nextCard">
+            <div class="nc-lead">Take it further — whenever you're ready</div>
+            <div class="nc-grid">
+              <div class="nc-block">
+                <div class="nc-h">Keep a copy of your snapshot</div>
+                <div class="nc-b">Emailed to you, so you've got it to come back to.</div>
+                <div class="m-row" id="emailRow">
+                  <input type="email" class="m-input" id="emailInput" placeholder="your@email.com" autocomplete="email" aria-label="Your email address">
+                  <button class="m-btn solid" id="emailBtn" onclick="submitEmail()">Send it</button>
+                </div>
+                <div class="m-thanks" id="emailThanks">Done — it's on its way.</div>
+                <div class="m-note" id="emailNote">No spam. Unsubscribe any time.</div>
+              </div>
+              <div class="nc-block clarity">
+                <div class="nc-h">Want your true position?</div>
+                <div class="nc-b">This is a broad picture built from rough answers. The Clarity Session walks you through your real figures with Finn — your exact position, built properly, in one sitting, and yours to keep.</div>
+                <button class="m-btn warm" onclick="goClarity()">The Clarity Session →</button>
+              </div>
             </div>
           </div>
 
@@ -357,29 +385,9 @@ src="https://www.facebook.com/tr?id=1501463388385490&ev=PageView&noscript=1"/></
   <button id="tabPicture" onclick="setTab('picture')">Your picture <span class="nd" id="pictureDot"></span></button>
 </div>
 
-<div class="overlay" id="doneOverlay">
-  <div class="modal">
-    <div class="m-eyebrow">Snapshot complete</div>
-    <h2>That's all nineteen. Your picture's <span class="fr">ready</span>.</h2>
-    <p class="m-sub">It's a broad view — the general shape of things, and the areas worth a look. Two ways to take it further, and both are optional.</p>
-    <div class="m-block">
-      <div class="mb-title">Want your snapshot emailed to you?</div>
-      <div class="mb-body">So you've got it to come back to whenever you're ready.</div>
-      <div class="m-row" id="emailRow">
-        <input type="email" class="m-input" id="emailInput" placeholder="your@email.com" autocomplete="email" aria-label="Your email address">
-        <button class="m-btn solid" id="emailBtn" onclick="submitEmail()">Send it</button>
-      </div>
-      <div class="m-thanks" id="emailThanks">Done — it's on its way.</div>
-      <div class="m-note" id="emailNote">No spam. Unsubscribe any time.</div>
-    </div>
-    <div class="m-block">
-      <div class="mb-title">Want your exact position?</div>
-      <div class="mb-body">The Clarity Session uses your real figures. Finn guides you through it step by step — no spreadsheets, no homework — and the picture you build is yours to keep.</div>
-      <button class="m-btn warm" onclick="goClarity()">The Clarity Session →</button>
-    </div>
-    <button class="m-dismiss" onclick="closeDone()">Let me look around my picture first</button>
-  </div>
-</div>
+<!-- The completion pop-up is gone by design: the user lands on their
+     picture uninterrupted, and the dual-path offer lives in the persistent
+     next-card on the dashboard instead. -->
 
 <script>
 'use strict';
@@ -830,12 +838,11 @@ function finish() {
   updateProgress();
   document.getElementById('hdrT').textContent = 'Your broad picture, built';
   document.getElementById('heroLine').innerHTML = 'Your snapshot’s <span class="fr">ready</span>.';
-  document.getElementById('heroActions').classList.add('show');
+  showNextCard();
   updateTiles();
-  addFinn('<p>That’s all nineteen. Your broad picture is built — it’s on the right, and every tile opens up if you want a closer look.</p><p>It’s the general shape of things, not your exact position. That’s what the full Clarity Session builds, with your real figures.</p>');
+  addFinn('<p>That’s all nineteen. Your broad picture is built — it’s on the right, and every tile opens up if you want a closer look.</p><p>It’s the general shape of things, not your exact position. That’s what the full Clarity Session builds, with your real figures. Whenever you’re ready, both next steps sit at the top of your picture — no rush.</p>');
   try { fbq('track', 'CompleteRegistration'); } catch {}
   notifyPictureTab();
-  setTimeout(openDone, 1200);
 }
 
 /* ═════════════════════ INTRO + RESTORE ═════════════════════ */
@@ -877,8 +884,8 @@ function init() {
     currentQ = questions.length;
     document.getElementById('hdrT').textContent = 'Your broad picture, built';
     document.getElementById('heroLine').innerHTML = 'Your snapshot’s <span class="fr">ready</span>.';
-    document.getElementById('heroActions').classList.add('show');
-    addFinn('<p>Welcome back — your snapshot’s done, and your broad picture is on the right. Every tile opens up if you want a closer look.</p><p>When you’re ready to go further, the full Clarity Session builds your exact position with real figures.</p>');
+    showNextCard();
+    addFinn('<p>Welcome back — your snapshot’s done, and your broad picture is on the right. Every tile opens up if you want a closer look.</p><p>When you’re ready to go further, both next steps sit at the top of your picture.</p>');
     renderAllTiles();
     updateProgress();
     return;
@@ -1263,8 +1270,7 @@ function openDetail(key) {
 function closeDetail() { document.getElementById('detailPanel').classList.remove('on'); }
 
 /* ═════════════════════ COMPLETION + EMAIL ═════════════════════ */
-function openDone() { document.getElementById('doneOverlay').classList.add('on'); }
-function closeDone() { document.getElementById('doneOverlay').classList.remove('on'); }
+function showNextCard() { document.getElementById('nextCard').classList.add('show'); }
 function goClarity() {
   try { fbq('track', 'InitiateCheckout'); } catch {}
   window.location.href = 'https://meetfinn.com.au/ready?from=snapshot-demo';
