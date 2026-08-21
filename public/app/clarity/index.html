@@ -752,7 +752,7 @@ const PANELS = {
         : [pro('Financial planner', 'putting a monthly surplus deliberately behind a goal is the bread and butter of what they do')];
       const gp = goalPhrase();
       return { pros, obs: r.state === 'flag' && gp
-        ? 'There’s <b>' + esc(r.metric) + '</b> building each month, and you’ve said ' + esc(gp) + ' is what matters. Putting one behind the other is exactly what a <b>' + (taxMinded ? 'financial planner and accountant' : 'financial planner') + '</b> help structure — worth discussing.'
+        ? 'There’s <b>' + esc(r.metric) + '</b> building each month, and you’ve said ' + esc(gp) + ' is what matters. Putting one behind the other is exactly what ' + (taxMinded ? 'a <b>financial planner and accountant</b> help' : 'a <b>financial planner</b> helps') + ' structure — worth discussing.'
         : null };
     }
   },
