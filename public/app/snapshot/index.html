@@ -930,7 +930,7 @@ function buildEnvelope(q, text) {
     `ANSWER: <the option text that best matches, or their own words if none match>\n` +
     (q.multi ? `They can pick several — if they gave several, put them all on the ANSWER line separated by " | ".\n` : '') +
     `Then on a new line, one short warm acknowledgment sentence (no advice, no evaluation of their situation).\n\n` +
-    `If instead they are confused, unsure, or asking about the question, help them according to your instructions and finish by gently re-asking the question. Never move to a different question. Never start the ANSWER line unless they actually answered.\n\n` +
+    `If instead they are confused, unsure, or asking about the question, help them according to your instructions and finish by gently re-asking the question. When re-asking, do NOT list the answer options in your text — tappable buttons for them are shown automatically beneath your reply. Never move to a different question. Never start the ANSWER line unless they actually answered.\n\n` +
     `The snapshot flow is FORWARD-ONLY. There is no way to go back, re-show, or change an earlier question or answer, and you must never claim or imply that you can (no "of course, which question did you want to revisit?", no "let me show you that one again"). If they ask to go back or amend a previous answer, do NOT start the ANSWER line. Respond honestly and warmly along these lines: you can't jump back to earlier questions in the snapshot itself, but this is just the broad five minute version, and they'll go through everything properly and can adjust it all in the full Clarity Session; then invite them to keep going from here. Never make them feel stuck, and never promise a correction you cannot perform.`;
   return e;
 }
