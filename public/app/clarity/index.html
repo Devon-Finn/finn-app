@@ -157,10 +157,21 @@
   .dp-grid .dp-section{margin-top:0;}
   @media(max-width:900px){.dp-grid{grid-template-columns:1fr;}}
   .dp-figures{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:6px 16px; box-shadow:var(--shadow);}
-  .dp-figrow{display:flex; justify-content:space-between; gap:14px; padding:11px 0; border-bottom:1px solid var(--rule-soft); font-size:13.5px;}
+  /* Figure rows: the label may wrap; the value never crushes to
+     one-word-per-line. Grid children get min-width:0 so columns can't
+     collide or overlap. */
+  .dp-grid > .dp-section{min-width:0;}
+  .dp-figrow{display:flex; justify-content:space-between; align-items:baseline; gap:16px; padding:11px 0; border-bottom:1px solid var(--rule-soft); font-size:13.5px;}
   .dp-figrow:last-child{border-bottom:none;}
-  .dp-figrow .k{color:var(--mid); flex-shrink:0;} .dp-figrow .v{font-weight:600; text-align:right;}
+  .dp-figrow .k{color:var(--mid); flex:1 1 auto; min-width:0; line-height:1.45;}
+  .dp-figrow .v{font-weight:600; text-align:right; flex:0 0 auto; max-width:55%; line-height:1.45;}
   .dp-figrow .v.na{color:var(--light); font-weight:500;}
+  /* "Why this is worth a conversation" — the education layer's structure.
+     Content is Devon-written; placeholders are visually unmistakable. */
+  .dp-edu{display:flex; flex-direction:column; gap:9px;}
+  .dp-edu-block{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:13px 15px; box-shadow:var(--shadow);}
+  .dp-edu-block .eh{font-size:12.5px; font-weight:600; color:var(--dark); margin-bottom:6px;}
+  .edu-placeholder{border:1.5px dashed var(--steel-deep); border-radius:9px; padding:9px 12px; font-size:12.5px; color:var(--steel-deep); font-style:italic; line-height:1.5; background:rgba(194,212,222,.12);}
   .dp-terms{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:4px 16px; box-shadow:var(--shadow);}
   .dp-term{padding:10px 0; border-bottom:1px solid var(--rule-soft); font-size:13px; line-height:1.5; color:var(--mid);}
   .dp-term:last-child{border-bottom:none;}
@@ -899,22 +910,40 @@ function openDetail(key) {
   badge.innerHTML = '<span class="d"></span>' + BADGE_LABEL[r.state];
 
   let html = '<div class="dp-inner">';
+  // 1. The insight + figure (the headline)
   if (r.metric !== undefined) {
     html += '<div class="dp-hero-num">' + esc(r.metric) + (r.unit ? ' <span class="u">' + esc(r.unit) + '</span>' : '') + '</div>';
   }
   html += '<div class="dp-context">' + esc(cfg.context) + '</div>';
-  html += '<div class="dp-section"><div class="lbl">What this means</div><div class="dp-read">' + esc(cfg.meaning(d, r)) + '</div></div>';
 
+  // 2 + 3. What you told me | In plain terms — clean two-column grid
   const figs = cfg.figures(d);
   html += '<div class="dp-grid">';
   if (figs.length) {
-    html += '<div class="dp-section"><div class="lbl">The detail</div><div class="dp-figures">' +
+    html += '<div class="dp-section"><div class="lbl">What you told me</div><div class="dp-figures">' +
       figs.map(f => '<div class="dp-figrow"><span class="k">' + esc(f[0]) + '</span><span class="v' + (f[2] ? ' na' : '') + '">' + esc(f[1]) + '</span></div>').join('') +
       '</div></div>';
   }
   html += '<div class="dp-section"><div class="lbl">In plain terms</div><div class="dp-terms">' +
     cfg.terms.map(t => '<div class="dp-term">' + t + '</div>').join('') + '</div></div>';
   html += '</div>';
+
+  // 4. Why this is worth a conversation — the education layer's STRUCTURE.
+  // Devon writes the actual education content separately (line-sensitive);
+  // the placeholders below are deliberately unmistakable and must never
+  // ship with improvised financial content in their place.
+  if (r.state === 'flag') {
+    const EDU_BLOCKS = [
+      'Why it matters',
+      'What the benefit could be',
+      'How the professional works',
+      'Why it may cost nothing',
+      'What people often don’t realise'
+    ];
+    html += '<div class="dp-section"><div class="lbl">Why this is worth a conversation</div><div class="dp-edu">' +
+      EDU_BLOCKS.map(h => '<div class="dp-edu-block"><div class="eh">' + h + '</div><div class="edu-placeholder">[Education content to be written — ' + h.toLowerCase() + ' for this insight. Placeholder only; not financial content.]</div></div>').join('') +
+      '</div></div>';
+  }
 
   if (r.state === 'building') {
     html += '<div class="dp-section"><div class="dp-building">This area is still building — the figures above fill in as the conversation covers it. Who can help comes into focus once the insight is complete.</div></div>';
