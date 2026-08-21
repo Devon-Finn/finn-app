@@ -134,6 +134,52 @@
   .dash-note{margin-top:14px; background:var(--accent-light); border-radius:12px; padding:13px 15px; font-size:12.5px; line-height:1.55; color:var(--mid);}
   .dash-note b{color:var(--accent);}
 
+  /* ===== DETAIL PANEL (3c — click a tile to expand; spans both panes,
+     header + nav stay visible; the v10 locked pattern) ===== */
+  .detail-panel{position:absolute; inset:0; background:var(--canvas); z-index:30; display:none; flex-direction:column; animation:slideIn .28s cubic-bezier(.4,0,.2,1);}
+  .detail-panel.on{display:flex;}
+  @keyframes slideIn{from{opacity:0;transform:translateX(18px);}to{opacity:1;transform:translateX(0);}}
+  .dp-head{display:flex; align-items:center; gap:12px; padding:20px 26px 16px; border-bottom:1px solid var(--rule-cool); flex-wrap:wrap; flex-shrink:0;}
+  .dp-back{font-family:inherit; font-size:13px; font-weight:500; color:var(--accent); background:var(--surface); border:1px solid var(--rule); border-radius:9px; padding:8px 13px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all .16s;}
+  .dp-back:hover{border-color:var(--accent); background:var(--accent-light);}
+  .dp-title{font-size:19px; font-weight:600; letter-spacing:-.01em;}
+  .dp-badge{margin-left:auto;}
+  .dp-body{flex:1; overflow-y:auto; padding:26px 40px 36px;}
+  .dp-body::-webkit-scrollbar{width:7px;} .dp-body::-webkit-scrollbar-thumb{background:var(--rule);border-radius:8px;}
+  .dp-inner{max-width:920px; margin:0 auto;}
+  .dp-hero-num{font-size:32px; font-weight:600; letter-spacing:-.02em; color:var(--accent); line-height:1.1;}
+  .dp-hero-num .u{font-size:15px; color:var(--light); font-weight:500;}
+  .dp-context{font-size:14px; color:var(--mid); margin-top:8px; line-height:1.5;}
+  .dp-section{margin-top:22px;}
+  .dp-section .lbl{font-size:10.5px; text-transform:uppercase; letter-spacing:.1em; color:var(--steel-deep); font-weight:600; margin-bottom:9px;}
+  .dp-read{font-size:14.5px; line-height:1.6; color:var(--dark);}
+  .dp-grid{display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:22px;}
+  .dp-grid .dp-section{margin-top:0;}
+  @media(max-width:900px){.dp-grid{grid-template-columns:1fr;}}
+  .dp-figures{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:6px 16px; box-shadow:var(--shadow);}
+  .dp-figrow{display:flex; justify-content:space-between; gap:14px; padding:11px 0; border-bottom:1px solid var(--rule-soft); font-size:13.5px;}
+  .dp-figrow:last-child{border-bottom:none;}
+  .dp-figrow .k{color:var(--mid); flex-shrink:0;} .dp-figrow .v{font-weight:600; text-align:right;}
+  .dp-figrow .v.na{color:var(--light); font-weight:500;}
+  .dp-terms{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:4px 16px; box-shadow:var(--shadow);}
+  .dp-term{padding:10px 0; border-bottom:1px solid var(--rule-soft); font-size:13px; line-height:1.5; color:var(--mid);}
+  .dp-term:last-child{border-bottom:none;}
+  .dp-term b{color:var(--dark); font-weight:600;}
+  .dp-pros{display:flex; flex-direction:column; gap:8px;}
+  .dp-pro{display:flex; align-items:flex-start; gap:11px; background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:13px 15px; box-shadow:var(--shadow);}
+  .dp-pro .ic{width:30px;height:30px;border-radius:8px;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .dp-pro .ic svg{width:15px;height:15px;}
+  .dp-pro .txt{font-size:13.5px; line-height:1.5; color:var(--mid);}
+  .dp-pro .txt b{color:var(--dark); font-weight:600;}
+  .dp-goalnote{background:var(--parch-deep); border-radius:12px; padding:12px 15px; font-size:13px; line-height:1.55; color:var(--mid); margin-top:10px;}
+  /* Referral card — warm invitation, never alarm, never salesy */
+  .ref-card{margin-top:22px; background:var(--warm-light); border:1px solid var(--warm); border-radius:14px; padding:17px 18px; box-shadow:var(--shadow);}
+  .ref-card .rc-tag{font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--warm-deep); font-weight:700; margin-bottom:8px;}
+  .ref-card .rc-body{font-size:14px; line-height:1.6; color:var(--dark);}
+  .ref-card .rc-body b{color:var(--warm-deep);}
+  .ref-card .rc-foot{margin-top:11px; font-size:11.5px; color:#9a7550; line-height:1.5;}
+  .dp-building{background:var(--surface); border:1px dashed var(--rule-cool); border-radius:12px; padding:14px 16px; font-size:13.5px; color:var(--mid); line-height:1.55;}
+
   .loading-veil{position:fixed; inset:0; background:var(--canvas); z-index:50; display:flex; align-items:center; justify-content:center; transition:opacity .3s;}
   .loading-veil.gone{opacity:0; pointer-events:none;}
   .loading-veil .dots{display:flex; gap:8px;}
@@ -220,8 +266,18 @@
             </div>
           </div>
           <div class="tiles" id="tilesGrid"></div>
-          <div class="dash-note"><b>Built from your real figures as you talk.</b> A warm edge means an area is worth a conversation with the right professional — it's never a judgment of your numbers. Every tile opens up in full detail soon.</div>
+          <div class="dash-note"><b>Built from your real figures as you talk.</b> A warm edge means an area is worth a conversation with the right professional — it's never a judgment of your numbers. Tap any tile for the full detail.</div>
         </div>
+      </div>
+
+      <!-- Detail panel — spans both panes; header + nav stay visible (3c) -->
+      <div class="detail-panel" id="detailPanel">
+        <div class="dp-head">
+          <button class="dp-back" id="dpBack">‹ Back to your picture</button>
+          <span class="dp-title" id="dpTitle"></span>
+          <span class="dp-badge badge building" id="dpBadge"></span>
+        </div>
+        <div class="dp-body" id="dpBody"></div>
       </div>
     </div>
   </div>
@@ -543,6 +599,7 @@ function renderTiles(picture) {
     el.className = 'tile s-' + (r.state === 'flag' ? 'flag' : r.state === 'calm' ? 'calm' : 'building') + (r.pct >= 100 ? ' done' : '');
     // Clickable-ready for 3c's detail panel — no panel exists yet.
     el.setAttribute('data-tile', t.key);
+    el.onclick = () => openDetail(t.key);
     const ROUTE_ARROW = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
     el.innerHTML =
       '<div class="status-row"><span class="badge ' + r.state + '"><span class="d"></span>' + BADGE_LABEL[r.state] + '</span><span class="ico">' + CHEV + '</span></div>' +
@@ -570,10 +627,322 @@ function renderHero(completed) {
 async function refreshProgress() {
   const { data } = await finnSupabase.from('picture').select('domains, goals, completed_domains').limit(1);
   const picture = (data && data[0]) ? data[0] : { domains: {}, goals: {}, completed_domains: [] };
+  lastPicture = picture;
   const completed = Array.isArray(picture.completed_domains) ? picture.completed_domains : [];
   renderHero(completed);
   renderTiles(picture);
 }
+
+/* ══════════ DETAIL PANELS + GOAL ROUTING + REFERRAL CARDS (3c) ══════════
+   Read-only over the member's own RLS-scoped picture. Panels show the
+   advice-ready FACTS; routing names the professional TYPE that helps; the
+   referral card is an invitation, never a push. The same locked line as
+   3a/3b: state facts and route to a conversation — never grade, never
+   prescribe. And the two-case routing discipline: a captured goal
+   direction was discovered from the person's OWN words (owned — Case B,
+   full set including execution specialists); no captured goal → Case A,
+   assessor only, never a guessed goal. No handoff mechanics exist in 3c:
+   nothing is sent anywhere, no professional is named as a business. */
+let lastPicture = { domains: {}, goals: {}, completed_domains: [] };
+
+function goalDirs() {
+  const g = lastPicture.goals || {};
+  return Array.isArray(g.directions) ? g.directions.map(x => String(x).toLowerCase()) : [];
+}
+function hasDir(frags) { return goalDirs().some(d => frags.some(f => d.includes(f))); }
+function goalPhrase() {
+  if (hasDir(['kids', 'family'])) return 'setting the kids up';
+  if (hasDir(['property'])) return 'exploring property';
+  if (hasDir(['retire'])) return 'retiring earlier';
+  if (hasDir(['security'])) return 'feeling secure';
+  if (hasDir(['tax'])) return 'keeping tax tidy';
+  if (hasDir(['growth', 'invest'])) return 'growing what you have';
+  return null;
+}
+function resolvedCount() {
+  const d = lastPicture.domains || {};
+  const done = Array.isArray(lastPicture.completed_domains) ? lastPicture.completed_domains : [];
+  return TILES.filter(t => (t.derive(d, done) || {}).state !== 'building').length;
+}
+
+const PRO_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c.6-3.7 3.2-6 6.5-6s5.9 2.3 6.5 6"/></svg>';
+
+function pro(name, why) { return { name, why }; }
+
+/* Per-insight panel content: context line, plain meaning, term
+   explanations, advice-ready figure rows, and routing (pros + optional
+   goal-matched referral observation). */
+const PANELS = {
+  equity: {
+    title: 'Equity position',
+    context: 'Everything you own set against everything you owe.',
+    meaning(d, r) {
+      const l = d.liabilities || {};
+      return 'Your net position is the plain sum of it: what you own minus what you owe. ' +
+        (num(l.mortgage_balance) !== null ? 'The mortgage sits inside this, and how it is set up — the rate, and whether savings sit against it — changes what it costs over time.' : 'With no loan against it, this is simply what you have.');
+    },
+    terms: [
+      '<b>Net position</b> — everything you own minus everything you owe.',
+      '<b>Offset</b> — a savings account linked to a home loan; money sitting in it reduces the interest charged.',
+      '<b>Rate</b> — the interest percentage the loan is charged at. Lenders don’t always tell existing customers when a better one exists.'
+    ],
+    figures(d) {
+      const a = d.assets || {}, l = d.liabilities || {};
+      const rows = [];
+      if (num(a.home_value) !== null) rows.push(['Home value', fmt$(a.home_value)]);
+      if (num(a.investment_property_value) !== null) rows.push(['Investment property', fmt$(a.investment_property_value)]);
+      if (num(a.savings) !== null) rows.push(['Savings', fmt$(a.savings)]);
+      if (num(a.shares_value) !== null) rows.push(['Shares and funds', fmt$(a.shares_value)]);
+      if (num(a.business_value) !== null) rows.push(['Business', fmt$(a.business_value)]);
+      if (num(l.mortgage_balance) !== null) rows.push(['Mortgage balance', fmt$(l.mortgage_balance)]);
+      if (num(l.mortgage_rate_percent) !== null) rows.push(['Mortgage rate', l.mortgage_rate_percent + '%']);
+      if (num(l.offset_balance) !== null) rows.push(['Offset balance', fmt$(l.offset_balance)]);
+      (Array.isArray(l.expensive_debts) ? l.expensive_debts : []).forEach(x => {
+        if (x && num(x.balance) !== null) rows.push([(x.type || 'Other debt'), fmt$(x.balance)]);
+      });
+      if (num(l.hecs_balance) !== null && l.hecs_balance > 0) rows.push(['HECS', fmt$(l.hecs_balance)]);
+      return rows;
+    },
+    routing(d, r) {
+      const propertyOwned = hasDir(['property']);
+      if (propertyOwned) {
+        return { pros: [
+          pro('Financial planner', 'helps work out how property would fit alongside everything else in your picture, before anything is committed'),
+          pro('Mortgage broker', 'the borrowing side — what’s workable and how a loan would be structured'),
+          pro('Buyer’s agent / property strategist', 'the search and negotiation side, once you’re actually looking — you’ve said property is a direction you want to explore')
+        ], obs: r.state === 'flag'
+          ? 'There’s <b>' + esc(r.metric) + '</b> in your net position and you’ve said you want to explore property. How the current loan is structured, and how this position could support the next step, is worth discussing with a <b>financial planner</b> and a <b>mortgage broker</b>.'
+          : null };
+      }
+      return { pros: [
+        pro('Mortgage broker', 'checks a loan’s rate and structure against the whole market — that’s exactly their job')
+      ], obs: r.state === 'flag' && goalPhrase()
+        ? 'Your mortgage’s rate and structure are checkable facts, and you’ve told Finn ' + esc(goalPhrase()) + ' matters — making sure the loan is working as hard as it could is worth discussing with a <b>mortgage broker</b>.'
+        : null };
+    }
+  },
+  surplus: {
+    title: 'Monthly surplus',
+    context: 'What’s left after the month’s income covers the month’s spending.',
+    meaning() {
+      return 'A surplus is simply the gap between what comes in and what goes out each month. Over time it’s what funds most financial goals — where it goes next depends entirely on what you want, which is exactly the conversation it points to.';
+    },
+    terms: [
+      '<b>Surplus</b> — what’s left after the month’s income covers the month’s spending.',
+      '<b>Putting it to work</b> — directing leftover money somewhere deliberate (against a loan, into savings, investments or super) rather than letting it drift. Which of those suits you is a professional’s conversation.'
+    ],
+    figures(d) {
+      const inc = d.income || {};
+      const rows = [];
+      if (num(inc.salary_annual) !== null) rows.push(['Salary', fmt$(inc.salary_annual) + ' /yr']);
+      if (num(inc.partner_salary_annual) !== null) rows.push(['Partner salary', fmt$(inc.partner_salary_annual) + ' /yr']);
+      if (num(inc.side_income_annual) !== null) rows.push(['Side income', fmt$(inc.side_income_annual) + ' /yr']);
+      if (num(inc.other_income_annual) !== null) rows.push(['Other income', fmt$(inc.other_income_annual) + ' /yr']);
+      const mIn = deriveMonthlyIncome(inc);
+      if (mIn !== null) rows.push(['Monthly income', fmt$(mIn)]);
+      if (num(inc.monthly_expenses) !== null) rows.push(['Monthly expenses', fmt$(inc.monthly_expenses)]);
+      if (mIn !== null && num(inc.monthly_expenses) !== null) rows.push(['Surplus', fmt$(mIn - inc.monthly_expenses) + ' /mo']);
+      return rows;
+    },
+    routing(d, r) {
+      const taxMinded = hasDir(['tax']);
+      const pros = taxMinded
+        ? [pro('Accountant', 'the tax side of where a surplus goes — structure, timing, what’s deductible'),
+           pro('Financial planner', 'the bigger picture of putting a surplus behind a goal')]
+        : [pro('Financial planner', 'putting a monthly surplus deliberately behind a goal is the bread and butter of what they do')];
+      const gp = goalPhrase();
+      return { pros, obs: r.state === 'flag' && gp
+        ? 'There’s <b>' + esc(r.metric) + '</b> building each month, and you’ve said ' + esc(gp) + ' is what matters. Putting one behind the other is exactly what a <b>' + (taxMinded ? 'financial planner and accountant' : 'financial planner') + '</b> help structure — worth discussing.'
+        : null };
+    }
+  },
+  buffer: {
+    title: 'Emergency buffer',
+    context: 'How long the household could keep going if income stopped.',
+    meaning() {
+      return 'This is the resilience number: accessible money divided by monthly expenses gives the months you could cover if income paused. How big a buffer should be, and where it’s parked, is a personal call — the kind worked out with a professional, not a rule.';
+    },
+    terms: [
+      '<b>Emergency buffer</b> — money you can get to quickly, counted in months of expenses it would cover.',
+      '<b>Accessible</b> — in a bank account or similar; not locked in super or property.'
+    ],
+    figures(d) {
+      const b = d.buffer || {}, inc = d.income || {};
+      const rows = [];
+      if (num(b.accessible_savings) !== null) rows.push(['Accessible savings', fmt$(b.accessible_savings)]);
+      if (num(inc.monthly_expenses) !== null) rows.push(['Monthly expenses', fmt$(inc.monthly_expenses)]);
+      let months = num(b.months_cover);
+      if (months === null && num(b.accessible_savings) !== null && num(inc.monthly_expenses) !== null && inc.monthly_expenses > 0) months = b.accessible_savings / inc.monthly_expenses;
+      if (months !== null) rows.push(['Cover', (Math.round(months * 10) / 10) + ' months']);
+      return rows;
+    },
+    routing(d, r) {
+      const gp = goalPhrase();
+      return { pros: [pro('Financial planner', 'helps work out what buffer suits your household and how to build it at a pace that fits')],
+        obs: r.state === 'flag' && gp
+          ? 'Your buffer sits at <b>' + esc(r.metric) + '</b>, and you’ve said ' + esc(gp) + ' matters. How the buffer should sit underneath that is a natural early thing to work through with a <b>financial planner</b> — worth discussing.'
+          : null };
+    }
+  },
+  income: {
+    title: 'Income structure',
+    context: 'Where the household’s income comes from, and in what shape.',
+    meaning(d) {
+      const inc = d.income || {};
+      const side = num(inc.side_income_annual);
+      return side !== null && side > 0
+        ? 'Income arrives in more than one shape here. How non-salary income is structured — sole trader, company, trust — changes its tax treatment, and what suits best changes as it grows.'
+        : 'Income here is salary-shaped, which keeps the tax side simple and the picture easy to read.';
+    },
+    terms: [
+      '<b>Structure</b> — whether income comes as salary, sole trader, company or trust. Each is taxed differently.',
+      '<b>Side income</b> — regular income outside a salary; the part where structure starts to matter.'
+    ],
+    figures(d) { return PANELS.surplus.figures(d).filter(r => r[0] !== 'Monthly expenses' && r[0] !== 'Surplus'); },
+    routing(d, r) {
+      const gp = goalPhrase();
+      return { pros: [pro('Accountant', 'checks the structure still fits as income changes — the how-it-arrives side of the picture')],
+        obs: r.state === 'flag' && gp
+          ? 'There’s non-salary income in the mix, and you’ve said ' + esc(gp) + ' matters. Whether the structure still fits is worth discussing with an <b>accountant</b>.'
+          : null };
+    }
+  },
+  super: {
+    title: 'Super',
+    context: 'Retirement savings — whose accounts, where, and what sits inside them.',
+    meaning(d) {
+      const s = d.super || {};
+      const multi = (Array.isArray(s.funds) && s.funds.filter(f => (f.owner || '').toLowerCase() === 'you').length > 1) || s.multiple_accounts === true;
+      return multi
+        ? 'Each super account charges its own set of fees, so one person holding more than one account can mean paying twice for the same job. Whether combining them suits you depends on things like the insurance held inside each — a professional’s check, not a rule.'
+        : 'Super quietly compounds for decades, which makes it worth knowing what’s there and where.';
+    },
+    terms: [
+      '<b>Rolling over</b> — moving one super account’s balance into another. It can affect insurance held inside the fund, which is why it’s checked before it’s done.',
+      '<b>Insurance inside super</b> — cover paid for out of the fund balance. Many people don’t know they have it.',
+      '<b>Death-benefit nomination</b> — who your super goes to. It isn’t automatically covered by a will.'
+    ],
+    figures(d) {
+      const s = d.super || {};
+      const rows = (Array.isArray(s.funds) ? s.funds : []).map((f, i) => [
+        (f.fund && f.fund !== 'unknown' ? f.fund : 'Fund ' + (i + 1)) + (f.owner ? ' · ' + (String(f.owner).toLowerCase() === 'you' ? 'yours' : String(f.owner).toLowerCase() === 'partner' ? 'partner’s' : f.owner) : ''),
+        num(f.balance) !== null ? fmt$(f.balance) : '—'
+      ]);
+      const total = sumArr(s.funds, 'balance');
+      if (total !== null && rows.length > 1) rows.push(['Total', fmt$(total)]);
+      if (s.extra_contributions !== undefined) rows.push(['Extra contributions', s.extra_contributions ? 'yes' : 'no']);
+      return rows;
+    },
+    routing(d, r) {
+      const gp = goalPhrase();
+      return { pros: [pro('Financial planner', 'untangling multiple accounts — including the insurance inside each — is exactly what they check before anything moves')],
+        obs: r.state === 'flag'
+          ? 'One person here holds more than one super account' + (gp ? ', and you’ve said ' + esc(gp) + ' matters — tidy super sits underneath that' : '') + '. What combining them would mean, including the insurance inside each, is worth discussing with a <b>financial planner</b>.'
+          : null };
+    }
+  },
+  protect: {
+    title: 'Protection & estate',
+    context: 'The cover and the paperwork that protect a household when something goes wrong.',
+    meaning() {
+      return 'Two halves: insurance cover if illness or injury stopped income, and the legal basics — a will, power of attorney, guardianship, and where super goes. These are shown here exactly as captured: in place, absent, or not yet discussed. Absences are facts, not grades.';
+    },
+    terms: [
+      '<b>Income protection</b> — replaces part of your income if you can’t work for a stretch.',
+      '<b>TPD</b> — total and permanent disability cover.',
+      '<b>Trauma</b> — a lump-sum payout on diagnosis of certain serious illnesses.',
+      '<b>Power of attorney</b> — who can legally act for you if you can’t.',
+      '<b>Death-benefit nomination</b> — who your super goes to; separate from a will.'
+    ],
+    figures(d) {
+      const p = d.protection || {}, e = d.estate || {};
+      const show = v => v === undefined || v === null ? ['not yet discussed', true]
+        : v === 'na' ? ['not applicable', true]
+        : v === 'unsure' ? ['unsure', true]
+        : v === false ? ['absent', false]
+        : v === true ? ['in place', false]
+        : [fmt$(v), false];
+      return [
+        ['Life cover', p.life_cover_amount], ['Income protection', p.income_protection],
+        ['TPD', p.tpd_amount], ['Trauma', p.trauma_amount],
+        ['Will', e.will], ['Power of attorney', e.poa],
+        ['Guardianship', e.guardianship], ['Super nomination', e.super_nomination]
+      ].map(([k, v]) => { const [txt, na] = show(v); return [k, txt, na]; });
+    },
+    routing(d, r) {
+      const p = d.protection || {}, e = d.estate || {};
+      const coverGap = [p.life_cover_amount, p.income_protection, p.tpd_amount, p.trauma_amount].some(v => v === false || v === 'unsure');
+      const estateGap = [e.will, e.poa, e.guardianship, e.super_nomination].some(v => v === false || v === 'unsure');
+      const pros = [];
+      if (estateGap) pros.push(pro('Estate lawyer', 'wills, powers of attorney and guardianship — the paperwork half'));
+      if (coverGap) pros.push(pro('Risk (insurance) specialist', 'what cover exists, what’s absent, and what suits the household — the cover half'));
+      if (!pros.length) pros.push(pro('Risk (insurance) specialist or estate lawyer', 'the pair who look after this area when anything changes'));
+      const gp = goalPhrase();
+      return { pros, obs: r.state === 'flag' && gp
+        ? 'There are absences in the cover and paperwork that protect exactly what you’ve said matters — ' + esc(gp) + '. Worth discussing with ' + (estateGap && coverGap ? 'an <b>estate lawyer</b> and a <b>risk specialist</b>' : estateGap ? 'an <b>estate lawyer</b>' : 'a <b>risk specialist</b>') + '.'
+        : null };
+    }
+  }
+};
+
+function openDetail(key) {
+  const cfg = PANELS[key];
+  const tile = TILES.find(t => t.key === key);
+  if (!cfg || !tile) return;
+  const d = lastPicture.domains || {};
+  const done = Array.isArray(lastPicture.completed_domains) ? lastPicture.completed_domains : [];
+  const r = tile.derive(d, done) || { state: 'building', pct: 0 };
+
+  document.getElementById('dpTitle').textContent = cfg.title;
+  const badge = document.getElementById('dpBadge');
+  badge.className = 'dp-badge badge ' + r.state;
+  badge.innerHTML = '<span class="d"></span>' + BADGE_LABEL[r.state];
+
+  let html = '<div class="dp-inner">';
+  if (r.metric !== undefined) {
+    html += '<div class="dp-hero-num">' + esc(r.metric) + (r.unit ? ' <span class="u">' + esc(r.unit) + '</span>' : '') + '</div>';
+  }
+  html += '<div class="dp-context">' + esc(cfg.context) + '</div>';
+  html += '<div class="dp-section"><div class="lbl">What this means</div><div class="dp-read">' + esc(cfg.meaning(d, r)) + '</div></div>';
+
+  const figs = cfg.figures(d);
+  html += '<div class="dp-grid">';
+  if (figs.length) {
+    html += '<div class="dp-section"><div class="lbl">The detail</div><div class="dp-figures">' +
+      figs.map(f => '<div class="dp-figrow"><span class="k">' + esc(f[0]) + '</span><span class="v' + (f[2] ? ' na' : '') + '">' + esc(f[1]) + '</span></div>').join('') +
+      '</div></div>';
+  }
+  html += '<div class="dp-section"><div class="lbl">In plain terms</div><div class="dp-terms">' +
+    cfg.terms.map(t => '<div class="dp-term">' + t + '</div>').join('') + '</div></div>';
+  html += '</div>';
+
+  if (r.state === 'building') {
+    html += '<div class="dp-section"><div class="dp-building">This area is still building — the figures above fill in as the conversation covers it. Who can help comes into focus once the insight is complete.</div></div>';
+  } else {
+    const route = cfg.routing(d, r);
+    html += '<div class="dp-section"><div class="lbl">Who can help</div><div class="dp-pros">' +
+      route.pros.map(p => '<div class="dp-pro"><div class="ic">' + PRO_ICON + '</div><div class="txt"><b>' + esc(p.name) + '</b> — ' + esc(p.why) + '</div></div>').join('') +
+      '</div>';
+    if (!goalDirs().length) {
+      html += '<div class="dp-goalnote">Pinning down what you want next would sharpen exactly who helps here — that’s a conversation Finn can have with you whenever you’re ready.</div>';
+    }
+    html += '</div>';
+    // Referral card: only once the picture is substantially complete
+    // (≥4 of 6 insights resolved), only on flagged insights, and only when
+    // a goal the person owns makes the observation genuinely theirs.
+    if (route.obs && resolvedCount() >= 4) {
+      html += '<div class="ref-card"><div class="rc-tag">Worth a conversation</div><div class="rc-body">' + route.obs + '</div>' +
+        '<div class="rc-foot">When referrals open, Finn can introduce you to a vetted professional for this — nothing about your picture is ever shared unless you choose it.</div></div>';
+    }
+  }
+  html += '</div>';
+  document.getElementById('dpBody').innerHTML = html;
+  document.getElementById('detailPanel').classList.add('on');
+}
+
+function closeDetail() { document.getElementById('detailPanel').classList.remove('on'); }
+document.getElementById('dpBack').addEventListener('click', closeDetail);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
 
 /* ── conversation ── */
 async function talk(userText, hidden, file) {
