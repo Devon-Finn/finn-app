@@ -249,6 +249,322 @@ async function authenticate(request) {
   return { userId: user.id, householdId, depth };
 }
 
+/* ════════════ SCHEMA v2 — field-spec.md Part 2 (Step 1) ════════════
+   The domains JSONB target shape. Conventions, enforced here:
+     * null = not yet asked; false/0 = asked and answered no. Strictly
+       distinct — the translator never turns absence into a negative.
+     * Money is a whole-dollar integer, never a string (floats are
+       rounded; strings are rejected).
+     * Derived values (Part 2.11) are computed at read time in
+       public/app/shared/finn-derived.js and are NEVER stored here.
+   The 3a system prompt is untouched in this step (it still emits the
+   legacy capture shape), so every incoming capture is TRANSLATED v1→v2
+   before merge, and a legacy stored row is lazily upgraded on its first
+   new write. schema_version identifies which shape a row holds.
+   Deliberate deviation from the spec, flagged for Devon: every domain
+   also accepts optional `_notes` (string) — the legacy protocol captures
+   per-domain notes and dropping them silently would lose data. Step 2
+   decides their fate. */
+
+const MONEY = "money", RATE = "rate", BOOL = "bool", INT = "int", STR = "str";
+const V2_ENUMS = {
+  work_intent: ["both continuing", "one reducing", "one stopping", "unsure"],
+  structure: ["paye", "sole_trader", "company", "trust", "mixed"],
+  debt_type: ["credit_card", "personal_loan", "car_loan", "bnpl", "tax_debt", "other"],
+  confidence: ["stated", "estimated", "inferred"],
+};
+const COVER = { held: BOOL, amount: MONEY, inside_super: BOOL };
+const ESTATE_DOC = { in_place: "docstate", last_updated: STR };
+
+const V2_SCHEMA = {
+  context: { adults: INT, children: { array: { age: INT } }, owner_age: INT, partner_age: INT, work_intent: { enum: "work_intent" }, horizon_years: INT },
+  income: { salary_gross_annual: MONEY, salary_net_monthly: MONEY, partner_salary_gross_annual: MONEY, partner_salary_net_monthly: MONEY, business_income_annual: MONEY, rental_income_annual: MONEY, other_income_annual: MONEY, structure: { enum: "structure" }, entity: { object: { type: STR, name: STR } }, employer_super_on: { array: STR } },
+  expenses: { living_monthly: MONEY, includes_housing: BOOL, housing_repayment_monthly: MONEY },
+  home: { owns_home: BOOL, value_estimate: MONEY, value_source: STR, mortgage_balance: MONEY, rate_percent: RATE, rate_type: STR, lender: STR, with_lender_since: STR, repayment_monthly: MONEY, term_remaining_years: INT, has_offset: BOOL, offset_balance: MONEY, package_fee_annual: MONEY },
+  buffer: { accessible_savings: MONEY, where_held: STR, linked_to_loan: BOOL, counts_credit_as_buffer: BOOL },
+  super: { funds: { array: { fund: STR, owner: STR, balance: MONEY, has_insurance: BOOL } }, multiple_accounts: BOOL, extra_contributions: BOOL },
+  protection: { life: { object: COVER }, tpd: { object: COVER }, income_protection: { object: COVER }, trauma: { object: COVER } },
+  estate: { will: { object: ESTATE_DOC }, poa: { object: ESTATE_DOC }, guardianship: { object: ESTATE_DOC }, super_nomination: { object: { ...ESTATE_DOC, binding: BOOL } } },
+  investments: { shares_value: MONEY, held_in: STR, managed_funds_value: MONEY, properties: { array: { value_estimate: MONEY, loan_balance: MONEY, rate_percent: RATE, repayment_type: STR, rent_monthly: MONEY, held_in: STR } } },
+  debts: { items: { array: { type: { enum: "debt_type" }, balance: MONEY, rate_percent: RATE, minimum_monthly: MONEY } }, hecs_balance: MONEY },
+  flags: { hardship: BOOL, hardship_signal: STR },
+};
+
+// Validate + normalise one value against a field spec. Returns the
+// normalised value; pushes human-readable problems into errors.
+function v2CheckValue(spec, v, path, errors) {
+  if (v === null || v === undefined) return v === undefined ? undefined : null;
+  if (spec === MONEY) {
+    if (typeof v !== "number" || !isFinite(v)) { errors.push(path + ": money must be a number, got " + typeof v); return undefined; }
+    return Math.round(v); // whole-dollar integer
+  }
+  if (spec === RATE) {
+    if (typeof v !== "number" || !isFinite(v)) { errors.push(path + ": rate must be a number"); return undefined; }
+    return v;
+  }
+  if (spec === INT) {
+    if (typeof v !== "number" || !isFinite(v)) { errors.push(path + ": must be an integer"); return undefined; }
+    return Math.round(v);
+  }
+  if (spec === BOOL) {
+    if (typeof v !== "boolean") { errors.push(path + ": must be true/false/null"); return undefined; }
+    return v;
+  }
+  if (spec === STR) {
+    if (typeof v !== "string") { errors.push(path + ": must be a string"); return undefined; }
+    return v.slice(0, 500);
+  }
+  if (spec === "docstate") {
+    // Three-state estate value, approved by Devon with the trigger rule
+    // DECIDED (for the Step-4 trigger engine): false fires 6.1, "unsure"
+    // ALSO fires 6.1, "na" does not fire and renders as not applicable.
+    if (typeof v === "boolean" || v === "unsure" || v === "na") return v;
+    errors.push(path + ': must be true/false/"unsure"/"na"/null'); return undefined;
+  }
+  if (spec.enum) {
+    if (typeof v === "string" && V2_ENUMS[spec.enum].includes(v)) return v;
+    errors.push(path + ": must be one of " + V2_ENUMS[spec.enum].join("/")); return undefined;
+  }
+  if (spec.array) {
+    if (!Array.isArray(v)) { errors.push(path + ": must be an array"); return undefined; }
+    return v.map((item, i) => {
+      if (typeof spec.array === "string" || spec.array === STR) return v2CheckValue(spec.array, item, path + "[" + i + "]", errors);
+      if (item === null || typeof item !== "object" || Array.isArray(item)) { errors.push(path + "[" + i + "]: must be an object"); return undefined; }
+      return v2CheckObject(spec.array, item, path + "[" + i + "]", errors);
+    }).filter(x => x !== undefined);
+  }
+  if (spec.object) {
+    if (typeof v !== "object" || Array.isArray(v)) { errors.push(path + ": must be an object"); return undefined; }
+    return v2CheckObject(spec.object, v, path, errors);
+  }
+  errors.push(path + ": unhandled spec"); return undefined;
+}
+
+function v2CheckObject(shape, obj, path, errors) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (!(k in shape)) { errors.push(path + "." + k + ": unknown field"); continue; }
+    const checked = v2CheckValue(shape[k], v, path + "." + k, errors);
+    if (checked !== undefined) out[k] = checked;
+  }
+  return out;
+}
+
+// Validate a full v2 domains object. Unknown domains and unknown fields are
+// ERRORS, not tolerated noise — a silently malformed picture is worse than
+// a failed write.
+function validateDomainsV2(domains) {
+  const errors = [];
+  const out = {};
+  if (!domains || typeof domains !== "object" || Array.isArray(domains)) {
+    return { ok: false, errors: ["domains: must be an object"], value: null };
+  }
+  for (const [name, body] of Object.entries(domains)) {
+    if (!(name in V2_SCHEMA)) { errors.push(name + ": unknown domain"); continue; }
+    if (body === null) { out[name] = null; continue; }
+    if (typeof body !== "object" || Array.isArray(body)) { errors.push(name + ": must be an object"); continue; }
+    const clean = {};
+    for (const [k, v] of Object.entries(body)) {
+      if (k === "_confidence") {
+        if (v === null || (typeof v === "string" && V2_ENUMS.confidence.includes(v))) clean._confidence = v;
+        else errors.push(name + "._confidence: must be stated/estimated/inferred/null");
+        continue;
+      }
+      if (k === "_notes") {
+        // Approved deviation. HARD CONSTRAINT (Devon): _notes must NEVER
+        // feed a trigger or a position line — human reading and the
+        // Advice-Ready Pack only.
+        if (typeof v === "string") clean._notes = v.slice(0, 2000);
+        else errors.push(name + "._notes: must be a string");
+        continue;
+      }
+      if (k === "_unmapped") {
+        // Lossless-translation holding pen for v1 fields with no v2 home.
+        // Same hard constraint as _notes: never feeds a trigger or a
+        // position line. Step 2 re-asks or re-homes these.
+        if (v && typeof v === "object" && !Array.isArray(v) && JSON.stringify(v).length <= 4000) clean._unmapped = v;
+        else errors.push(name + "._unmapped: must be a small object");
+        continue;
+      }
+      if (!(k in V2_SCHEMA[name])) { errors.push(name + "." + k + ": unknown field"); continue; }
+      const checked = v2CheckValue(V2_SCHEMA[name][k], v, name + "." + k, errors);
+      if (checked !== undefined) clean[k] = checked;
+    }
+    out[name] = clean;
+  }
+  return { ok: errors.length === 0, errors, value: out };
+}
+
+/* ── v1 → v2 translation ──
+   Sparse: only domains present in the input produce output. Absence stays
+   absence; null stays null; has_offset is NEVER inferred. */
+function isV2Domains(d) {
+  if (!d || typeof d !== "object") return false;
+  if (["context", "expenses", "home", "investments", "debts", "flags"].some(k => k in d)) return true;
+  const p = d.protection;
+  return !!(p && p.life && typeof p.life === "object");
+}
+
+function v2DebtType(s) {
+  const t = String(s || "").toLowerCase();
+  if (t.includes("credit")) return "credit_card";
+  if (t.includes("car")) return "car_loan";
+  if (t.includes("personal")) return "personal_loan";
+  if (t.includes("bnpl") || t.includes("afterpay") || t.includes("zip") || t.includes("buy now")) return "bnpl";
+  if (t.includes("tax")) return "tax_debt";
+  return "other";
+}
+
+function v2Cover(vAmount, globalInsideSuper) {
+  if (vAmount === undefined) return undefined;               // not mentioned
+  if (vAmount === null) return { held: null, amount: null, inside_super: null };   // not yet asked
+  if (vAmount === false) return { held: false, amount: null, inside_super: null }; // confirmed not held
+  if (vAmount === true) return { held: true, amount: null, inside_super: globalInsideSuper === true ? true : null };
+  if (typeof vAmount === "number") return { held: true, amount: Math.round(vAmount), inside_super: globalInsideSuper === true ? true : null };
+  return undefined;
+}
+
+// Translation is NEVER lossy (Devon rule): every v1 field either maps to a
+// v2 field or lands, raw and pathed, in the successor domain's _unmapped
+// object. _unmapped and _notes are for human reading and the Advice-Ready
+// Pack ONLY — they must NEVER feed a trigger or a position line.
+function stashUnmapped(out, targetDomain, srcDomain, srcObj, consumed) {
+  const leftovers = Object.entries(srcObj).filter(([k]) => !consumed.has(k) && k !== "notes");
+  if (!leftovers.length) return;
+  out[targetDomain] = out[targetDomain] || {};
+  const u = out[targetDomain]._unmapped = out[targetDomain]._unmapped || {};
+  for (const [k, v] of leftovers) u[srcDomain + "." + k] = v;
+}
+
+function translateLegacyDomains(v1) {
+  const out = {};
+  const inc = v1.income, a = v1.assets, l = v1.liabilities, b = v1.buffer, p = v1.protection, e = v1.estate, s = v1.super;
+
+  if (inc) {
+    const consumed = new Set(["salary_annual", "partner_salary_annual", "side_income_annual", "other_income_annual", "monthly_expenses"]);
+    const o = {};
+    if ("salary_annual" in inc) o.salary_gross_annual = inc.salary_annual;
+    if ("partner_salary_annual" in inc) o.partner_salary_gross_annual = inc.partner_salary_annual;
+    if ("side_income_annual" in inc) o.business_income_annual = inc.side_income_annual;
+    if ("other_income_annual" in inc) o.other_income_annual = inc.other_income_annual;
+    if (typeof inc.notes === "string") o._notes = inc.notes;
+    if (Object.keys(o).length) out.income = o;
+    if ("monthly_expenses" in inc) {
+      // Legacy figure never declared whether it includes housing — mark
+      // explicitly unknown so it can be identified and re-asked (spec 2.3).
+      out.expenses = { living_monthly: inc.monthly_expenses, includes_housing: null };
+    }
+    stashUnmapped(out, "income", "income", inc, consumed);
+  }
+
+  const home = {};
+  if (a && "home_value" in a) {
+    home.value_estimate = a.home_value;
+    if (a.home_value !== null) { home.owns_home = true; home.value_source = "owner estimate"; }
+  }
+  if (l) {
+    if ("mortgage_balance" in l) { home.mortgage_balance = l.mortgage_balance; if (l.mortgage_balance !== null) home.owns_home = true; }
+    if ("mortgage_rate_percent" in l) home.rate_percent = l.mortgage_rate_percent;
+    if ("offset_balance" in l) home.offset_balance = l.offset_balance;
+    // has_offset deliberately NOT set — explicit capture only, never inferred.
+  }
+  if (Object.keys(home).length) out.home = home;
+
+  if (b) {
+    // assets.savings is NOT folded in here (Devon rule): it answers a
+    // different question than accessible_savings and buffer_months is a
+    // headline figure. Step 2 asks properly; until then it sits in
+    // investments._unmapped["assets.savings"].
+    const consumed = new Set(["accessible_savings"]);
+    const buf = {};
+    if ("accessible_savings" in b) buf.accessible_savings = b.accessible_savings;
+    if (typeof b.notes === "string") buf._notes = b.notes;
+    if (Object.keys(buf).length) out.buffer = buf;
+    stashUnmapped(out, "buffer", "buffer", b, consumed);
+  }
+
+  if (a) {
+    const consumed = new Set(["home_value", "shares_value", "investment_property_value"]);
+    const inv = {};
+    if ("shares_value" in a) inv.shares_value = a.shares_value;
+    if ("investment_property_value" in a && a.investment_property_value !== null) {
+      inv.properties = [{ value_estimate: a.investment_property_value, loan_balance: null, rate_percent: null, repayment_type: null, rent_monthly: null, held_in: null }];
+    }
+    if (typeof a.notes === "string") inv._notes = a.notes;
+    if (Object.keys(inv).length) out.investments = inv;
+    // Everything else (savings, business_value, other, model drift) is
+    // preserved, pathed, in investments._unmapped — never dropped.
+    stashUnmapped(out, "investments", "assets", a, consumed);
+  }
+
+  if (l) {
+    const consumed = new Set(["mortgage_balance", "mortgage_rate_percent", "offset_balance", "expensive_debts", "hecs_balance"]);
+    const debts = {};
+    if (Array.isArray(l.expensive_debts)) {
+      debts.items = l.expensive_debts
+        .filter(x => x && typeof x === "object")
+        .map(x => ({ type: v2DebtType(x.type), balance: typeof x.balance === "number" ? Math.round(x.balance) : null, rate_percent: null, minimum_monthly: null }));
+    }
+    if ("hecs_balance" in l) debts.hecs_balance = l.hecs_balance; // separate, never in debt totals
+    if (typeof l.notes === "string") debts._notes = l.notes;
+    if (Object.keys(debts).length) out.debts = debts;
+    stashUnmapped(out, "debts", "liabilities", l, consumed);
+  }
+
+  if (s) {
+    const consumed = new Set(["funds", "multiple_accounts", "extra_contributions"]);
+    const o = {};
+    if (Array.isArray(s.funds)) {
+      o.funds = s.funds.filter(f => f && typeof f === "object").map(f => ({
+        fund: typeof f.fund === "string" ? f.fund : null,
+        owner: typeof f.owner === "string" ? f.owner : null,
+        balance: typeof f.balance === "number" ? Math.round(f.balance) : null,
+        has_insurance: (typeof f.has_insurance === "boolean") ? f.has_insurance : null, // not asked per-fund in v1
+      }));
+    }
+    if ("multiple_accounts" in s) o.multiple_accounts = s.multiple_accounts;
+    if ("extra_contributions" in s) o.extra_contributions = s.extra_contributions;
+    if (typeof s.notes === "string") o._notes = s.notes;
+    if (Object.keys(o).length) out.super = o;
+    stashUnmapped(out, "super", "super", s, consumed);
+  }
+
+  if (p) {
+    const consumed = new Set(["life_cover_amount", "tpd_amount", "income_protection", "trauma_amount", "inside_super"]);
+    const gis = p.inside_super;
+    const o = {};
+    const life = v2Cover(p.life_cover_amount, gis); if (life) o.life = life;
+    const tpd = v2Cover(p.tpd_amount, gis); if (tpd) o.tpd = tpd;
+    const ip = v2Cover(p.income_protection, gis); if (ip) o.income_protection = ip;
+    const trauma = v2Cover(p.trauma_amount, gis); if (trauma) o.trauma = trauma;
+    if (typeof p.notes === "string") o._notes = p.notes;
+    if (Object.keys(o).length) out.protection = o;
+    stashUnmapped(out, "protection", "protection", p, consumed);
+  }
+
+  if (e) {
+    const consumed = new Set(["will", "poa", "guardianship", "super_nomination"]);
+    const doc = v => v === undefined ? undefined : { in_place: v, last_updated: null };
+    const o = {};
+    const w = doc(e.will); if (w) o.will = w;
+    const poa = doc(e.poa); if (poa) o.poa = poa;
+    const g = doc(e.guardianship); if (g) o.guardianship = g;
+    if (e.super_nomination !== undefined) o.super_nomination = { in_place: e.super_nomination, last_updated: null, binding: null };
+    if (typeof e.notes === "string") o._notes = e.notes;
+    if (Object.keys(o).length) out.estate = o;
+    stashUnmapped(out, "estate", "estate", e, consumed);
+  }
+
+  // Unknown v1 domains (model drift) are passed through untouched; the
+  // validator rejects them and the whole write lands in quarantine — held,
+  // not lost, and loudly flagged.
+  for (const [k, v] of Object.entries(v1)) {
+    if (!["income", "assets", "liabilities", "buffer", "protection", "estate", "super"].includes(k)) out[k] = v;
+  }
+
+  return out;
+}
+
 // Deep-merge captured domain data into the existing picture. Objects merge
 // recursively; arrays and scalars replace (a corrected figure overwrites).
 function deepMerge(base, patch) {
@@ -305,8 +621,49 @@ async function accumulateStreamText(stream) {
 }
 
 // Apply a parsed capture to the household's picture row (and completion stub).
+// Schema v2 path: the stored row is lazily upgraded v1→v2 on its first new
+// write, the incoming capture (still emitted in the legacy shape by the
+// untouched 3a prompt) is translated, and the merged result is validated
+// against Part 2 before anything is written. A write that fails validation
+// is REFUSED and logged loudly — never stored malformed.
 async function applyCapture(householdId, picture, capture) {
-  const domains = deepMerge(picture.domains ?? {}, capture.domains ?? {});
+  let baseDomains = picture.domains ?? {};
+  if ((picture.schema_version ?? 1) < 2 && !isV2Domains(baseDomains)) {
+    baseDomains = translateLegacyDomains(baseDomains);
+  }
+  let patch = capture.domains ?? {};
+  if (Object.keys(patch).length && !isV2Domains(patch)) {
+    patch = translateLegacyDomains(patch);
+  }
+  const merged = deepMerge(baseDomains, patch);
+  const check = validateDomainsV2(merged);
+  if (!check.ok) {
+    const at = new Date().toISOString();
+    // 1. Loud, greppable log line — the alert signal.
+    console.error(
+      "[Finn clarity] QUARANTINE — schema v2 validation failed, picture write REFUSED for household " + householdId +
+      ". Nothing is lost: the rejected payload is quarantined and the session UI is told. Problems: " + JSON.stringify(check.errors)
+    );
+    // 2. Quarantine the rejected payload — a refused write must never mean
+    //    silent data loss.
+    const q = await sbFetch(`/rest/v1/picture_quarantine`, {
+      method: "POST",
+      headers: { "Prefer": "return=minimal" },
+      body: JSON.stringify({ household_id: householdId, capture: capture ?? null, merged_domains: merged, errors: check.errors }),
+    });
+    if (!q.ok) console.error(`[Finn clarity] QUARANTINE INSERT FAILED — ${q.status}: ${await q.text()}`);
+    // 3. Tell the session: last_write_status is member-readable via RLS, so
+    //    the UI can say "that didn't save" instead of carrying on as though
+    //    it did. domains/schema_version are NOT touched on this path.
+    const st = await sbFetch(`/rest/v1/picture?household_id=eq.${householdId}`, {
+      method: "PATCH",
+      headers: { "Prefer": "return=minimal" },
+      body: JSON.stringify({ last_write_status: { ok: false, at, errors: check.errors.slice(0, 20) }, updated_at: at }),
+    });
+    if (!st.ok) console.error(`[Finn clarity] last_write_status update failed — ${st.status}`);
+    return;
+  }
+  const domains = check.value;
   const goals = deepMerge(picture.goals ?? {}, capture.goals ?? {});
   const prevDone = Array.isArray(picture.completed_domains) ? picture.completed_domains : [];
   const newDone = Array.isArray(capture.completed_domains) ? capture.completed_domains : [];
@@ -320,6 +677,8 @@ async function applyCapture(householdId, picture, capture) {
       domains,
       goals,
       completed_domains: completed,
+      schema_version: 2,
+      last_write_status: { ok: true, at: new Date().toISOString() },
       updated_at: new Date().toISOString(),
     }),
   });
@@ -385,7 +744,7 @@ export default async function handler(request, context) {
 
   // ── Server-side context: picture state + snapshot carry-over. ──
   let picture = { domains: {}, goals: {}, completed_domains: [] };
-  const picRes = await sbFetch(`/rest/v1/picture?household_id=eq.${auth.householdId}&select=domains,goals,completed_domains`);
+  const picRes = await sbFetch(`/rest/v1/picture?household_id=eq.${auth.householdId}&select=domains,goals,completed_domains,schema_version`);
   if (picRes.ok) {
     const rows = await picRes.json();
     if (rows.length) picture = rows[0];

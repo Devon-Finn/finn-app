@@ -64,6 +64,9 @@
   .msg.finn .who{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); font-weight:600; margin-bottom:6px;}
   .msg.finn p{margin-bottom:9px;} .msg.finn p:last-child{margin-bottom:0;}
   .msg.user{align-self:flex-end; background:var(--accent); color:#fff; padding:11px 16px; border-radius:15px 15px 4px 15px; font-size:14.5px; line-height:1.5; box-shadow:var(--shadow);}
+  /* System notice — a refused save is surfaced, never silent. Visually
+     distinct from Finn: this is the app speaking, not the conversation. */
+  .msg.sys-note{align-self:center; background:var(--warm-light); border:1px solid #ecd9c4; color:#8a6038; border-radius:12px; padding:10px 14px; font-size:12.5px; line-height:1.55; max-width:88%; text-align:center;}
   .typing{display:flex; gap:5px; padding:4px 0;}
   .typing .td{width:7px;height:7px;border-radius:50%;background:var(--steel-deep);animation:tdp 1.2s ease infinite;}
   .typing .td:nth-child(2){animation-delay:.15s;} .typing .td:nth-child(3){animation-delay:.3s;}
@@ -636,7 +639,7 @@ function renderHero(completed) {
 }
 
 async function refreshProgress() {
-  const { data } = await finnSupabase.from('picture').select('domains, goals, completed_domains').limit(1);
+  const { data } = await finnSupabase.from('picture').select('domains, goals, completed_domains, last_write_status').limit(1);
   const picture = (data && data[0]) ? data[0] : { domains: {}, goals: {}, completed_domains: [] };
   lastPicture = picture;
   const completed = Array.isArray(picture.completed_domains) ? picture.completed_domains : [];
@@ -974,7 +977,25 @@ document.getElementById('dpBack').addEventListener('click', closeDetail);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
 
 /* ── conversation ── */
+// A refused server-side save must never pass silently in a paid session.
+// After each turn we re-read last_write_status; a fresh failure surfaces
+// as a visible system notice inviting the person to re-share the detail.
+let lastNoticedFailure = null;
+function checkWriteStatus(turnStartedAt) {
+  const s = lastPicture && lastPicture.last_write_status;
+  if (!s || s.ok !== false || !s.at) return;
+  const t = new Date(s.at).getTime();
+  if (isNaN(t) || t < turnStartedAt - 15000 || s.at === lastNoticedFailure) return;
+  lastNoticedFailure = s.at;
+  const div = document.createElement('div');
+  div.className = 'msg sys-note';
+  div.textContent = 'Heads up — the details from your last message didn’t save to your picture properly. Nothing is lost (they’ve been set aside for review), but they’re not in your picture yet. Mind sharing that last part again?';
+  messagesEl.appendChild(div);
+  scrollChat();
+}
+
 async function talk(userText, hidden, file) {
+  const turnStartedAt = Date.now();
   busy = true;
   sendBtn.disabled = true;
   if (!hidden) addUser(userText, file && file.name);
@@ -1051,8 +1072,12 @@ async function talk(userText, hidden, file) {
   }
   busy = false;
   sendBtn.disabled = false;
-  // Server has merged this turn's capture; give it a beat, then refresh.
-  setTimeout(refreshProgress, 900);
+  // Server has merged (or refused) this turn's capture; give it a beat,
+  // refresh, then surface any refusal to the person.
+  setTimeout(async () => {
+    await refreshProgress();
+    checkWriteStatus(turnStartedAt);
+  }, 1200);
 }
 
 function handleSend() {
