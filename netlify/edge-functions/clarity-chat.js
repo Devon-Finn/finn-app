@@ -422,9 +422,22 @@ function validateDomainsV2(domains) {
    absence; null stays null; has_offset is NEVER inferred. */
 function isV2Domains(d) {
   if (!d || typeof d !== "object") return false;
+  // v2-only domain names are decisive.
   if (["context", "expenses", "home", "investments", "debts", "flags"].some(k => k in d)) return true;
+  // Domains that exist in both shapes need field-level detection — a
+  // capture touching only one shared-name domain must still be recognised
+  // (an income-only v2 patch has no marker key at the top level).
   const p = d.protection;
-  return !!(p && p.life && typeof p.life === "object");
+  if (p && ["life", "tpd", "income_protection", "trauma"].some(k => p[k] && typeof p[k] === "object")) return true;
+  const e = d.estate;
+  if (e && ["will", "poa", "guardianship", "super_nomination"].some(k => e[k] && typeof e[k] === "object")) return true;
+  const inc = d.income;
+  if (inc && ["salary_gross_annual", "salary_net_monthly", "partner_salary_gross_annual", "partner_salary_net_monthly", "business_income_annual", "rental_income_annual", "structure", "entity", "employer_super_on"].some(k => k in inc)) return true;
+  const b = d.buffer;
+  if (b && ["where_held", "linked_to_loan", "counts_credit_as_buffer"].some(k => k in b)) return true;
+  const s = d.super;
+  if (s && Array.isArray(s.funds) && s.funds.some(f => f && typeof f === "object" && "has_insurance" in f)) return true;
+  return false;
 }
 
 function v2DebtType(s) {
@@ -649,6 +662,25 @@ async function accumulateStreamText(stream) {
 // against Part 2 before anything is written. A write that fails validation
 // is REFUSED and logged loudly — never stored malformed.
 async function applyCapture(householdId, picture, capture) {
+  // Defensive re-homing: the model occasionally emits a domain as a SIBLING
+  // of "domains" instead of inside it. Ignoring unexpected top-level keys
+  // would be silent data loss, so unambiguous domain names are folded back
+  // into domains (loudly) before processing.
+  const KNOWN_TOP = new Set(["domains", "goals", "completed_domains", "session_complete"]);
+  for (const [k, v] of Object.entries(capture ?? {})) {
+    if (KNOWN_TOP.has(k)) continue;
+    if (k in V2_SCHEMA && v && typeof v === "object" && !Array.isArray(v)) {
+      console.error(`[Finn clarity] capture anomaly: domain "${k}" emitted outside "domains" — re-homed rather than dropped.`);
+      capture.domains = capture.domains || {};
+      capture.domains[k] = capture.domains[k] ? deepMerge(capture.domains[k], v) : v;
+    } else if (["assets", "liabilities"].includes(k) && v && typeof v === "object") {
+      console.error(`[Finn clarity] capture anomaly: legacy domain "${k}" emitted outside "domains" — re-homed rather than dropped.`);
+      capture.domains = capture.domains || {};
+      capture.domains[k] = capture.domains[k] ? deepMerge(capture.domains[k], v) : v;
+    } else {
+      console.error(`[Finn clarity] capture anomaly: unknown top-level key "${k}" ignored (value type: ${typeof v}).`);
+    }
+  }
   let baseDomains = picture.domains ?? {};
   if ((picture.schema_version ?? 1) < 2 && !isV2Domains(baseDomains)) {
     baseDomains = translateLegacyDomains(baseDomains);
