@@ -1,0 +1,304 @@
+{
+  "_meta": {
+    "source": "field-spec.md Part 4 — content as data",
+    "rules": [
+      "position_line.template is filled by slot substitution ONLY. The renderer never composes or rewords the sentence, and no model call touches this path.",
+      "blocks are immutable at runtime: no summarisation, no rewriting for length, no tone adjustment. If a block is too long for a viewport, that is a layout problem.",
+      "Every string marked [Education content to be written ...] is a PLACEHOLDER. Devon and Charlie write the real copy; it must never be improvised by a model or a developer.",
+      "Slots suffixed _display (statuses, counts, descriptions) are formatted by the deterministic renderer from the listed fields — formatting, never characterisation.",
+      "A missing field renders as 'none recorded', never as zero. (Fixture H, field-spec 3.6.)"
+    ]
+  },
+  "insights": [
+    {
+      "id": "1.1",
+      "tile": 1,
+      "variant": null,
+      "route": "mortgage_broker",
+      "position_line": {
+        "template": "Your loan is at {rate_percent}% ({rate_type}), and you've been with {lender} since {with_lender_since}.",
+        "fields": ["home.rate_percent", "home.rate_type", "home.lender", "home.with_lender_since"]
+      },
+      "blocks": {
+        "why": "[Education content to be written — Devon/Charlie: why rate and loan setup is worth a conversation]",
+        "turn_up": "[Education content to be written — Devon/Charlie: what turns up when people look at this]",
+        "dont_realise": "[Education content to be written — Devon/Charlie: what people often don't realise]",
+        "how_professional": "[Education content to be written — Devon/Charlie: how a mortgage broker works this, incl. paid-by-the-lender note]",
+        "nothing_to_prepare": "[Education content to be written — Devon/Charlie: reassurance that nothing needs preparing]"
+      },
+      "action_label": "Find a mortgage broker"
+    },
+    {
+      "id": "1.2",
+      "tile": 1,
+      "variant": null,
+      "route": "mortgage_broker",
+      "position_line": {
+        "template": "Your offset account holds {offset_balance}, against a loan balance of {mortgage_balance}.",
+        "fields": ["home.offset_balance", "home.mortgage_balance", "home.package_fee_annual"]
+      },
+      "blocks": {
+        "why": "[Education content to be written — Devon/Charlie: why the offset setup is worth a conversation]",
+        "turn_up": "[Education content to be written — Devon/Charlie]",
+        "dont_realise": "[Education content to be written — Devon/Charlie: incl. package fees where present]",
+        "how_professional": "[Education content to be written — Devon/Charlie]",
+        "nothing_to_prepare": "[Education content to be written — Devon/Charlie]"
+      },
+      "action_label": "Find a mortgage broker"
+    },
+    {
+      "id": "1.3",
+      "tile": 1,
+      "variant": null,
+      "route": "broker_or_planner",
+      "position_line": {
+        "template": "Your equity in the home is {home_equity}, with the loan at {lvr_percent}% of the home's value.",
+        "fields": ["derived.home_equity", "derived.lvr_percent"]
+      },
+      "blocks": {
+        "why": "[Education content to be written — Devon/Charlie: why equity is worth a conversation]",
+        "turn_up": "[Education content to be written — Devon/Charlie]",
+        "dont_realise": "[Education content to be written — Devon/Charlie]",
+        "how_professional": "[Education content to be written — Devon/Charlie: broker and planner roles here]",
+        "nothing_to_prepare": "[Education content to be written — Devon/Charlie]"
+      },
+      "action_label": "Talk it through with a broker or planner"
+    },
+    {
+      "id": "2.1",
+      "tile": 2,
+      "variant": null,
+      "route": "planner_or_accountant",
+      "position_line": {
+        "template": "About {surplus_monthly} is left in a typical month after living costs and housing.",
+        "fields": ["derived.surplus_monthly"]
+      },
+      "blocks": {
+        "why": "[Education content to be written — Devon/Charlie: why the monthly surplus is worth a conversation]",
+        "turn_up": "[Education content to be written — Devon/Charlie]",
+        "dont_realise": "[Education content to be written — Devon/Charlie]",
+        "how_professional": "[Education content to be written — Devon/Charlie]",
+        "nothing_to_prepare": "[Education content to be written — Devon/Charlie]"
+      },
+      "action_label": "Find a planner or accountant"
+    },
+    {
+      "id": "3.1",
+      "tile": 3,
+      "variant": null,
+      "route": "planner",
+      "position_line": {
+        "template": "Your accessible savings would cover about {buffer_months} months of your usual outgoings.",
+        "fields": ["derived.buffer_months", "context.children", "income.structure"]
+      },
+      "blocks": {
+        "why": "[Education content to be written — Devon/Charlie: why how-long-it-would-last is worth a conversation; context.children and income.structure inform the copy variant]",
+        "turn_up": "[Education content to be written — Devon/Charlie]",
+        "dont_realise": "[Education content to be written — Devon/Charlie]",
+        "how_professional": "[Education content to be written — Devon/Charlie]",
+        "nothing_to_prepare": "[Education content to be written — Devon/Charlie]"
+      },
+      "action_label": "Find a financial planner"
+    },
+    {
+      "id": "3.2a",
+      "tile": 3,
+      "variant": "has_offset",
+      "route": "mortgage_broker",
+      "position_line": {
+        "template": "Your safety net of {accessible_savings} is held in {where_held}, separately from your loan.",
+        "fields": ["buffer.accessible_savings", "buffer.where_held"]
+      },
+      "blocks": {
+        "why": "[Education content to be written — Devon/Charlie: savings sitting outside an existing offset]",
+        "turn_up": "[Education content to be written — Devon/Charlie]",
+        "dont_realise": "[Education content to be written — Devon/Charlie]",
+        "how_professional": "[Education content to be written — Devon/Charlie]",
+        "nothing_to_prepare": "[Education content to be written — Devon/Charlie]"
+      },
+      "action_label": "Find a mortgage broker"
+    },
+    {
+      "id": "3.2b",
+      "tile": 3,
+      "variant": "no_offset",
+      "route": "mortgage_broker",
+      "position_line": {
+        "template": "Your safety net of {accessible_savings} is held in {where_held}, and your loan has no offset account attached.",
+        "fields": ["buffer.accessible_savings", "buffer.where_held"]
+      },
+      "blocks": {
+        "why": "[Education content to be written — Devon/Charlie: savings held against a loan with no offset facility]",
+        "turn_up": "[Education content to be written — Devon/Charlie]",
+        "dont_realise": "[Education content to be written — Devon/Charlie]",
+        "how_professional": "[Education content to be written — Devon/Charlie]",
+        "nothing_to_prepare": "[Education content to be written — Devon/Charlie]"
+      },
+      "action_label": "Find a mortgage broker"
+    },
+    {
+      "id": "4.1",
+      "tile": 4,
+      "variant": null,
+      "route": "planner",
+      "position_line": {
+        "template": "{owner_display} holds {fund_count_display} super accounts.",
+        "fields": ["super.funds"]
+      },
+      "blocks": {
+        "why": "[Education content to be written — Devon/Charlie: multiple accounts for one person; fees; insurance inside super referenced only as a consolidation caution per precedence rule, never its own referral]",
+        "turn_up": "[Education content to be written — Devon/Charlie]",
+        "dont_realise": "[Education content to be written — Devon/Charlie]",
+        "how_professional": "[Education content to be written — Devon/Charlie]",
+        "nothing_to_prepare": "[Education content to be written — Devon/Charlie]"
+      },
+      "action_label": "Find a financial planner"
+    },
+    {
+      "id": "5.1",
+      "tile": 5,
+      "variant": null,
+      "route": "risk_specialist_or_planner",
+      "position_line": {
+        "template": "Cover recorded: life {life_display}, income protection {ip_display}, TPD {tpd_display}, trauma {trauma_display}.",
+        "fields": ["protection.life", "protection.income_protection", "protection.tpd", "protection.trauma", "context", "home.mortgage_balance"]
+      },
+      "blocks": {
+        "why": "[Education content to be written — Devon/Charlie: household cover in the context of dependants and the mortgage]",
+        "turn_up": "[Education content to be written — Devon/Charlie]",
+        "dont_realise": "[Education content to be written — Devon/Charlie: incl. cover held inside super]",
+        "how_professional": "[Education content to be written — Devon/Charlie]",
+        "nothing_to_prepare": "[Education content to be written — Devon/Charlie]"
+      },
+      "action_label": "Find a risk specialist or planner"
+    },
+    {
+      "id": "6.1",
+      "tile": 6,
+      "variant": null,
+      "route": "estate_lawyer",
+      "position_line": {
+        "template": "Recorded: will {will_display}, power of attorney {poa_display}, guardianship {guardianship_display}, super nomination {nomination_display}.",
+        "fields": ["estate.will", "estate.poa", "estate.guardianship", "estate.super_nomination", "context.children"]
+      },
+      "blocks": {
+        "why": "[Education content to be written — Devon/Charlie: will and legal basics; 'unsure' fires this insight, 'na' renders as not applicable; will older than 5 years also fires]",
+        "turn_up": "[Education content to be written — Devon/Charlie]",
+        "dont_realise": "[Education content to be written — Devon/Charlie]",
+        "how_professional": "[Education content to be written — Devon/Charlie]",
+        "nothing_to_prepare": "[Education content to be written — Devon/Charlie]"
+      },
+      "action_label": "Find an estate lawyer"
+    },
+    {
+      "id": "7.1",
+      "tile": 7,
+      "variant": null,
+      "route": "broker_planner_accountant",
+      "position_line": {
+        "template": "Investment property valued around {property_value}, with {property_loan} owing and rent of {rental_income_annual} a year.",
+        "fields": ["investments.properties", "income.rental_income_annual"]
+      },
+      "blocks": {
+        "why": "[Education content to be written — Devon/Charlie: the investment property as a position]",
+        "turn_up": "[Education content to be written — Devon/Charlie]",
+        "dont_realise": "[Education content to be written — Devon/Charlie]",
+        "how_professional": "[Education content to be written — Devon/Charlie: broker, planner and accountant roles]",
+        "nothing_to_prepare": "[Education content to be written — Devon/Charlie]"
+      },
+      "action_label": "Talk it through with a broker, planner or accountant"
+    },
+    {
+      "id": "7.2",
+      "tile": 7,
+      "variant": null,
+      "route": "planner",
+      "position_line": {
+        "template": "Investments of {investments_total_display}, held in {held_in}.",
+        "fields": ["investments.shares_value", "investments.managed_funds_value", "investments.held_in"]
+      },
+      "blocks": {
+        "why": "[Education content to be written — Devon/Charlie: investments and how they fit. Note: the ownership block stands down when income.entity is present — Tile 9 owns the ownership question (precedence rule)]",
+        "turn_up": "[Education content to be written — Devon/Charlie]",
+        "dont_realise": "[Education content to be written — Devon/Charlie]",
+        "how_professional": "[Education content to be written — Devon/Charlie]",
+        "nothing_to_prepare": "[Education content to be written — Devon/Charlie]"
+      },
+      "action_label": "Find a financial planner"
+    },
+    {
+      "id": "8.1a",
+      "tile": 8,
+      "variant": "has_mortgage",
+      "route": "mortgage_broker",
+      "position_line": {
+        "template": "Debts outside the mortgage total {debts_total}, across {debt_count_display} items.",
+        "fields": ["debts.items", "derived.debts_total"]
+      },
+      "blocks": {
+        "why": "[Education content to be written — Devon/Charlie: other debts alongside a mortgage. NCCP applies — Charlie to review the credit framing]",
+        "turn_up": "[Education content to be written — Devon/Charlie]",
+        "dont_realise": "[Education content to be written — Devon/Charlie]",
+        "how_professional": "[Education content to be written — Devon/Charlie]",
+        "nothing_to_prepare": "[Education content to be written — Devon/Charlie]"
+      },
+      "action_label": "Find a mortgage broker"
+    },
+    {
+      "id": "8.1b",
+      "tile": 8,
+      "variant": "no_mortgage",
+      "route": "national_debt_helpline",
+      "position_line": {
+        "template": "Debts total {debts_total}, across {debt_count_display} items.",
+        "fields": ["debts.items", "derived.debts_total"]
+      },
+      "blocks": {
+        "why": "[Education content to be written — Devon/Charlie: debts without a mortgage. NO PAID REFERRAL on this variant, by rule — education plus the National Debt Helpline only]",
+        "turn_up": "[Education content to be written — Devon/Charlie]",
+        "dont_realise": "[Education content to be written — Devon/Charlie]",
+        "how_professional": "[Education content to be written — Devon/Charlie: the National Debt Helpline, a genuinely free service]",
+        "nothing_to_prepare": "[Education content to be written — Devon/Charlie]"
+      },
+      "action_label": "About the National Debt Helpline"
+    },
+    {
+      "id": "9.1",
+      "tile": 9,
+      "variant": null,
+      "route": "accountant",
+      "position_line": {
+        "template": "Your income is made up as {structure_display}.",
+        "fields": ["income.structure", "income.entity", "income.employer_super_on", "income.business_income_annual"]
+      },
+      "blocks": {
+        "why": "[Education content to be written — Devon/Charlie: structural complexity in how the income is made up. Does NOT fire on rental or dividend income alone (explicit non-trigger)]",
+        "turn_up": "[Education content to be written — Devon/Charlie]",
+        "dont_realise": "[Education content to be written — Devon/Charlie]",
+        "how_professional": "[Education content to be written — Devon/Charlie]",
+        "nothing_to_prepare": "[Education content to be written — Devon/Charlie]"
+      },
+      "action_label": "Find an accountant"
+    }
+  ],
+  "overrides": [
+    {
+      "id": "hardship",
+      "tile": 8,
+      "variant": null,
+      "route": "financial_counsellor",
+      "position_line": {
+        "template": "Debts total {debts_total}, across {debt_count_display} items.",
+        "fields": ["debts.items", "derived.debts_total"]
+      },
+      "blocks": {
+        "why": "[Education content to be written — Devon/Charlie: the hardship override. flags.hardship = true suppresses 8.1a and 8.1b entirely; posture is care, never sales. Free financial counsellor only — distress is never monetised]",
+        "turn_up": "[Education content to be written — Devon/Charlie]",
+        "dont_realise": "[Education content to be written — Devon/Charlie]",
+        "how_professional": "[Education content to be written — Devon/Charlie: the National Debt Helpline]",
+        "nothing_to_prepare": "[Education content to be written — Devon/Charlie]"
+      },
+      "action_label": "About the National Debt Helpline"
+    }
+  ]
+}
