@@ -94,8 +94,8 @@ The chain is: **the model turns conversation into data → code turns data into 
 
 Why it cannot be the model's judgment:
 
-- **Legal.** The display rule is the thing Charlie signs off. He can review a table of thirteen conditions. He cannot review a vibe.
-- **Testability.** Thirteen triggers can be unit tested against sample households. A judgment cannot.
+- **Legal.** The display rule is the thing Charlie signs off. He can review a table of fourteen conditions. He cannot review a vibe.
+- **Testability.** Fourteen triggers can be unit tested against sample households. A judgment cannot.
 - **Consistency.** The same household must get the same dashboard on Tuesday as on Monday.
 - **Support.** When someone asks why Finn told them about super, there must be a one-line answer.
 
@@ -124,7 +124,7 @@ The conversational read is not wasted, it moves upstream. "Sounds like my job's 
 | 8 | Your other debts | Conditional | 8.1 |
 | 9 | How your income is made up | **Core** | 9.1 |
 
-**Thirteen insights across nine tiles, fifteen entries with variants.**
+**Fourteen insights across nine tiles, sixteen entries with variants.**
 
 ### Ownership rules, so nobody is routed twice for one thing
 
@@ -280,6 +280,33 @@ A financial planner helps you work out what your spare money could be working to
 You don't need a goal figured out, or a plan, or the right words for what you want. Working out what you actually want is a large part of what this conversation is for. Finn has already built the picture and passes it on, so you can turn up unsure, which is completely normal, and still get somewhere useful.
 
 → *Find a financial planner*
+
+---
+
+### 2.2 — When there's nothing left over → no paid referral
+
+*Fires when surplus is zero or negative and computable. Never fires where surplus is null, which means the inputs were ambiguous rather than the money being tight.*
+
+**Position line**
+On these figures, what goes out each month is a little more than what comes in.
+
+**The figure is a snapshot, not a verdict**
+This number is built from what you told Finn about a typical month. It doesn't know about the quiet months, or the ones where the car registration and the school costs land together. Most households come out differently across a full year than they do in any single month, so the useful thing here is the shape of it rather than the precision.
+
+**Where the gap usually comes from**
+For most households it isn't one big thing. It's that the regular costs have crept up over a few years while the income hasn't, or that direct debits set up at different times have quietly accumulated. Debts with high minimum payments do it faster than anything else, because those minimums come out before anything is left.
+
+**What people do about it**
+Only two things move this number, what comes in and what goes out, and neither is a small thing to change. What tends to help first is seeing every regular payment in one place, because the ones people find are almost always the ones they'd forgotten they were still paying for.
+
+**There's no referral here, and that's deliberate**
+Finn doesn't have anyone on its list for this one. Planners don't generally take on work at this scale and the fee would be larger than the problem, and we won't point you at the businesses that advertise debt help. So instead of a referral, that's what's worth knowing.
+
+**If it's causing real stress**
+Financial counsellors are free, they're on your side entirely, and you don't have to be in crisis to call one. The National Debt Helpline is 1800 007 007. There's no cost and no catch. It's there if you want it.
+
+> **Build note.** No action button. No professional card on the who-to-see view. The counsellor is named as available, never prescribed. Tone is the whole risk here: someone tight but coping should not feel diagnosed.
+
 
 > **Build note.** The list of options in block two is safe because it is long and unranked. If it is ever ordered or trimmed to two or three, it starts to read as a suggestion. Keep it flat.
 
@@ -774,4 +801,67 @@ If the answer is no provided no conclusion is stated, build exactly what is in t
 
 ---
 
-*Thirteen insights across nine tiles. Reviewed and signed off tile by tile, August 2026.*
+---
+
+# PART SIX — PROFESSIONALS AND CALM BLOCKS
+
+## 6.1 Professionals registry
+
+Cost belongs to the professional, not the insight, so it renders once on the who-to-see view rather than repeating under every insight. `role` is the one-line description on the professional card.
+
+### mortgage_broker
+- **role** — Looks across a lot of lenders at once rather than one, and handles the comparison and the paperwork.
+- **cost_pill** — Usually free
+- **cost_line** — Most brokers charge you nothing. They're paid a commission by the lender when a loan settles. A few charge a fee in complex situations, and they have to tell you before you start.
+
+### financial_planner
+- **role** — Helps you work out what you're aiming at and how the pieces fit together, based on what matters to you.
+- **cost_pill** — Varies
+- **cost_line** — Usually a first conversation at no cost to see whether it's a fit. If you go ahead there's a fee for the written advice, and often an ongoing fee if you keep them on. The amounts vary a lot, and they tell you before anything is agreed.
+
+### insurance_specialist
+- **role** — Works out what cover you actually hold, what it would pay and when, and where the gaps sit for a household like yours.
+- **cost_pill** — Usually free
+- **cost_line** — Generally paid a commission by the insurer rather than a fee by you. Some charge a fee instead, and will say so upfront.
+
+### estate_lawyer
+- **role** — Prepares the documents that decide what happens to what you own, and who looks after the children, so they actually do what you intend.
+- **cost_pill** — Fixed price
+- **cost_line** — Usually a set price for a will and the related documents, quoted before they start. For a straightforward situation it's often less than people expect.
+
+### accountant
+- **role** — Looks at where your income comes from and how it's structured, and handles the tax that follows from it.
+- **cost_pill** — Fee, often deductible
+- **cost_line** — A fee for the work, often a set price for a return and hourly for advice. Accounting fees are generally deductible, so part of it comes back.
+
+### financial_counsellor
+- **role** — Free, independent help for people having trouble with debt. Not a salesperson and not a lender.
+- **cost_pill** — Free
+- **cost_line** — Free, always. They're on your side entirely, and you don't have to be in crisis to call one.
+
+---
+
+## 6.2 Calm blocks
+
+Structure per tile: `statement`, `why`, `what_would_change[]`, `closing`.
+
+**Never** a tick, a green anything, "you're in good shape", or a completion state. The `why` describes a property of the situation type, never a judgment of the person.
+
+### Tile 9 — how your income is made up
+
+- **statement** — Nothing here routes to anyone.
+- **why** — When income comes from an employer, the tax is settled before it reaches you and super goes in on top automatically. There's no structure sitting underneath it to review, so there's no conversation to have.
+- **what_would_change**
+  - Contracting or work under an ABN
+  - A business, however small
+  - Rent from a property
+  - Money paid through a trust or a company
+- **closing** — Each of those brings tax you settle yourself rather than an employer settling it, and super nobody pays for you unless you arrange it. That's when this becomes an accountant's conversation.
+
+### Tiles 1 to 8
+
+*[Not provided — being written. Do not invent.]*
+
+---
+
+*Fourteen insights across nine tiles. Reviewed and signed off tile by tile, August 2026.*

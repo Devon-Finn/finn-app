@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "source": "field-spec.md Part 4 (structure) + docs/education-library.md v2 August 2026 (copy, signed off tile by tile with Devon)",
+    "source": "docs/field-spec.md Part 4 + docs/component-spec.md 5.2 (structure) + docs/education-library.md (copy, signed off tile by tile with Devon) + docs/term-registry.md (companion)",
     "rules": [
       "position_line.template is filled by slot substitution ONLY. The renderer never composes or rewords the sentence, and no model call touches this path.",
       "blocks are immutable at runtime: no summarisation, no rewriting for length, no tone adjustment. If a block is too long for a viewport, that is a layout problem.",
@@ -9,26 +9,109 @@
       "Entries with block_style 'inline_headings' carry their own headings inside the block text (8.1b's four-part no-referral content); the renderer must not print the template headings over them. Entries with block_style 'single' are deliberately one block; a one-paragraph unit beside five-block units is a Step 5 layout problem, never a copy gap to fill.",
       "An entry's 'intro' renders above its blocks, verbatim (8.1b's no-referral lead-in is the trust moment on that tile).",
       "Slots suffixed _display (statuses, counts, descriptions) are formatted by the deterministic renderer from the listed fields: formatting, never characterisation.",
-      "A missing field renders as 'none recorded', never as zero. (Fixture H, field-spec 3.6.)"
+      "A missing field renders as 'none recorded', never as zero. (Fixture H, field-spec 3.6.)",
+      "route_primary/route_also (component-spec 5.2): a fixed property of the insight, never derived from the person. An insight appears once under its primary professional on the who-to-see view; route_also professionals are named inline beneath it, never given a duplicate entry.",
+      "no_referral: true means the entry has NO action button, NO route_primary and NO professional card. Where a counsellor appears in its copy, they are named as available, never prescribed.",
+      "section_b is absent ONLY where a calc block demonstrates the same mechanic (tiles 1 and 2). On tiles 3-9 the mechanic is about what a product does, not how numbers relate, so section_b stays (component-spec 4.1).",
+      "Each tile carries a calm block {statement, why, what_would_change[], closing} rendered when the tile has figures and zero insights. why is a property of the situation type, never a judgment of the person; what_would_change lists circumstances; closing says why each matters. Never a tick, never green, never a completion state (component-spec 3.6, education-library 6.2).",
+      "professionals: cost belongs to the professional, not the insight. cost_pill and cost_line render once on the who-to-see view, never per insight (component-spec 2.6)."
     ]
   },
+  "professionals": {
+    "mortgage_broker": {
+      "name": "Mortgage broker",
+      "role": "Looks across a lot of lenders at once rather than one, and handles the comparison and the paperwork.",
+      "cost_pill": "Usually free",
+      "cost_line": "Most brokers charge you nothing. They're paid a commission by the lender when a loan settles. A few charge a fee in complex situations, and they have to tell you before you start."
+    },
+    "financial_planner": {
+      "name": "Financial planner",
+      "role": "Helps you work out what you're aiming at and how the pieces fit together, based on what matters to you.",
+      "cost_pill": "Varies",
+      "cost_line": "Usually a first conversation at no cost to see whether it's a fit. If you go ahead there's a fee for the written advice, and often an ongoing fee if you keep them on. The amounts vary a lot, and they tell you before anything is agreed."
+    },
+    "insurance_specialist": {
+      "name": "Insurance specialist",
+      "role": "Works out what cover you actually hold, what it would pay and when, and where the gaps sit for a household like yours.",
+      "cost_pill": "Usually free",
+      "cost_line": "Generally paid a commission by the insurer rather than a fee by you. Some charge a fee instead, and will say so upfront."
+    },
+    "estate_lawyer": {
+      "name": "Estate planning lawyer",
+      "role": "Prepares the documents that decide what happens to what you own, and who looks after the children, so they actually do what you intend.",
+      "cost_pill": "Fixed price",
+      "cost_line": "Usually a set price for a will and the related documents, quoted before they start. For a straightforward situation it's often less than people expect."
+    },
+    "accountant": {
+      "name": "Accountant",
+      "role": "Looks at where your income comes from and how it's structured, and handles the tax that follows from it.",
+      "cost_pill": "Fee, often deductible",
+      "cost_line": "A fee for the work, often a set price for a return and hourly for advice. Accounting fees are generally deductible, so part of it comes back."
+    },
+    "financial_counsellor": {
+      "name": "Financial counsellor",
+      "role": "Free, independent help for people having trouble with debt. Not a salesperson and not a lender.",
+      "cost_pill": "Free",
+      "cost_line": "Free, always. They're on your side entirely, and you don't have to be in crisis to call one."
+    }
+  },
   "tiles": {
-    "1": { "title": "Your home and mortgage", "section_b": "Your equity is the part of the property you own outright, which is the value less what's still owing. The rate is what the loan costs you to carry, and on a variable rate it can move. An offset account reduces the balance interest is charged on by whatever is sitting in it, and the money stays available to you the whole time." },
-    "2": { "title": "What's left over each month", "section_b": "What's left over is what remains once everything that has to be paid has been paid. The figure here starts from take-home pay rather than gross, then takes off your living costs, your housing repayment, and the minimum payments on any other debts you carry. It doesn't account for the irregular things, the car registration or the school costs that land a few times a year, so the real figure across a full year is usually a little lower." },
-    "3": { "title": "Your safety net", "section_b": "Your safety net is money you could reach quickly, without selling anything or asking anyone's permission. The months figure is that amount divided by what a month of your life costs, so it's expressed as time rather than dollars. It counts only money you already hold. Credit you could draw on isn't included, because that belongs to a lender rather than to you." },
-    "4": { "title": "Your super", "section_b": "Super is money held for you until retirement, in one account or several. Each account charges its own fees, taken out of the balance rather than billed to you, so they're easy not to notice. Accounts can also hold insurance inside them, with the premiums coming out of the balance the same way." },
-    "5": { "title": "Protection", "section_b": "Life cover pays a lump sum if you die. Total and permanent disability cover pays if you're permanently unable to work again. Income protection is a different thing again, it replaces part of your income month to month while you're unable to work, and stops when you go back. They're three separate events, and holding cover for one doesn't cover you for the others." },
-    "6": { "title": "Your will and estate", "section_b": "A will directs what happens to what you own. An enduring power of attorney lets someone you choose make decisions on your behalf if you're unable to, while you're still alive, which a will doesn't cover. Guardianship names who would raise your children. A super nomination directs your super, which is dealt with separately from your will." },
-    "7": { "title": "Your investments", "section_b": "An investment property has its own value, its own loan and its own equity, in the same way your home does. The rent it earns is income, and the interest on its loan is treated differently at tax time from the interest on the loan for the home you live in. For shares and funds, what they earn is taxed at the marginal rate of whoever the asset is held by, so whose name is on it changes what it costs." },
-    "8": { "title": "Your other debts", "section_b": "The minimum repayment on a credit card is calculated as a small percentage of the balance, which means most of an early payment goes to interest rather than the debt. It's why a balance at 20% moves slowly even when the minimum is met every month." },
-    "9": { "title": "How your income is made up", "section_b": "Income from an employer has tax taken out before it reaches you, and the employer pays super on top of it. Income you earn for yourself arrives whole, with the tax on it settled later, and no super attached unless you arrange it yourself. The total here is annual and before tax, so it won't match what actually lands in your account each month." }
+    "1": {
+      "title": "Your home and mortgage",
+      "calm": { "statement": "[Not provided - being written. Do not invent.]", "why": "[Not provided - being written. Do not invent.]", "what_would_change": [], "closing": "[Not provided - being written. Do not invent.]" }
+    },
+    "2": {
+      "title": "What's left over each month",
+      "calm": { "statement": "[Not provided - being written. Do not invent.]", "why": "[Not provided - being written. Do not invent.]", "what_would_change": [], "closing": "[Not provided - being written. Do not invent.]" }
+    },
+    "3": {
+      "title": "Your safety net",
+      "section_b": "Your safety net is money you could reach quickly, without selling anything or asking anyone's permission. The months figure is that amount divided by what a month of your life costs, so it's expressed as time rather than dollars. It counts only money you already hold. Credit you could draw on isn't included, because that belongs to a lender rather than to you.",
+      "calm": { "statement": "[Not provided - being written. Do not invent.]", "why": "[Not provided - being written. Do not invent.]", "what_would_change": [], "closing": "[Not provided - being written. Do not invent.]" }
+    },
+    "4": {
+      "title": "Your super",
+      "section_b": "Super is money held for you until retirement, in one account or several. Each account charges its own fees, taken out of the balance rather than billed to you, so they're easy not to notice. Accounts can also hold insurance inside them, with the premiums coming out of the balance the same way.",
+      "calm": { "statement": "[Not provided - being written. Do not invent.]", "why": "[Not provided - being written. Do not invent.]", "what_would_change": [], "closing": "[Not provided - being written. Do not invent.]" }
+    },
+    "5": {
+      "title": "Protection",
+      "section_b": "Life cover pays a lump sum if you die. Total and permanent disability cover pays if you're permanently unable to work again. Income protection is a different thing again, it replaces part of your income month to month while you're unable to work, and stops when you go back. They're three separate events, and holding cover for one doesn't cover you for the others.",
+      "calm": { "statement": "[Not provided - being written. Do not invent.]", "why": "[Not provided - being written. Do not invent.]", "what_would_change": [], "closing": "[Not provided - being written. Do not invent.]" }
+    },
+    "6": {
+      "title": "Your will and estate",
+      "section_b": "A will directs what happens to what you own. An enduring power of attorney lets someone you choose make decisions on your behalf if you're unable to, while you're still alive, which a will doesn't cover. Guardianship names who would raise your children. A super nomination directs your super, which is dealt with separately from your will.",
+      "calm": { "statement": "[Not provided - being written. Do not invent.]", "why": "[Not provided - being written. Do not invent.]", "what_would_change": [], "closing": "[Not provided - being written. Do not invent.]" }
+    },
+    "7": {
+      "title": "Your investments",
+      "section_b": "An investment property has its own value, its own loan and its own equity, in the same way your home does. The rent it earns is income, and the interest on its loan is treated differently at tax time from the interest on the loan for the home you live in. For shares and funds, what they earn is taxed at the marginal rate of whoever the asset is held by, so whose name is on it changes what it costs.",
+      "calm": { "statement": "[Not provided - being written. Do not invent.]", "why": "[Not provided - being written. Do not invent.]", "what_would_change": [], "closing": "[Not provided - being written. Do not invent.]" }
+    },
+    "8": {
+      "title": "Your other debts",
+      "section_b": "The minimum repayment on a credit card is calculated as a small percentage of the balance, which means most of an early payment goes to interest rather than the debt. It's why a balance at 20% moves slowly even when the minimum is met every month.",
+      "calm": { "statement": "[Not provided - being written. Do not invent.]", "why": "[Not provided - being written. Do not invent.]", "what_would_change": [], "closing": "[Not provided - being written. Do not invent.]" }
+    },
+    "9": {
+      "title": "How your income is made up",
+      "section_b": "Income from an employer has tax taken out before it reaches you, and the employer pays super on top of it. Income you earn for yourself arrives whole, with the tax on it settled later, and no super attached unless you arrange it yourself. The total here is annual and before tax, so it won't match what actually lands in your account each month.",
+      "calm": {
+        "statement": "Nothing here routes to anyone.",
+        "why": "When income comes from an employer, the tax is settled before it reaches you and super goes in on top automatically. There's no structure sitting underneath it to review, so there's no conversation to have.",
+        "what_would_change": ["Contracting or work under an ABN", "A business, however small", "Rent from a property", "Money paid through a trust or a company"],
+        "closing": "Each of those brings tax you settle yourself rather than an employer settling it, and super nobody pays for you unless you arrange it. That's when this becomes an accountant's conversation."
+      }
+    }
   },
   "insights": [
     {
       "id": "1.1",
       "tile": 1,
       "variant": null,
-      "route": "mortgage_broker",
+      "route_primary": "mortgage_broker",
+      "route_also": [],
       "position_line": {
         "template": "Your loan is at {rate_percent}% ({rate_type}), and you've been with {lender} since {with_lender_since}.",
         "fields": ["home.rate_percent", "home.rate_type", "home.lender", "home.with_lender_since"]
@@ -46,7 +129,8 @@
       "id": "1.2",
       "tile": 1,
       "variant": null,
-      "route": "mortgage_broker",
+      "route_primary": "mortgage_broker",
+      "route_also": [],
       "position_line": {
         "template": "Your offset account holds {offset_balance}, against a loan balance of {mortgage_balance}.",
         "fields": ["home.offset_balance", "home.mortgage_balance", "home.package_fee_annual"]
@@ -64,7 +148,8 @@
       "id": "1.3",
       "tile": 1,
       "variant": null,
-      "route": "broker_or_planner",
+      "route_primary": "mortgage_broker",
+      "route_also": ["financial_planner"],
       "position_line": {
         "template": "Your equity in the home is {home_equity}, with the loan at {lvr_percent}% of the home's value.",
         "fields": ["derived.home_equity", "derived.lvr_percent"]
@@ -82,7 +167,8 @@
       "id": "2.1",
       "tile": 2,
       "variant": null,
-      "route": "planner_or_accountant",
+      "route_primary": "financial_planner",
+      "route_also": ["accountant"],
       "position_line": {
         "template": "About {surplus_monthly} is left in a typical month after living costs and housing.",
         "fields": ["derived.surplus_monthly"]
@@ -97,10 +183,32 @@
       "action_label": "Find a financial planner"
     },
     {
+      "id": "2.2",
+      "tile": 2,
+      "variant": null,
+      "no_referral": true,
+      "route_primary": null,
+      "route_also": [],
+      "position_line": {
+        "template": "On these figures, what goes out each month is a little more than what comes in.",
+        "fields": ["derived.surplus_monthly", "debts.items"]
+      },
+      "block_style": "inline_headings",
+      "blocks": {
+        "why": "The figure is a snapshot, not a verdict\n\nThis number is built from what you told Finn about a typical month. It doesn't know about the quiet months, or the ones where the car registration and the school costs land together. Most households come out differently across a full year than they do in any single month, so the useful thing here is the shape of it rather than the precision.",
+        "turn_up": "Where the gap usually comes from\n\nFor most households it isn't one big thing. It's that the regular costs have crept up over a few years while the income hasn't, or that direct debits set up at different times have quietly accumulated. Debts with high minimum payments do it faster than anything else, because those minimums come out before anything is left.",
+        "dont_realise": "What people do about it\n\nOnly two things move this number, what comes in and what goes out, and neither is a small thing to change. What tends to help first is seeing every regular payment in one place, because the ones people find are almost always the ones they'd forgotten they were still paying for.",
+        "how_professional": "There's no referral here, and that's deliberate\n\nFinn doesn't have anyone on its list for this one. Planners don't generally take on work at this scale and the fee would be larger than the problem, and we won't point you at the businesses that advertise debt help. So instead of a referral, that's what's worth knowing.",
+        "nothing_to_prepare": "If it's causing real stress\n\nFinancial counsellors are free, they're on your side entirely, and you don't have to be in crisis to call one. The National Debt Helpline is 1800 007 007. There's no cost and no catch. It's there if you want it."
+      },
+      "action_label": null
+    },
+    {
       "id": "3.1",
       "tile": 3,
       "variant": null,
-      "route": "planner",
+      "route_primary": "financial_planner",
+      "route_also": [],
       "position_line": {
         "template": "Your accessible savings would cover about {buffer_months} months of your usual outgoings.",
         "fields": ["derived.buffer_months", "context.children", "income.structure"]
@@ -118,7 +226,8 @@
       "id": "3.2a",
       "tile": 3,
       "variant": "has_offset",
-      "route": "mortgage_broker",
+      "route_primary": "mortgage_broker",
+      "route_also": [],
       "position_line": {
         "template": "Your safety net of {accessible_savings} is held in {where_held}, separately from your loan.",
         "fields": ["buffer.accessible_savings", "buffer.where_held"]
@@ -136,7 +245,8 @@
       "id": "3.2b",
       "tile": 3,
       "variant": "no_offset",
-      "route": "mortgage_broker",
+      "route_primary": "mortgage_broker",
+      "route_also": [],
       "position_line": {
         "template": "Your safety net of {accessible_savings} is held in {where_held}, and your loan has no offset account attached.",
         "fields": ["buffer.accessible_savings", "buffer.where_held"]
@@ -155,7 +265,8 @@
       "id": "4.1",
       "tile": 4,
       "variant": null,
-      "route": "planner",
+      "route_primary": "financial_planner",
+      "route_also": [],
       "position_line": {
         "template": "{owner_display} holds {fund_count_display} super accounts.",
         "fields": ["super.funds"]
@@ -173,7 +284,8 @@
       "id": "5.1",
       "tile": 5,
       "variant": null,
-      "route": "risk_specialist_or_planner",
+      "route_primary": "insurance_specialist",
+      "route_also": ["financial_planner"],
       "position_line": {
         "template": "Cover recorded: life {life_display}, income protection {ip_display}, TPD {tpd_display}, trauma {trauma_display}.",
         "fields": ["protection.life", "protection.income_protection", "protection.tpd", "protection.trauma", "context", "home.mortgage_balance"]
@@ -191,7 +303,8 @@
       "id": "6.1",
       "tile": 6,
       "variant": null,
-      "route": "estate_lawyer",
+      "route_primary": "estate_lawyer",
+      "route_also": [],
       "position_line": {
         "template": "Recorded: will {will_display}, power of attorney {poa_display}, guardianship {guardianship_display}, super nomination {nomination_display}.",
         "fields": ["estate.will", "estate.poa", "estate.guardianship", "estate.super_nomination", "context.children"]
@@ -209,7 +322,8 @@
       "id": "7.1",
       "tile": 7,
       "variant": null,
-      "route": "broker_planner_accountant",
+      "route_primary": "mortgage_broker",
+      "route_also": ["financial_planner", "accountant"],
       "position_line": {
         "template": "Investment property valued around {property_value}, with {property_loan} owing and rent of {rental_income_annual} a year.",
         "fields": ["investments.properties", "income.rental_income_annual"]
@@ -227,7 +341,8 @@
       "id": "7.2",
       "tile": 7,
       "variant": null,
-      "route": "planner",
+      "route_primary": "financial_planner",
+      "route_also": [],
       "ownership_block": { "block": "dont_realise", "paragraph": 0 },
       "position_line": {
         "template": "Investments of {investments_total_display}, held in {held_in}.",
@@ -246,7 +361,8 @@
       "id": "8.1a",
       "tile": 8,
       "variant": "has_mortgage",
-      "route": "mortgage_broker",
+      "route_primary": "mortgage_broker",
+      "route_also": [],
       "position_line": {
         "template": "Debts outside the mortgage total {debts_total}, across {debt_count_display} items.",
         "fields": ["debts.items", "derived.debts_total"]
@@ -264,7 +380,9 @@
       "id": "8.1b",
       "tile": 8,
       "variant": "no_mortgage",
-      "route": "national_debt_helpline",
+      "no_referral": true,
+      "route_primary": null,
+      "route_also": [],
       "position_line": {
         "template": "Debts total {debts_total}, across {debt_count_display} items.",
         "fields": ["debts.items", "derived.debts_total"]
@@ -278,13 +396,14 @@
         "how_professional": "And a free option worth knowing about\n\nFinancial counsellors are free, they're on your side entirely, and you don't have to be in crisis to call one. The National Debt Helpline is 1800 007 007. There's no cost and no catch.",
         "nothing_to_prepare": "[Not provided - docs/education-library.md gives 8.1b the four-part no-referral content only; no 'nothing to prepare' block exists for this variant]"
       },
-      "action_label": "About the National Debt Helpline"
+      "action_label": null
     },
     {
       "id": "9.1",
       "tile": 9,
       "variant": null,
-      "route": "accountant",
+      "route_primary": "accountant",
+      "route_also": [],
       "position_line": {
         "template": "Your income is made up as {structure_display}.",
         "fields": ["income.structure", "income.entity", "income.employer_super_on", "income.business_income_annual"]
@@ -304,7 +423,8 @@
       "id": "hardship",
       "tile": 8,
       "variant": null,
-      "route": "financial_counsellor",
+      "route_primary": "financial_counsellor",
+      "route_also": [],
       "position_line": {
         "template": "Debts total {debts_total}, across {debt_count_display} items.",
         "fields": ["debts.items", "derived.debts_total"]

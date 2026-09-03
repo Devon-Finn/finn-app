@@ -332,9 +332,10 @@ A visible tile with no firing insight is a valid and intended state. It shows th
 | # | Insight | Fires when | Reads | Route |
 |---|---|---|---|---|
 | 1.1 | Rate and loan setup | `home.owns_home` AND `mortgage_balance > 0` | `rate_percent`, `rate_type`, `lender`, `with_lender_since` | Mortgage broker |
-| 1.2 | Offset account | `home.has_offset = true` | `offset_balance`, `mortgage_balance`, `package_fee_annual` | Mortgage broker |
+| 1.2 | Offset account | `home.has_offset = true` **AND** `home.offset_balance = 0` (asked and answered zero, never null) | `offset_balance`, `package_fee_annual` | Mortgage broker |
 | 1.3 | Equity | `home_equity > 0` | `home_equity`, `lvr_percent` | Broker / planner |
 | 2.1 | Spare money | `surplus_monthly > 0` | `surplus_monthly` | Planner / accountant |
+| 2.2 | Nothing left over | `surplus_monthly <= 0` **and** computable (never on null) | `surplus_monthly`, `debts.items[]` | **No paid referral.** Education, with the counsellor named as available. |
 | 3.1 | How long it would last | Always, where `expenses` is present | `buffer_months`, `context.children`, `income.structure` | Planner |
 | 3.2a | Where it sits — has offset | `has_offset = true` AND `buffer.linked_to_loan = false` AND `accessible_savings > 0` | `accessible_savings`, `offset_balance` | Mortgage broker |
 | 3.2b | Where it sits — no offset | `owns_home = true` AND `has_offset = false` AND `accessible_savings > 0` | `accessible_savings` | Mortgage broker |
@@ -355,6 +356,8 @@ Recorded because a lawyer will ask, and because they are easy to reintroduce by 
 - **Nothing fires on `extra_contributions = false`.** Super contributions as a tax lever is product advice. Finn shows the income and leaves that door for the planner.
 - **No insight fires on a comparison to a benchmark.** There are no benchmarks in this system.
 - **No insight fires on portfolio composition.** Allocation is displayed as fact and never evaluated.
+- **1.2 does not fire merely because an offset exists.** Someone with money in their offset already has the arrangement working and has no question to take anyone. Deciding whether their balance is "enough" to justify the package fee would be an evaluation of their position. An offset holding nothing is a different thing: the fee is charged and the benefit is zero, which is mechanically true whatever their circumstances. The package-fee knowledge otherwise lives in 1.1, where a broker reviewing the loan would look at it anyway.
+- **2.1 and 2.2 are mutually exclusive, and neither fires on a null surplus.** A null means the inputs were ambiguous, not that the money is tight. Assert the exclusivity in tests.
 - **No insight fires on a domain that was never reached.** An all-null domain means the conversation didn't get there, not that the answer is no. Finn cannot say something is worth a conversation when it has no idea what the person holds. This is the `null` vs `false` convention applied to triggering, and it is why 5.1 conditions on the protection domain having been asked rather than firing always.
 
 ## 3.4 Precedence
@@ -436,7 +439,7 @@ Each step is one Claude Code prompt. Do not combine them.
 |---|---|---|
 | 1 | Migrate the capture schema to Part 2 | New domains exist; legacy records identifiable via `includes_housing` and the retyped protection shape |
 | 2 | Extend the 3a system prompt to collect the new fields | Context, expenses split, `has_offset`, investment property, income structure, hardship signal all captured in conversation |
-| 3 | Land the library as a content file per Part 4 | Fifteen entries plus the hardship override, no copy in components |
+| 3 | Land the library as a content file per Part 4 | Sixteen entries plus the hardship override, no copy in components |
 | 4 | Build the trigger engine as a pure function | All eight fixtures in 3.6 pass |
 | 5 | Build the panel components, sections A/B/C | Renders fixture H without crashing or inventing zeroes |
 | 6 | Wire it together and merge `clarity-3b` | End to end on all fixtures |
@@ -447,4 +450,4 @@ Each step is one Claude Code prompt. Do not combine them.
 
 ---
 
-*Companion to Finn-Insight-Education-Library.md. Thirteen insights, nine tiles, one deterministic path from data to display.*
+*Companion to Finn-Insight-Education-Library.md. Fourteen insights, nine tiles, one deterministic path from data to display.*

@@ -301,6 +301,9 @@ const V2_ENUMS = {
   structure: ["paye", "sole_trader", "company", "trust", "mixed"],
   debt_type: ["credit_card", "personal_loan", "car_loan", "bnpl", "tax_debt", "other"],
   confidence: ["stated", "estimated", "inferred"],
+  // component-spec 5.1: a holiday house is neither the home they live in
+  // nor an investment, and needs somewhere to go.
+  property_use: ["investment", "holiday", "other"],
 };
 const COVER = { held: BOOL, amount: MONEY, inside_super: BOOL };
 const ESTATE_DOC = { in_place: "docstate", last_updated: STR };
@@ -310,11 +313,11 @@ const V2_SCHEMA = {
   income: { salary_gross_annual: MONEY, salary_net_monthly: MONEY, partner_salary_gross_annual: MONEY, partner_salary_net_monthly: MONEY, business_income_annual: MONEY, rental_income_annual: MONEY, other_income_annual: MONEY, structure: { enum: "structure" }, entity: { object: { type: STR, name: STR } }, employer_super_on: { array: STR } },
   expenses: { living_monthly: MONEY, includes_housing: BOOL, housing_repayment_monthly: MONEY },
   home: { owns_home: BOOL, value_estimate: MONEY, value_source: STR, mortgage_balance: MONEY, rate_percent: RATE, rate_type: STR, lender: STR, with_lender_since: STR, repayment_monthly: MONEY, term_remaining_years: INT, has_offset: BOOL, offset_balance: MONEY, package_fee_annual: MONEY },
-  buffer: { accessible_savings: MONEY, where_held: STR, linked_to_loan: BOOL, counts_credit_as_buffer: BOOL },
+  buffer: { accessible_savings: MONEY, where_held: STR, linked_to_loan: BOOL, counts_credit_as_buffer: BOOL, other_cash: MONEY, other_cash_where_held: STR },
   super: { funds: { array: { fund: STR, owner: STR, balance: MONEY, has_insurance: BOOL } }, multiple_accounts: BOOL, extra_contributions: BOOL },
   protection: { life: { object: COVER }, tpd: { object: COVER }, income_protection: { object: COVER }, trauma: { object: COVER } },
   estate: { will: { object: ESTATE_DOC }, poa: { object: ESTATE_DOC }, guardianship: { object: ESTATE_DOC }, super_nomination: { object: { ...ESTATE_DOC, binding: BOOL } } },
-  investments: { shares_value: MONEY, held_in: STR, managed_funds_value: MONEY, properties: { array: { value_estimate: MONEY, loan_balance: MONEY, rate_percent: RATE, repayment_type: STR, rent_monthly: MONEY, held_in: STR } } },
+  investments: { shares_value: MONEY, held_in: STR, managed_funds_value: MONEY, properties: { array: { value_estimate: MONEY, loan_balance: MONEY, rate_percent: RATE, repayment_type: STR, rent_monthly: MONEY, held_in: STR, use: { enum: "property_use" } } } },
   debts: { items: { array: { type: { enum: "debt_type" }, balance: MONEY, rate_percent: RATE, minimum_monthly: MONEY } }, hecs_balance: MONEY },
   flags: { hardship: BOOL, hardship_signal: STR },
 };
@@ -441,7 +444,7 @@ function isV2Domains(d) {
   const inc = d.income;
   if (inc && ["salary_gross_annual", "salary_net_monthly", "partner_salary_gross_annual", "partner_salary_net_monthly", "business_income_annual", "rental_income_annual", "structure", "entity", "employer_super_on"].some(k => k in inc)) return true;
   const b = d.buffer;
-  if (b && ["where_held", "linked_to_loan", "counts_credit_as_buffer"].some(k => k in b)) return true;
+  if (b && ["where_held", "linked_to_loan", "counts_credit_as_buffer", "other_cash", "other_cash_where_held"].some(k => k in b)) return true;
   const s = d.super;
   if (s && Array.isArray(s.funds) && s.funds.some(f => f && typeof f === "object" && "has_insurance" in f)) return true;
   return false;
