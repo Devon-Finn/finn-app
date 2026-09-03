@@ -40,9 +40,8 @@
         buffer: { accessible_savings: 30000, where_held: 'savings account', linked_to_loan: false, _confidence: 'stated' },
         estate: { ...estateQuiet, _confidence: 'stated' },
       },
-      expect: ['1.1', '1.2', '1.3', '2.1', '3.1', '3.2a'],
-      mustNotFire: ['3.2b', '5.1'],
-      tileFlags: { 1: { lender_paid_note_once: true } },
+      expect: ['1.1', '1.3', '2.1', '3.1', '3.2a'],
+      mustNotFire: ['3.2b', '5.1', '1.2', '2.2'],
     },
     {
       name: 'C — mortgage, no offset, savings',
@@ -127,6 +126,30 @@
       expect: ['4.1'],
     },
     {
+      name: '1.2-empty-offset — an offset holding nothing fires; a funded one never does',
+      domains: {
+        income: { salary_net_monthly: 6800, structure: 'paye', _confidence: 'stated' },
+        expenses: { living_monthly: 4200, includes_housing: false, housing_repayment_monthly: 2100, _confidence: 'stated' },
+        home: { owns_home: true, value_estimate: 700000, mortgage_balance: 420000, rate_percent: 6.1, has_offset: true, offset_balance: 0, package_fee_annual: 395, _confidence: 'stated' },
+        estate: { ...estateQuiet, _confidence: 'stated' },
+      },
+      expect: ['1.1', '1.2', '1.3', '2.1', '3.1'],
+      tileFlags: { 1: { lender_paid_note_once: true } },
+    },
+    {
+      name: '2.2-nothing-left — computable zero-or-negative surplus fires 2.2, never 2.1',
+      domains: {
+        income: { salary_net_monthly: 5100, structure: 'paye', _confidence: 'stated' },
+        expenses: { living_monthly: 4200, includes_housing: false, housing_repayment_monthly: 1300, _confidence: 'stated' },
+        home: { owns_home: false, _confidence: 'stated' },
+        debts: { items: [ { type: 'credit_card', balance: 4100, rate_percent: 20.99, minimum_monthly: 95 } ], _confidence: 'stated' },
+        flags: { hardship: false },
+        estate: { ...estateQuiet, _confidence: 'stated' },
+      },
+      expect: ['2.2', '3.1', '8.1b'],
+      mustNotFire: ['2.1', '8.1a'],
+    },
+    {
       name: '5.1-reached — protection reached with a confirmed absence fires',
       domains: {
         protection: { life: { held: false, amount: null, inside_super: null }, tpd: { held: null, amount: null, inside_super: null }, income_protection: { held: null, amount: null, inside_super: null }, trauma: { held: null, amount: null, inside_super: null }, _confidence: 'stated' },
@@ -175,6 +198,11 @@
       // 3.4 construction assertion — never both offset variants.
       if (result.insight_ids.includes('3.2a') && result.insight_ids.includes('3.2b')) {
         failures.push(`${fx.name}: 3.2a and 3.2b both fired — exclusivity broken`);
+      }
+      // 2.1 and 2.2 are mutually exclusive, and neither fires on a null
+      // surplus (field-spec 3.3 explicit non-trigger).
+      if (result.insight_ids.includes('2.1') && result.insight_ids.includes('2.2')) {
+        failures.push(`${fx.name}: 2.1 and 2.2 both fired — exclusivity broken`);
       }
     }
     return { pass: failures.length === 0, total: FIXTURES.length, failures };

@@ -80,9 +80,18 @@
     const fires = {};
 
     fires['1.1'] = home.owns_home === true && hasMortgage;
-    fires['1.2'] = home.has_offset === true;
+    // 1.2 — fires only on an offset holding NOTHING: asked and answered
+    // zero, never null. Someone with money in their offset has the
+    // arrangement working and no question to take anyone; judging whether
+    // their balance is "enough" would be an evaluation (explicit
+    // non-trigger, field-spec 3.3).
+    fires['1.2'] = home.has_offset === true && num(home.offset_balance) !== null && home.offset_balance === 0;
     fires['1.3'] = pos(derived.home_equity);
     fires['2.1'] = pos(derived.surplus_monthly);
+    // 2.2 — nothing left over: surplus zero or negative AND computable.
+    // Null means the inputs were ambiguous, not that the money is tight;
+    // 2.1 and 2.2 are mutually exclusive by construction (>0 vs <=0).
+    fires['2.2'] = num(derived.surplus_monthly) !== null && derived.surplus_monthly <= 0;
     fires['3.1'] = expensesPresent;
     fires['3.2a'] = home.has_offset === true && buf.linked_to_loan === false && pos(buf.accessible_savings);
     fires['3.2b'] = home.owns_home === true && home.has_offset === false && pos(buf.accessible_savings);
@@ -135,7 +144,7 @@
 
     // Assemble in fixed order (3.5): tiles 1..9, insights numeric within.
     const TILE_INSIGHTS = {
-      1: ['1.1', '1.2', '1.3'], 2: ['2.1'], 3: ['3.1', '3.2a', '3.2b'],
+      1: ['1.1', '1.2', '1.3'], 2: ['2.1', '2.2'], 3: ['3.1', '3.2a', '3.2b'],
       4: ['4.1'], 5: ['5.1'], 6: ['6.1'], 7: ['7.1', '7.2'],
       8: ['8.1a', '8.1b'], 9: ['9.1'],
     };
