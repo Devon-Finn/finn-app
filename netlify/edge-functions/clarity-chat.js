@@ -158,7 +158,7 @@ The spirit: you gather WITH them, you explain WHY it's worth it, and you hold th
 
 **You do not accept not knowing. You convert it into finding out.** This is not a new rule. The locked USP is "when you don't know a number, Finn tells you exactly where to find it." That is the accompaniment promise and it is what separates a Clarity Session from a form. Five rules make it real:
 
-1. NEVER pre-soften the ask. No "roughly", "approximately", "a ballpark", or "if you're not sure" before they have tried. Ask the real question. Soften only after they say they don't know. Wrong: "Do you know roughly how many years are left?" Right: "How many years are left on the loan?"
+1. NEVER pre-soften the ask. No "roughly", "approximately", "a ballpark", or "if you're not sure" before they have tried. Ask the real question. Soften only after they say they don't know. Wrong: "Do you know roughly how many years are left?" Right: "How many years are left on the loan?" This applies to RETRIEVABLE FACTS, which are printed somewhere: a rate, a balance, a term, a repayment, a cover amount, a super balance, the date on a will. There is a document or a screen that has the answer, so never pre-soften these. ESTIMATED QUANTITIES have no document: what a household spends in a typical month, what the place might be worth. Nobody can retrieve these, and demanding precision produces false precision, which is worse than an honest estimate. "Roughly" is correct for an estimate and wrong for a fact. The test: is there a screen or a statement with the answer on it? If yes, ask straight. If no, "roughly" is honest. This maps onto _confidence: a retrieved fact is "stated", an estimate is "estimated". If you are about to write "estimated", softening the ask was appropriate. If you are about to write "stated", it wasn't.
 2. When they don't know, give the retrieval path and stay on it. Name the specific place, then offer to wait: "It'll be on your most recent super statement, or in the fund's app under a heading like Insurance or Cover. Have a look now if you can, I'll wait."
 3. Offer to do the work. The upload is there for this. The input accepts a statement or a screenshot. Say so: "Or screenshot the page and drop it in here, and I'll pull the numbers out." That single sentence is the product. Use it whenever a document would settle the question.
 4. NEVER offer the deferral in the same breath as the help. "Or make a note to check later" alongside "we can do it now" means everyone takes the deferral. Deferral is the fallback after retrieval has actually been attempted and failed, never an option presented in parallel.
@@ -647,6 +647,72 @@ function parseCapture(fullText) {
   return null;
 }
 
+/* Deterministic em-dash substitution in the VISIBLE reply stream only
+   (Devon's ruling): the brand ban stays in the prompt (belt and braces),
+   and this makes it mechanical rather than hoping the model complies.
+   — becomes ", " which matches the house comma rhythm the no-em-dash rule
+   was implemented with across the education library. Never applied inside
+   the [CAPTURE] machine block (the boundary is tracked across deltas) and
+   never to stored data; en-dashes (–) are untouched, ranges like 30–90
+   days are legitimate. Every substitution is counted and logged so the
+   leak rate stays visible over time instead of being silently papered
+   over. */
+function emDashScrubStream() {
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let lineBuf = "";
+  let seenText = ""; // cumulative model text, to locate the [CAPTURE] boundary
+  let substitutions = 0;
+
+  function scrub(s) {
+    return s.replace(/\s*—\s*/g, () => { substitutions++; return ", "; });
+  }
+
+  function scrubDelta(text) {
+    const full = seenText + text;
+    const markerIx = full.indexOf("[CAPTURE]");
+    let out;
+    if (markerIx === -1) {
+      out = scrub(text);
+    } else {
+      const boundary = markerIx - seenText.length;
+      out = boundary <= 0 ? text : scrub(text.slice(0, boundary)) + text.slice(boundary);
+    }
+    seenText = full;
+    return out;
+  }
+
+  return new TransformStream({
+    transform(chunk, controller) {
+      lineBuf += decoder.decode(chunk, { stream: true });
+      const lines = lineBuf.split("\n");
+      lineBuf = lines.pop();
+      for (const line of lines) {
+        let outLine = line;
+        if (line.startsWith("data: ")) {
+          const raw = line.slice(6).trim();
+          if (raw && raw !== "[DONE]") {
+            try {
+              const evt = JSON.parse(raw);
+              if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
+                evt.delta.text = scrubDelta(evt.delta.text);
+                outLine = "data: " + JSON.stringify(evt);
+              }
+            } catch {}
+          }
+        }
+        controller.enqueue(encoder.encode(outLine + "\n"));
+      }
+    },
+    flush(controller) {
+      if (lineBuf) controller.enqueue(encoder.encode(lineBuf));
+      if (substitutions > 0) {
+        console.log(`[Finn clarity] em-dash substitutions in visible reply: ${substitutions}`);
+      }
+    },
+  });
+}
+
 async function accumulateStreamText(stream) {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
@@ -906,7 +972,7 @@ export default async function handler(request, context) {
     })
   );
 
-  return new Response(clientStream, {
+  return new Response(clientStream.pipeThrough(emDashScrubStream()), {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",

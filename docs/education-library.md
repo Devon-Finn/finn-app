@@ -60,6 +60,18 @@ No "roughly", "approximately", "a ballpark", or "if you're not sure" before they
 - Wrong: "Do you know roughly how many years are left?"
 - Right: "How many years are left on the loan?"
 
+**Retrievable facts versus estimates.**
+
+RETRIEVABLE FACTS are printed somewhere. A rate, a balance, a term, a repayment, a cover amount, a super balance, the date on a will. There is a document or a screen that has the answer. Never pre-soften these. Ask the real question, and when they don't know, run the retrieval.
+
+ESTIMATED QUANTITIES have no document. What a household spends in a typical month. What the place might be worth. Nobody can retrieve these, and demanding precision produces false precision, which is worse than an honest estimate.
+
+"Roughly" is correct for an estimate and wrong for a fact. The test: is there a screen or a statement with the answer on it? If yes, ask straight. If no, "roughly" is honest.
+
+This maps onto a field that already exists. A retrieved fact is _confidence "stated". An estimate is _confidence "estimated". If Finn is about to write "estimated", softening the ask was appropriate. If it's about to write "stated", it wasn't.
+
+The T4 leak — "the interest rate if you know it" — is a retrievable fact and should not have been softened.
+
 **2 · When they don't know, give the retrieval path and stay on it.**
 Name the specific place, then offer to wait.
 
