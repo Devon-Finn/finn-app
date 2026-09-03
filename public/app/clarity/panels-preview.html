@@ -4,44 +4,48 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Finn panel preview (fixtures only)</title>
-<!-- Step 5 review harness. Renders the trigger-engine fixtures through the
-     panel components. FIXTURE DATA ONLY — no real household data is loaded
-     or loadable here; there is no auth and no Supabase call on this page.
-     Remove before merge if preferred. -->
+<link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/shared/finn-components.css">
+<!-- Step 4/5 review harness. Renders the trigger-engine fixtures through
+     the component-built panels. FIXTURE DATA ONLY: no auth, no data calls
+     beyond static files. Remove before merge. -->
 <style>
-  body { font: 15px/1.55 -apple-system, "Segoe UI", system-ui, sans-serif; color: #1e2430; background: #f7f6f3; margin: 0; padding: 24px; }
+  :root{
+    --parch:#f6f2ec; --canvas:#e7e0d3; --surface:#ffffff; --surface-warm:#faf7f2;
+    --dark:#1c1917; --mid:#5c5a55; --light:#9a9a94; --rule:#e6e0d6; --rule-soft:#efeae1;
+    --accent:#2a4a3a; --accent-deep:#213b2e; --accent-light:#f0f4f1;
+    --steel:#c2d4de; --warm:#c4956a; --warm-deep:#a8703f; --warm-light:#fdf6ee;
+    --shadow:0 1px 2px rgba(28,25,23,.04), 0 8px 24px rgba(28,25,23,.05);
+  }
+  body { font: 15px/1.55 'Jost', sans-serif; font-weight: 500; color: var(--dark); background: var(--canvas); margin: 0; padding: 24px 16px 80px; }
   .bar { max-width: 720px; margin: 0 auto 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .bar select { font: inherit; padding: 6px 10px; }
-  .bar .note { color: #66707f; font-size: 13px; }
-  .fp-dashboard { max-width: 720px; margin: 0 auto; display: grid; gap: 18px; }
-  .fp-tile { background: #fff; border: 1px solid #e4e1da; border-radius: 10px; padding: 20px 22px; }
-  .fp-tile h3 { margin: 0 0 12px; font-size: 17px; }
-  .fp-tile h4 { margin: 18px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: #66707f; }
-  .fp-tile h5 { margin: 14px 0 4px; font-size: 14px; }
-  .fp-row { display: flex; justify-content: space-between; gap: 16px; padding: 5px 0; border-bottom: 1px dashed #eeece7; }
-  .fp-row .fp-label { color: #66707f; }
-  .fp-row .fp-value { text-align: right; }
-  .fp-insight { border-top: 1px solid #e4e1da; margin-top: 14px; padding-top: 12px; }
-  .fp-position { font-weight: 600; }
-  .fp-intro { font-style: italic; }
-  .fp-action { font-weight: 600; margin-bottom: 0; }
-  .fp-b p, .fp-block p { margin: 6px 0; }
+  .bar .note { color: var(--mid); font-size: 13px; }
+  .fp-dashboard { max-width: 720px; margin: 0 auto; }
+  .fp-tile { background: var(--surface-warm); border: 1px solid var(--rule); border-radius: 12px; padding: 20px 22px; }
+  .fp-tile > h3 { margin: 0 0 4px; font-size: 17px; }
+  .fp-b { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 13px 16px; box-shadow: var(--shadow); }
 </style>
 </head>
 <body>
 <div class="bar">
   <label for="fx">Fixture:</label>
   <select id="fx"></select>
-  <span class="note">Fixture data only. Nothing here is a real household.</span>
+  <span class="note">Fixture data only. Nothing here is a real household. Term handovers reset per fixture change.</span>
 </div>
-<div id="out"></div>
+<div id="out" class="fc"></div>
 <script src="/app/shared/finn-derived.js"></script>
 <script src="/app/shared/finn-triggers.js"></script>
 <script src="/app/shared/finn-fixtures.js"></script>
+<script src="/app/shared/finn-components.js"></script>
+<script src="/app/shared/finn-terms.js"></script>
 <script src="/app/shared/finn-panels.js"></script>
 <script>
 (async function () {
-  const library = await (await fetch('/app/shared/finn-library.json')).json();
+  const [library, termsData] = await Promise.all([
+    (await fetch('/app/shared/finn-library.json')).json(),
+    (await fetch('/app/shared/finn-terms.json')).json(),
+  ]);
   const fixtures = window.FINN_TRIGGER_FIXTURES;
   const sel = document.getElementById('fx');
   fixtures.forEach((fx, i) => {
@@ -50,9 +54,13 @@
     sel.appendChild(opt);
   });
   function render() {
+    // Fresh in-memory handed state per fixture so every panel shows its
+    // first-encounter handovers (the real page persists per household).
+    window.finnTerms.init({ terms: termsData.terms, handed: {}, onHandover: null });
     const fx = fixtures[Number(sel.value)];
-    document.getElementById('out').innerHTML =
-      window.finnPanels.renderDashboard(fx.domains, { yearNow: 2026, library });
+    const out = document.getElementById('out');
+    out.innerHTML = window.finnPanels.renderDashboard(fx.domains, { yearNow: 2026, library, terms: window.finnTerms });
+    window.finnTerms.processContainer(out);
   }
   sel.addEventListener('change', render);
   render();

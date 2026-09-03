@@ -108,6 +108,7 @@
   "insights": [
     {
       "id": "1.1",
+      "title": "Your rate and how the loan is set up",
       "tile": 1,
       "variant": null,
       "route_primary": "mortgage_broker",
@@ -127,6 +128,7 @@
     },
     {
       "id": "1.2",
+      "title": "Your offset account",
       "tile": 1,
       "variant": null,
       "route_primary": "mortgage_broker",
@@ -146,6 +148,7 @@
     },
     {
       "id": "1.3",
+      "title": "Your equity and what it could be used for",
       "tile": 1,
       "variant": null,
       "route_primary": "mortgage_broker",
@@ -165,6 +168,7 @@
     },
     {
       "id": "2.1",
+      "title": "What your spare money could be doing",
       "tile": 2,
       "variant": null,
       "route_primary": "financial_planner",
@@ -184,6 +188,7 @@
     },
     {
       "id": "2.2",
+      "title": "When there's nothing left over",
       "tile": 2,
       "variant": null,
       "no_referral": true,
@@ -205,6 +210,7 @@
     },
     {
       "id": "3.1",
+      "title": "How long your safety net would last",
       "tile": 3,
       "variant": null,
       "route_primary": "financial_planner",
@@ -224,6 +230,7 @@
     },
     {
       "id": "3.2a",
+      "title": "Where your safety net sits",
       "tile": 3,
       "variant": "has_offset",
       "route_primary": "mortgage_broker",
@@ -243,6 +250,7 @@
     },
     {
       "id": "3.2b",
+      "title": "Where your safety net sits",
       "tile": 3,
       "variant": "no_offset",
       "route_primary": "mortgage_broker",
@@ -263,6 +271,7 @@
     },
     {
       "id": "4.1",
+      "title": "More than one super account",
       "tile": 4,
       "variant": null,
       "route_primary": "financial_planner",
@@ -282,6 +291,7 @@
     },
     {
       "id": "5.1",
+      "title": "The cover that protects your household",
       "tile": 5,
       "variant": null,
       "route_primary": "insurance_specialist",
@@ -301,6 +311,7 @@
     },
     {
       "id": "6.1",
+      "title": "Your will and the legal basics",
       "tile": 6,
       "variant": null,
       "route_primary": "estate_lawyer",
@@ -320,6 +331,7 @@
     },
     {
       "id": "7.1",
+      "title": "Your investment property",
       "tile": 7,
       "variant": null,
       "route_primary": "mortgage_broker",
@@ -339,6 +351,7 @@
     },
     {
       "id": "7.2",
+      "title": "Your investments and how they fit",
       "tile": 7,
       "variant": null,
       "route_primary": "financial_planner",
@@ -359,6 +372,7 @@
     },
     {
       "id": "8.1a",
+      "title": "Your other debts",
       "tile": 8,
       "variant": "has_mortgage",
       "route_primary": "mortgage_broker",
@@ -378,6 +392,7 @@
     },
     {
       "id": "8.1b",
+      "title": "Your other debts",
       "tile": 8,
       "variant": "no_mortgage",
       "no_referral": true,
@@ -400,6 +415,7 @@
     },
     {
       "id": "9.1",
+      "title": "How your income is set up",
       "tile": 9,
       "variant": null,
       "route_primary": "accountant",

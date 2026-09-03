@@ -137,5 +137,23 @@
     onHandover = (opts && opts.onHandover) || null;
   }
 
-  window.finnTerms = { init, processContainer };
+  /* Handover at the foot of a calc block (component-spec 2.2): the panel
+     layer asks for a term's handover where a calc has just demonstrated
+     the thing. First encounter returns the handover line and records it;
+     afterwards it returns nothing. Same household persistence, same
+     harmless failure mode. */
+  function handoverFor(termId) {
+    const t = TERMS[termId];
+    if (!t || handed[termId]) return '';
+    handed[termId] = new Date().toISOString();
+    if (typeof onHandover === 'function') {
+      Promise.resolve(onHandover({ ...handed })).catch(err =>
+        console.error('[Finn terms] handover persistence failed (harmless):', err));
+    }
+    return window.finnComponents
+      ? window.finnComponents.handoverLine(t.handover)
+      : '<div class="fc fc-handover">' + esc(t.handover) + '</div>';
+  }
+
+  window.finnTerms = { init, processContainer, handoverFor };
 })();

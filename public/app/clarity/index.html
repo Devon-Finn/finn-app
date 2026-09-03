@@ -226,26 +226,11 @@
   }
   *:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 
-  /* ── Step 6: library-driven panel sections (A/B/C) inside the detail panel ── */
+  /* ── Panel sections inside the detail panel (styles live in
+        finn-components.css; only page-specific integration here) ── */
   .fp-tile{background:transparent;}
   .fp-tile > h3{display:none;} /* the dp-head already carries the title */
-  .fp-section{margin-top:18px;}
-  .fp-a{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:4px 16px; box-shadow:var(--shadow);}
-  .fp-row{display:flex; justify-content:space-between; gap:16px; padding:10px 0; border-bottom:1px solid var(--rule-soft); font-size:13.5px;}
-  .fp-row:last-child{border-bottom:none;}
-  .fp-row .fp-label{color:var(--mid);}
-  .fp-row .fp-value{color:var(--dark); text-align:right;}
-  .fp-row .fp-value strong{font-weight:600; color:var(--steel-deep);}
   .fp-b{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:13px 16px; box-shadow:var(--shadow);}
-  .fp-b h4, .fp-c > h4{font-size:10.5px; text-transform:uppercase; letter-spacing:.09em; color:var(--steel-deep); font-weight:700; margin-bottom:8px;}
-  .fp-b p{font-size:13.5px; line-height:1.6; color:var(--mid); margin:0;}
-  .fp-insight{background:var(--surface); border:1px solid var(--rule); border-radius:14px; padding:16px 18px; box-shadow:var(--shadow); margin-top:10px;}
-  .fp-position{font-size:14.5px; font-weight:600; color:var(--dark); line-height:1.55; margin:0 0 6px;}
-  .fp-intro{font-size:13.5px; line-height:1.6; color:var(--mid); font-style:italic; margin:6px 0;}
-  .fp-block{margin-top:12px;}
-  .fp-block h5{font-size:12.5px; font-weight:600; color:var(--dark); margin:0 0 4px;}
-  .fp-block p{font-size:13.5px; line-height:1.6; color:var(--mid); margin:6px 0 0;}
-  .fp-action{margin:14px 0 0; font-size:13.5px; font-weight:600; color:var(--accent);}
 </style>
 </head>
 <body class="tab-chat">
@@ -638,7 +623,7 @@ function openDetail(tileNo) {
   badge.innerHTML = '<span class="d"></span>' + BADGE_LABEL[state];
 
   let html = '<div class="dp-inner">' +
-    window.finnPanels.renderTile(tileNo, d, derived, tileResult, FINN_LIBRARY);
+    window.finnPanels.renderTile(tileNo, d, derived, tileResult, FINN_LIBRARY, { terms: window.finnTerms });
   if (state === 'building') {
     html += '<div class="dp-section"><div class="dp-building">This area is still building — the figures fill in as the conversation covers it.</div></div>';
   }

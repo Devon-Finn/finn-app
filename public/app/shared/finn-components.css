@@ -132,6 +132,24 @@ button.fc-term:focus-visible { outline: 2px solid var(--fc-forest); outline-offs
 .fc-pro .palso { font-size: 12px; color: var(--fc-light); margin-top: 2px; }
 .fc-pro .pcost { margin-top: 12px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 
+/* ── Panel layer (finn-panels.js, component-spec 4.1) ─────────────────
+      Teaching calcs get real headings in ink at 16px, as plain questions,
+      never small grey uppercase category labels. */
+.fp-teach { margin-top: 20px; }
+.fp-calchead { font-size: 16px; font-weight: 600; color: var(--fc-dark, #1c1917); margin: 0 0 8px; }
+.fp-section { margin-top: 20px; }
+.fp-b p { font-size: 13.5px; line-height: 1.6; color: var(--fc-mid, #5c5a55); margin: 0; }
+.fp-status { background: var(--fc-surface, #fff); border: 1px solid var(--fc-rule, #e6e0d6); border-radius: 10px; padding: 4px 14px; }
+.fp-status .fp-row { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--fc-rule-soft, #efeae1); font-size: 13.5px; }
+.fp-status .fp-row:last-child { border-bottom: none; }
+.fp-status .fp-label { color: var(--fc-mid, #5c5a55); }
+.fp-status .fp-value { color: var(--fc-dark, #1c1917); text-align: right; }
+.fp-status .fp-value strong { font-weight: 600; color: var(--fc-light, #9a9a94); }
+.fp-intro { font-size: 13.5px; line-height: 1.6; color: var(--fc-mid, #5c5a55); font-style: italic; margin: 6px 0; }
+.fp-tile .fc-ref { margin-top: 14px; }
+.fp-insights .fc-gap { margin-top: 10px; }
+.fp-dashboard { display: grid; gap: 18px; }
+
 /* ── Term popover (finn-terms.js) — glossary then why, never the
       handover sentence ── */
 .fc-termpop { position: absolute; z-index: 60; background: var(--fc-surface, #fff); border: 1px solid var(--fc-rule, #e6e0d6); border-radius: 10px; padding: 12px 14px; box-shadow: var(--fc-shadow, 0 8px 24px rgba(28,25,23,.12)); font-size: 12.5px; line-height: 1.55; }
