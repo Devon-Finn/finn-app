@@ -12,6 +12,17 @@
       "A missing field renders as 'none recorded', never as zero. (Fixture H, field-spec 3.6.)"
     ]
   },
+  "tiles": {
+    "1": { "title": "Your home and mortgage", "section_b": "[Not provided - docs/education-library.md gives no Section B mechanics block for this tile; Devon to write]" },
+    "2": { "title": "What's left over each month", "section_b": "[Not provided - docs/education-library.md gives no Section B mechanics block for this tile; Devon to write]" },
+    "3": { "title": "Your safety net", "section_b": "[Not provided - docs/education-library.md gives no Section B mechanics block for this tile; Devon to write]" },
+    "4": { "title": "Your super", "section_b": "[Not provided - docs/education-library.md gives no Section B mechanics block for this tile; Devon to write]" },
+    "5": { "title": "Protection", "section_b": "Life cover pays a lump sum if you die. Total and permanent disability cover pays if you're permanently unable to work again. Income protection is a different thing again, it replaces part of your income month to month while you're unable to work, and stops when you go back. They're three separate events, and holding cover for one doesn't cover you for the others." },
+    "6": { "title": "Your will and estate", "section_b": "A will directs what happens to what you own. An enduring power of attorney lets someone you choose make decisions on your behalf if you're unable to, while you're still alive, which a will doesn't cover. Guardianship names who would raise your children. A super nomination directs your super, which is dealt with separately from your will." },
+    "7": { "title": "Your investments", "section_b": "[Not provided - docs/education-library.md gives no Section B mechanics block for this tile; Devon to write]" },
+    "8": { "title": "Your other debts", "section_b": "The minimum repayment on a credit card is calculated as a small percentage of the balance, which means most of an early payment goes to interest rather than the debt. It's why a balance at 20% moves slowly even when the minimum is met every month." },
+    "9": { "title": "How your income is made up", "section_b": "[Not provided - docs/education-library.md gives no Section B mechanics block for this tile; Devon to write]" }
+  },
   "insights": [
     {
       "id": "1.1",
@@ -217,6 +228,7 @@
       "tile": 7,
       "variant": null,
       "route": "planner",
+      "ownership_block": { "block": "dont_realise", "paragraph": 0 },
       "position_line": {
         "template": "Investments of {investments_total_display}, held in {held_in}.",
         "fields": ["investments.shares_value", "investments.managed_funds_value", "investments.held_in"]
