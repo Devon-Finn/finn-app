@@ -252,7 +252,11 @@ These come up but no professional will say them, so they get described and moved
 
 **Markup.** A named term in library copy is wrapped as `<term id="lvr">LVR</term>`. The renderer draws a dotted underline and binds the popover. Copy is authored with the wrapper; the renderer never decides what to mark.
 
-**First use.** On the tile that introduces a term, the `handover` sentence renders after the plain label. Everywhere after, only the marked term renders, with the popover carrying the definition.
+**First encounter, not fixed tile.** The dashboard is a grid, so someone can open Tile 7 before Tile 1 and meet a term bare — the exact cold-acronym failure this system exists to prevent. The `handover` sentence therefore renders on the FIRST ENCOUNTER: whichever tile they open first that uses the term carries it. `introduced_on` is an authoring preference for where the copy reads best, never a rule the renderer obeys.
+
+**Persistence.** Handed-over state is stored against the HOUSEHOLD, not the browser session. They learned the word; it is not re-explained on the next visit or the next device.
+
+**The affordance always renders.** The dotted underline and popover appear on every marked term, regardless of handover state. The failure mode is deliberately asymmetric: if the tracking is ever wrong, a handover shown twice is mildly redundant, while a handover never shown strands someone with a cold acronym.
 
 **Cap.** The renderer asserts no more than one first-introduction per block. A block that would introduce two is a content error, not a layout one.
 

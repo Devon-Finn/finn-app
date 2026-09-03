@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/shared/finn-components.css">
 <style>
   :root{
     --parch:#f6f2ec; --parch-deep:#efe9dd; --canvas:#e7e0d3; --surface:#ffffff; --surface-warm:#faf7f2;
@@ -328,6 +329,8 @@
 <script src="/app/shared/finn-derived.js"></script>
 <script src="/app/shared/finn-triggers.js"></script>
 <script src="/app/shared/finn-panels.js"></script>
+<script src="/app/shared/finn-components.js"></script>
+<script src="/app/shared/finn-terms.js"></script>
 <script>
 'use strict';
 /* Clarity Session conversation (build 3a — Layer 1: collection).
@@ -641,6 +644,9 @@ function openDetail(tileNo) {
   }
   html += '</div>';
   document.getElementById('dpBody').innerHTML = html;
+  // First-encounter term handovers: whichever tile they open first that
+  // uses a term carries its handover sentence.
+  finnTerms.processContainer(document.getElementById('dpBody'));
   document.getElementById('detailPanel').classList.add('on');
 }
 
@@ -797,6 +803,30 @@ async function main() {
   // The locked library — Devon/Charlie's copy as data. Loaded once; the
   // dashboard renders nothing insight-shaped without it.
   FINN_LIBRARY = await (await fetch('/app/shared/finn-library.json')).json();
+
+  // Term registry + handed-over state. Handovers persist against the
+  // HOUSEHOLD (term-registry Part Four): learned words stay learned across
+  // visits and devices. A failed load or save is harmless by design — the
+  // worst case is a handover shown again, never a cold acronym.
+  try {
+    const termsData = await (await fetch('/app/shared/finn-terms.json')).json();
+    const [{ data: hh }, { data: ui }] = await Promise.all([
+      finnSupabase.from('households').select('id').limit(1),
+      finnSupabase.from('household_ui_state').select('terms_handed').limit(1),
+    ]);
+    const householdId = hh && hh[0] && hh[0].id;
+    finnTerms.init({
+      terms: termsData.terms,
+      handed: (ui && ui[0] && ui[0].terms_handed) || {},
+      onHandover: householdId
+        ? updated => finnSupabase.from('household_ui_state')
+            .upsert({ household_id: householdId, terms_handed: updated, updated_at: new Date().toISOString() })
+        : null,
+    });
+  } catch (err) {
+    console.error('[Finn terms] init failed (affordances degrade to plain text):', err);
+    finnTerms.init({ terms: {}, handed: {} });
+  }
 
   const [{ data: me }, { data: households }, { data: access }] = await Promise.all([
     finnSupabase.from('members').select('display_name, email').eq('id', s.user.id).maybeSingle(),

@@ -32,12 +32,13 @@
   <div class="note">Every component from component-spec Parts Two and Three, once. Fixture data only. Nothing here is a real household.</div>
 </div>
 <script src="/app/shared/finn-components.js"></script>
+<script src="/app/shared/finn-terms.js"></script>
 <script>
 (async function () {
   const C = window.finnComponents;
   const library = await (await fetch('/app/shared/finn-library.json')).json();
   const out = document.getElementById('out');
-  const sect = (title, html) => { const s = document.createElement('section'); s.innerHTML = '<h2>' + title + '</h2>' + html; out.appendChild(s); };
+  const sect = (title, html) => { const s = document.createElement('section'); s.innerHTML = '<h2>' + title + '</h2>' + html; out.appendChild(s); return s; };
 
   // 2.1 Calc block — the spec's own worked example.
   sect('2.1 · Calc block', C.calcBlock([
@@ -55,6 +56,15 @@
 
   // 2.2 Handover line — spec example.
   sect('2.2 · Handover line', C.handoverLine('Lenders and brokers call this your <term id="lvr">LVR</term>, for loan to value ratio. They change the terms they\'ll offer at certain levels of it.'));
+
+  // 2.3 Term affordance + first-encounter handover (in-memory handed state
+  // for the demo; the real page persists against the household).
+  const termsData = await (await fetch('/app/shared/finn-terms.json')).json();
+  window.finnTerms.init({ terms: termsData.terms, handed: {}, onHandover: null });
+  const termSect = sect('2.3 · Term affordance: first encounter hands over, second renders bare',
+    C.eduBlock(null, 'Your <term id="equity">equity</term> grows every time you make a repayment.') +
+    C.eduBlock(null, 'Using <term id="equity">equity</term> changes your <term id="lvr">LVR</term>, and lenders look at that number first.'));
+  window.finnTerms.processContainer(termSect);
 
   // 2.4 Proportion bar.
   sect('2.4 · Proportion bar', C.proportionBar(

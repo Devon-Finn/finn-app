@@ -1,0 +1,134 @@
+{
+  "_meta": {
+    "source": "docs/term-registry.md Part Two, imported verbatim",
+    "rules": [
+      "The handover renders on FIRST ENCOUNTER, not on a fixed tile. introduced_on is an authoring preference for where the copy reads best, never a rule the renderer obeys.",
+      "Handed-over state persists against the HOUSEHOLD, not the browser session.",
+      "The affordance (dotted underline + popover) renders on every marked term, always, regardless of handover state. A handover shown twice is mildly redundant; one never shown strands someone.",
+      "The popover shows glossary then why. Never the handover sentence.",
+      "One first-introduction per block, asserted. The renderer never decides what to mark; only <term id> wrappers in the copy do."
+    ]
+  },
+  "terms": {
+    "equity": {
+      "plain": "What you own of it",
+      "handover": "This is what everyone means by your equity.",
+      "glossary": "The part of a property you own outright. Its value, less whatever is still owing on it.",
+      "why": "It's the figure a lender starts from when you ask them for anything.",
+      "said_by": "brokers, planners, lenders",
+      "introduced_on": 1
+    },
+    "lvr": {
+      "plain": "How much of the place is borrowed",
+      "handover": "Lenders and brokers call this your LVR, for loan to value ratio.",
+      "glossary": "What you still owe, as a share of what the property is worth.",
+      "why": "Lenders change the terms they'll offer at certain levels of it, including whether lenders mortgage insurance comes into it.",
+      "said_by": "brokers, lenders",
+      "introduced_on": 1
+    },
+    "offset": {
+      "plain": "What interest is charged on",
+      "handover": "The account doing that is called an offset.",
+      "glossary": "An everyday account linked to your loan. Whatever sits in it comes off the balance interest is charged on, and you can still spend it any time.",
+      "why": "It's the one loan feature that works without you doing anything, and the one most often left half-used.",
+      "said_by": "brokers, lenders",
+      "introduced_on": 1
+    },
+    "redraw": {
+      "plain": "Money you've paid ahead and could pull back out",
+      "handover": "Lenders call this redraw.",
+      "glossary": "Extra repayments you've made that the lender may let you take back. Unlike an offset, the money is theirs to control and the terms can change.",
+      "why": "It looks like savings on a statement and behaves differently when you need it.",
+      "said_by": "brokers, lenders",
+      "introduced_on": 3
+    },
+    "variable_fixed": {
+      "plain": "Whether your rate can move",
+      "handover": "A rate that can move is called variable. One that's locked for a period is fixed.",
+      "glossary": "Variable rates move when the lender moves them. Fixed rates stay put for an agreed term, then revert.",
+      "why": "It decides whether your repayment is a known quantity or a moving one.",
+      "said_by": "brokers, lenders",
+      "introduced_on": 1
+    },
+    "take_home_pay": {
+      "plain": "What actually lands in your account",
+      "handover": "This is your take-home pay, or net pay.",
+      "glossary": "What reaches you after tax and anything else taken out before you see it.",
+      "why": "It's the only income figure that tells you what you can actually spend.",
+      "said_by": "everyone",
+      "introduced_on": 2
+    },
+    "marginal_rate": {
+      "plain": "The rate the next dollar you earn gets taxed at",
+      "handover": "Accountants call this your marginal rate.",
+      "glossary": "The tax rate that applies to your next dollar of income, rather than an average across everything you earn.",
+      "why": "Interest you earn is taxed at it. Interest an offset saves you isn't taxed at all. It's why the two aren't comparable on their headline rates.",
+      "said_by": "accountants, planners",
+      "introduced_on": 3
+    },
+    "consolidating": {
+      "plain": "Bringing accounts together into one",
+      "handover": "Funds and planners call this consolidating.",
+      "glossary": "Closing super accounts and moving the balances into one.",
+      "why": "Each account carries its own fees, and closing one can close the insurance held inside it.",
+      "said_by": "planners, funds",
+      "introduced_on": 4
+    },
+    "income_protection": {
+      "plain": "Cover that replaces part of your pay while you can't work",
+      "handover": "This is income protection.",
+      "glossary": "Pays a monthly amount while you're unable to work, and stops when you return. Different from cover that pays a lump sum.",
+      "why": "It's the cover most households don't hold and the one that matches how their life is actually funded.",
+      "said_by": "planners, risk specialists, insurers",
+      "introduced_on": 5
+    },
+    "tpd": {
+      "plain": "Cover that pays if you could never work again",
+      "handover": "Insurers call this TPD, for total and permanent disability.",
+      "glossary": "A lump sum paid if you're permanently unable to work. A separate event from dying, and separate again from being off work for a while.",
+      "why": "Holding one of the three doesn't cover you for the others.",
+      "said_by": "planners, risk specialists, insurers",
+      "introduced_on": 5
+    },
+    "waiting_period": {
+      "plain": "How long before a policy starts paying",
+      "handover": "This is the waiting period.",
+      "glossary": "The stretch between when you stop working and when a policy begins paying. Often 30, 60 or 90 days.",
+      "why": "It's the gap your own money has to cover, which is what ties cover to your safety net.",
+      "said_by": "planners, risk specialists, insurers",
+      "introduced_on": 5
+    },
+    "binding_nomination": {
+      "plain": "Who your super goes to",
+      "handover": "The form that decides it is called a binding nomination.",
+      "glossary": "An instruction on your super account naming who receives it. Binding means the fund must follow it. Most expire after three years unless the fund offers a non-lapsing one.",
+      "why": "Your super usually isn't covered by your will. Without a valid nomination the fund's trustee decides.",
+      "said_by": "lawyers, planners, funds",
+      "introduced_on": 6
+    },
+    "enduring_poa": {
+      "plain": "Someone who can act for you if you can't",
+      "handover": "The document is an enduring power of attorney.",
+      "glossary": "Names a person to make decisions for you while you're alive but unable to make them yourself. A will only takes effect after death and doesn't cover this.",
+      "why": "It's the gap most households don't know they have.",
+      "said_by": "lawyers",
+      "introduced_on": 6
+    },
+    "deductible": {
+      "plain": "An expense you can claim against income",
+      "handover": "Accountants call this deductible.",
+      "glossary": "A cost you're allowed to subtract from income before tax is worked out.",
+      "why": "Interest on an investment loan generally is. Interest on the loan for the home you live in isn't. It's why two identical-looking loans behave differently.",
+      "said_by": "accountants",
+      "introduced_on": 7
+    },
+    "payg_instalments": {
+      "plain": "Paying tax through the year rather than in one hit",
+      "handover": "The ATO calls these PAYG instalments.",
+      "glossary": "Quarterly prepayments toward the tax on income no employer withholds for you.",
+      "why": "The year they start, it's common to pay last year's bill and this year's instalments across the same few months.",
+      "said_by": "accountants, the ATO",
+      "introduced_on": 9
+    }
+  }
+}

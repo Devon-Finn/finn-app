@@ -132,6 +132,12 @@ button.fc-term:focus-visible { outline: 2px solid var(--fc-forest); outline-offs
 .fc-pro .palso { font-size: 12px; color: var(--fc-light); margin-top: 2px; }
 .fc-pro .pcost { margin-top: 12px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 
+/* ── Term popover (finn-terms.js) — glossary then why, never the
+      handover sentence ── */
+.fc-termpop { position: absolute; z-index: 60; background: var(--fc-surface, #fff); border: 1px solid var(--fc-rule, #e6e0d6); border-radius: 10px; padding: 12px 14px; box-shadow: var(--fc-shadow, 0 8px 24px rgba(28,25,23,.12)); font-size: 12.5px; line-height: 1.55; }
+.fc-termpop .g { color: var(--fc-dark, #1c1917); }
+.fc-termpop .w { color: var(--fc-mid, #5c5a55); margin-top: 6px; }
+
 /* ── 3.9 Trust banner ───────────────────────────────────────────────── */
 .fc-trust { background: var(--fc-forest); color: #e7efe9; border-radius: 12px; padding: 18px 20px; font-size: 13.5px; line-height: 1.65; }
 .fc-trust b { color: #fff; }
