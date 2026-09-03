@@ -6,7 +6,8 @@
       "blocks are immutable at runtime: no summarisation, no rewriting for length, no tone adjustment. If a block is too long for a viewport, that is a layout problem.",
       "Block copy is imported VERBATIM from docs/education-library.md. Editing copy happens in that document first, then re-imports here; never edit copy in this file alone.",
       "Blocks marked [Not provided ...] had no corresponding block in the signed-off document and await Devon's copy; they must never be improvised by a model or a developer.",
-      "Entries with block_style 'inline_headings' carry their own headings inside the block text (8.1b's four-part no-referral content); the renderer must not print the template headings over them.",
+      "Entries with block_style 'inline_headings' carry their own headings inside the block text (8.1b's four-part no-referral content); the renderer must not print the template headings over them. Entries with block_style 'single' are deliberately one block; a one-paragraph unit beside five-block units is a Step 5 layout problem, never a copy gap to fill.",
+      "An entry's 'intro' renders above its blocks, verbatim (8.1b's no-referral lead-in is the trust moment on that tile).",
       "Slots suffixed _display (statuses, counts, descriptions) are formatted by the deterministic renderer from the listed fields: formatting, never characterisation.",
       "A missing field renders as 'none recorded', never as zero. (Fixture H, field-spec 3.6.)"
     ]
@@ -64,7 +65,7 @@
         "how_professional": "A mortgage broker can tell you what a lender would actually consider and on what terms. A financial planner is the one who helps you think about whether using it serves what you're trying to do, and what it would mean if things went differently. Anything that involves borrowing in order to invest is a planner's conversation rather than a broker's, and it's worth knowing which one you're having.",
         "nothing_to_prepare": "You don't need to know what any of the options are called, or to have decided anything. Plenty of people have this conversation purely to find out what their position allows and what it would actually mean. Finn passes on the whole picture, so it starts from something real."
       },
-      "action_label": "Find a mortgage broker"
+      "action_label": "Find the right professional"
     },
     {
       "id": "2.1",
@@ -257,6 +258,7 @@
         "fields": ["debts.items", "derived.debts_total"]
       },
       "block_style": "inline_headings",
+      "intro": "There's nobody on Finn's list for this one, and that's deliberate. Planners don't generally take on debt of this size, and we won't point you at the businesses that advertise debt help. So instead of a referral, here's what's genuinely worth knowing.",
       "blocks": {
         "why": "The two ways people work through debts like these\n\nOne is to put everything spare against the debt charging the highest rate, and work down. That costs the least in interest. The other is to clear the smallest balance first, regardless of rate, so the number of debts drops quickly. That costs a bit more but people are more likely to stick with it. Both are well established, and which suits you has more to do with how you're wired than with the maths.",
         "turn_up": "Hardship is a right, not a favour\n\nEvery credit provider in Australia is legally required to consider a hardship request. You can ask for a payment pause, a reduced payment, or more time, and they have to respond. It doesn't cost anything, and it's a formal process rather than a negotiation you have to win. A lot of people don't know it exists, or assume it's only for people in serious trouble.",
@@ -295,12 +297,13 @@
         "template": "Debts total {debts_total}, across {debt_count_display} items.",
         "fields": ["debts.items", "derived.debts_total"]
       },
+      "block_style": "single",
       "blocks": {
-        "why": "[Not provided - docs/education-library.md handles distress in conversation (Part Three), not as tile copy; awaiting Devon's direction on whether the Part Three counsellor script doubles as this tile's content]",
-        "turn_up": "[Not provided - see why]",
-        "dont_realise": "[Not provided - see why]",
-        "how_professional": "[Not provided - see why]",
-        "nothing_to_prepare": "[Not provided - see why]"
+        "why": "If money is genuinely tight right now, and it's causing real stress, the most useful person is a financial counsellor. They're free, they're on your side entirely, and they help people work through exactly this. You can reach the National Debt Helpline on 1800 007 007. There's no cost and no catch, and it's a good place to start.",
+        "turn_up": "[Not provided - hardship override is deliberately a single block per Devon: the Part Three counsellor script is the whole content]",
+        "dont_realise": "[Not provided - see turn_up]",
+        "how_professional": "[Not provided - see turn_up]",
+        "nothing_to_prepare": "[Not provided - see turn_up]"
       },
       "action_label": "About the National Debt Helpline"
     }

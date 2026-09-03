@@ -233,7 +233,7 @@ A mortgage broker can tell you what a lender would actually consider and on what
 **There's nothing you need to know or prepare**
 You don't need to know what any of the options are called, or to have decided anything. Plenty of people have this conversation purely to find out what their position allows and what it would actually mean. Finn passes on the whole picture, so it starts from something real.
 
-→ *Find a mortgage broker*
+→ *Find the right professional*
 
 > **Build note.** "Paying the mortgage down faster" is a goal, not an insight. If it surfaces in conversation it belongs in goal-routing at layer three, not as a fourth stacked insight here. Three broker insights on one tile is the outer limit.
 

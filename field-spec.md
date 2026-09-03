@@ -338,8 +338,8 @@ A visible tile with no firing insight is a valid and intended state. It shows th
 | 3.1 | How long it would last | Always, where `expenses` is present | `buffer_months`, `context.children`, `income.structure` | Planner |
 | 3.2a | Where it sits — has offset | `has_offset = true` AND `buffer.linked_to_loan = false` AND `accessible_savings > 0` | `accessible_savings`, `offset_balance` | Mortgage broker |
 | 3.2b | Where it sits — no offset | `owns_home = true` AND `has_offset = false` AND `accessible_savings > 0` | `accessible_savings` | Mortgage broker |
-| 4.1 | More than one super account | `count(super.funds) > 1` for the same owner | `funds[]`, `has_insurance` | Planner |
-| 5.1 | Household cover | Always | `protection.*`, `context`, `mortgage_balance` | Risk specialist / planner |
+| 4.1 | More than one super account | `count(super.funds) > 1` for the same owner, OR `multiple_accounts = true` | `funds[]`, `has_insurance` | Planner |
+| 5.1 | Household cover | Any field in `protection` is non-null (the domain was reached) | `protection.*`, `context`, `mortgage_balance` | Risk specialist / planner |
 | 6.1 | Will and legal basics | Any of the four `in_place = false`, OR `will.last_updated` older than 5 years | `estate.*`, `context.children` | Estate lawyer |
 | 7.1 | Investment property | `investments.properties[]` non-empty | property fields, `rental_income_annual` | Broker / planner / accountant |
 | 7.2 | Investments and how they fit | `shares_value > 0` OR `managed_funds_value > 0` | `shares_value`, `held_in` | Planner |
@@ -355,6 +355,7 @@ Recorded because a lawyer will ask, and because they are easy to reintroduce by 
 - **Nothing fires on `extra_contributions = false`.** Super contributions as a tax lever is product advice. Finn shows the income and leaves that door for the planner.
 - **No insight fires on a comparison to a benchmark.** There are no benchmarks in this system.
 - **No insight fires on portfolio composition.** Allocation is displayed as fact and never evaluated.
+- **No insight fires on a domain that was never reached.** An all-null domain means the conversation never got there, not that they hold nothing. Finn cannot say something is worth a conversation about a position it knows nothing about. Fixture H fires zero insights.
 
 ## 3.4 Precedence
 

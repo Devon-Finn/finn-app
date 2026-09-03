@@ -40,8 +40,8 @@
         buffer: { accessible_savings: 30000, where_held: 'savings account', linked_to_loan: false, _confidence: 'stated' },
         estate: { ...estateQuiet, _confidence: 'stated' },
       },
-      expect: ['1.1', '1.2', '1.3', '2.1', '3.1', '3.2a', '5.1'],
-      mustNotFire: ['3.2b'],
+      expect: ['1.1', '1.2', '1.3', '2.1', '3.1', '3.2a'],
+      mustNotFire: ['3.2b', '5.1'],
       tileFlags: { 1: { lender_paid_note_once: true } },
     },
     {
@@ -53,8 +53,8 @@
         buffer: { accessible_savings: 30000, where_held: 'savings account', linked_to_loan: false, _confidence: 'stated' },
         estate: { ...estateQuiet, _confidence: 'stated' },
       },
-      expect: ['1.1', '1.3', '2.1', '3.1', '3.2b', '5.1'],
-      mustNotFire: ['3.2a', '1.2'],
+      expect: ['1.1', '1.3', '2.1', '3.1', '3.2b'],
+      mustNotFire: ['3.2a', '1.2', '5.1'],
     },
     {
       name: 'D — sole trader plus rental property plus shares',
@@ -64,7 +64,7 @@
         investments: { properties: [ { value_estimate: 640000, loan_balance: 410000, rate_percent: 5.89, repayment_type: 'interest_only', rent_monthly: 2340, held_in: 'joint' } ], shares_value: 84200, held_in: 'one name', _confidence: 'stated' },
         estate: { ...estateQuiet, _confidence: 'stated' },
       },
-      expect: ['5.1', '7.1', '7.2', '9.1'],
+      expect: ['7.1', '7.2', '9.1'],
       visibleTiles: [2, 3, 4, 5, 6, 7, 9],
     },
     {
@@ -75,8 +75,8 @@
         investments: { properties: [ { value_estimate: 640000, loan_balance: 410000, rate_percent: 5.89, repayment_type: 'interest_only', rent_monthly: 2340, held_in: 'joint' } ], _confidence: 'stated' },
         estate: { ...estateQuiet, _confidence: 'stated' },
       },
-      expect: ['5.1', '7.1'],
-      mustNotFire: ['9.1', '7.2'],
+      expect: ['7.1'],
+      mustNotFire: ['9.1', '7.2', '5.1'],
     },
     {
       name: 'E — consumer debts, no mortgage',
@@ -86,8 +86,8 @@
         flags: { hardship: false },
         estate: { ...estateQuiet, _confidence: 'stated' },
       },
-      expect: ['5.1', '8.1b'],
-      mustNotFire: ['8.1a', 'hardship'],
+      expect: ['8.1b'],
+      mustNotFire: ['8.1a', 'hardship', '5.1'],
       visibleTiles: [2, 3, 4, 5, 6, 8, 9],
     },
     {
@@ -98,8 +98,8 @@
         flags: { hardship: true, hardship_signal: 'missed two rent payments, collectors calling', _confidence: 'inferred' },
         estate: { ...estateQuiet, _confidence: 'stated' },
       },
-      expect: ['5.1', 'hardship'],
-      mustNotFire: ['8.1a', '8.1b'],
+      expect: ['hardship'],
+      mustNotFire: ['8.1a', '8.1b', '5.1'],
       expectHardship: true,
     },
     {
@@ -110,14 +110,28 @@
         investments: { shares_value: 200000, held_in: 'trust', _confidence: 'stated' },
         estate: { ...estateQuiet, _confidence: 'stated' },
       },
-      expect: ['5.1', '7.2', '9.1'],
+      expect: ['7.2', '9.1'],
       expectFlags: { '7.2': { ownership_block_suppressed: true } },
     },
     {
-      name: 'H — everything null beyond the minimum',
+      name: 'H — everything null beyond the minimum: ZERO insights',
       domains: { context: { adults: 2 } },
-      expect: ['5.1'],
+      expect: [],
       visibleTiles: [2, 3, 4, 5, 6, 9],
+    },
+    {
+      name: '4.1-flag — multiple_accounts true with only one named fund',
+      domains: {
+        super: { funds: [ { fund: 'Fund One', owner: 'you', balance: 60000, has_insurance: null } ], multiple_accounts: true, _confidence: 'stated' },
+      },
+      expect: ['4.1'],
+    },
+    {
+      name: '5.1-reached — protection reached with a confirmed absence fires',
+      domains: {
+        protection: { life: { held: false, amount: null, inside_super: null }, tpd: { held: null, amount: null, inside_super: null }, income_protection: { held: null, amount: null, inside_super: null }, trauma: { held: null, amount: null, inside_super: null }, _confidence: 'stated' },
+      },
+      expect: ['5.1'],
     },
   ];
 

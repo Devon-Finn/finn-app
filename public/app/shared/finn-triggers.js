@@ -87,18 +87,28 @@
     fires['3.2a'] = home.has_offset === true && buf.linked_to_loan === false && pos(buf.accessible_savings);
     fires['3.2b'] = home.owns_home === true && home.has_offset === false && pos(buf.accessible_savings);
 
-    // 4.1 — count(super.funds) > 1 for the SAME owner. Funds without an
-    // owner never aggregate (a couple with one fund each is calm; only a
-    // single person holding more than one account routes).
+    // 4.1 — count(super.funds) > 1 for the SAME owner, OR multiple_accounts
+    // true. Funds without an owner never aggregate (a couple with one fund
+    // each is calm); the flag covers the person who says "I've got a few
+    // super accounts somewhere" but can only name one.
     const ownerCounts = {};
     for (const f of arr(sup.funds)) {
       if (f && typeof f.owner === 'string' && f.owner) {
         ownerCounts[f.owner] = (ownerCounts[f.owner] || 0) + 1;
       }
     }
-    fires['4.1'] = Object.values(ownerCounts).some(n => n > 1);
+    fires['4.1'] = Object.values(ownerCounts).some(n => n > 1) || sup.multiple_accounts === true;
 
-    fires['5.1'] = true; // Always.
+    // 5.1 — fires when the protection domain was actually REACHED: any leaf
+    // of the four covers is non-null. An all-null domain means the
+    // conversation never got there, not that they hold nothing, and no
+    // insight fires on a domain that was never reached (explicit
+    // non-trigger). held false IS a reached answer and fires.
+    fires['5.1'] = ['life', 'tpd', 'income_protection', 'trauma'].some(k => {
+      const cover = (d.protection || {})[k];
+      return cover && typeof cover === 'object'
+        && ['held', 'amount', 'inside_super'].some(f => cover[f] !== null && cover[f] !== undefined);
+    });
 
     const willYear = est.will && est.will.in_place === true ? yearOf(est.will.last_updated) : null;
     fires['6.1'] = [est.will, est.poa, est.guardianship, est.super_nomination].some(estateDocFires)
