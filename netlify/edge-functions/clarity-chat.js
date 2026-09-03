@@ -663,6 +663,10 @@ function emDashScrubStream() {
   let lineBuf = "";
   let seenText = ""; // cumulative model text, to locate the [CAPTURE] boundary
   let substitutions = 0;
+  // Trailing whitespace of each visible delta is held back and prepended to
+  // the next one, so a dash whose leading space arrived in the previous
+  // chunk still scrubs to "word, next" rather than "word , next".
+  let heldWs = "";
 
   function scrub(s) {
     return s.replace(/\s*—\s*/g, () => { substitutions++; return ", "; });
@@ -673,13 +677,38 @@ function emDashScrubStream() {
     const markerIx = full.indexOf("[CAPTURE]");
     let out;
     if (markerIx === -1) {
-      out = scrub(text);
+      out = scrub(heldWs + text);
+      heldWs = "";
+      const tail = out.match(/\s+$/);
+      if (tail) { heldWs = tail[0]; out = out.slice(0, out.length - tail[0].length); }
     } else {
       const boundary = markerIx - seenText.length;
-      out = boundary <= 0 ? text : scrub(text.slice(0, boundary)) + text.slice(boundary);
+      if (boundary <= 0) {
+        out = heldWs + text;
+        heldWs = "";
+      } else {
+        out = scrub(heldWs + text.slice(0, boundary)) + text.slice(boundary);
+        heldWs = "";
+      }
     }
     seenText = full;
     return out;
+  }
+
+  /* Rule-1 softener detector — LOG ONLY, never substitute ("roughly" is
+     correct for estimate quantities; a blind swap would break that). Flags
+     a softener in the same sentence as a retrievable-fact keyword so the
+     leak rate is measurable over time, same principle as the em-dash log. */
+  const SOFTENERS = /\b(roughly|approximately|ballpark|a rough idea|if you know it)\b/i;
+  const FACT_KEYWORDS = /\b(rate|balance|owing|term|repayment|cover|super balance)\b/i;
+  function logSofteners() {
+    const ix = seenText.indexOf("[CAPTURE]");
+    const visible = ix === -1 ? seenText : seenText.slice(0, ix);
+    for (const sentence of visible.split(/(?<=[.!?])\s+/)) {
+      if (SOFTENERS.test(sentence) && FACT_KEYWORDS.test(sentence)) {
+        console.log('[Finn clarity] rule-1 softener on retrievable-fact ask: "' + sentence.trim().slice(0, 160) + '"');
+      }
+    }
   }
 
   return new TransformStream({
@@ -709,6 +738,7 @@ function emDashScrubStream() {
       if (substitutions > 0) {
         console.log(`[Finn clarity] em-dash substitutions in visible reply: ${substitutions}`);
       }
+      logSofteners();
     },
   });
 }
