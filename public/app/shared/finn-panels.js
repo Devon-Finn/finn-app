@@ -28,7 +28,11 @@
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const NONE = '<strong>none recorded</strong>';
 
-  const money = v => num(v) !== null ? '$' + Math.round(v).toLocaleString('en-AU') : null;
+  // Negative values render as "-$354" (tile 2's Section A can legitimately
+  // show a negative surplus; display is broader than triggering).
+  const money = v => num(v) !== null
+    ? (Math.round(v) < 0 ? '-$' + Math.abs(Math.round(v)).toLocaleString('en-AU') : '$' + Math.round(v).toLocaleString('en-AU'))
+    : null;
   const rate = v => num(v) !== null ? v + '%' : null;
   const text = v => (typeof v === 'string' && v.trim()) ? esc(v.trim()) : null;
   const show = v => v === null || v === undefined ? NONE : v;

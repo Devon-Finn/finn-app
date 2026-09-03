@@ -224,6 +224,27 @@
     .mobile-tabs button.on{background:var(--accent); color:#fff; border-color:var(--accent);}
   }
   *:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+
+  /* ── Step 6: library-driven panel sections (A/B/C) inside the detail panel ── */
+  .fp-tile{background:transparent;}
+  .fp-tile > h3{display:none;} /* the dp-head already carries the title */
+  .fp-section{margin-top:18px;}
+  .fp-a{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:4px 16px; box-shadow:var(--shadow);}
+  .fp-row{display:flex; justify-content:space-between; gap:16px; padding:10px 0; border-bottom:1px solid var(--rule-soft); font-size:13.5px;}
+  .fp-row:last-child{border-bottom:none;}
+  .fp-row .fp-label{color:var(--mid);}
+  .fp-row .fp-value{color:var(--dark); text-align:right;}
+  .fp-row .fp-value strong{font-weight:600; color:var(--steel-deep);}
+  .fp-b{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:13px 16px; box-shadow:var(--shadow);}
+  .fp-b h4, .fp-c > h4{font-size:10.5px; text-transform:uppercase; letter-spacing:.09em; color:var(--steel-deep); font-weight:700; margin-bottom:8px;}
+  .fp-b p{font-size:13.5px; line-height:1.6; color:var(--mid); margin:0;}
+  .fp-insight{background:var(--surface); border:1px solid var(--rule); border-radius:14px; padding:16px 18px; box-shadow:var(--shadow); margin-top:10px;}
+  .fp-position{font-size:14.5px; font-weight:600; color:var(--dark); line-height:1.55; margin:0 0 6px;}
+  .fp-intro{font-size:13.5px; line-height:1.6; color:var(--mid); font-style:italic; margin:6px 0;}
+  .fp-block{margin-top:12px;}
+  .fp-block h5{font-size:12.5px; font-weight:600; color:var(--dark); margin:0 0 4px;}
+  .fp-block p{font-size:13.5px; line-height:1.6; color:var(--mid); margin:6px 0 0;}
+  .fp-action{margin:14px 0 0; font-size:13.5px; font-weight:600; color:var(--accent);}
 </style>
 </head>
 <body class="tab-chat">
@@ -304,6 +325,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/app/shared/finn-supabase.js"></script>
+<script src="/app/shared/finn-derived.js"></script>
+<script src="/app/shared/finn-triggers.js"></script>
+<script src="/app/shared/finn-panels.js"></script>
 <script>
 'use strict';
 /* Clarity Session conversation (build 3a — Layer 1: collection).
@@ -411,221 +435,165 @@ function addTyping() {
   return div;
 }
 
-/* ══════════ INSIGHT TILES (3b — Layer 2) ══════════
-   Displays DERIVED insights, never raw collection buckets. All derivation
-   happens here over the member's own RLS-scoped picture read — this page
-   never writes to picture (3a captures; 3b displays).
+/* ══════════ THE DETERMINISTIC DASHBOARD (Step 6 — wired) ══════════
+   Layers 2 and 3 are now the locked chain from field-spec.md:
+   the model turned conversation into data (3a, server-side) → code turns
+   data into display (finn-derived.js + finn-triggers.js, pure functions) →
+   finn-library.json supplies the words (Devon/Charlie's signed-off copy,
+   rendered by finn-panels.js by slot substitution only). No model call and
+   no judgment anywhere in this path; the page never writes to picture.
 
-   THE LOCKED LINE: every status is a ROUTER, never a verdict.
-   Allowed labels: "Worth a conversation" / "Nothing flagged" / "Still
-   building". A flag means "this area is discussable with a professional",
-   decided ONLY from structural facts (a mortgage exists; more than one
-   super account; a document is absent) — NEVER from whether a number is
-   big or small, and never against any benchmark. No wording that grades:
-   no low/high/behind/healthy/on track/needs attention, no comparisons. */
+   Display rules carried through from the education library: a missing value
+   is "none recorded", never zero; no colour verdicts, no benchmarks, no
+   scores with denominators. Display is broader than triggering — a visible
+   tile with nothing flagged shows its figures and routes nowhere. A tile
+   whose domain the conversation never reached is "Still building": no
+   insight fires on a domain that was never reached.
+
+   Referral cards (the old 3c layer) are intentionally NOT wired here; they
+   return after Devon's end-to-end walk, rebuilt against the trigger engine. */
+
+let FINN_LIBRARY = null;
 
 function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
-function fmt$(n) { return '$' + Math.round(n).toLocaleString('en-AU'); }
-function sumArr(arr, field) {
-  if (!Array.isArray(arr)) return null;
-  let s = 0, any = false;
-  for (const it of arr) { const v = num(it && it[field]); if (v !== null) { s += v; any = true; } }
-  return any ? s : null;
-}
-
-function deriveMonthlyIncome(inc) {
-  const parts = [num(inc.salary_annual), num(inc.partner_salary_annual), num(inc.side_income_annual), num(inc.other_income_annual)].filter(v => v !== null);
-  return parts.length ? parts.reduce((a, b) => a + b, 0) / 12 : null;
-}
-
-/* Each derive() returns { state:'flag'|'calm'|'building', metric, unit, ctx, pct }
-   metric is ALWAYS the real figure once derivable — never hidden. */
-const TILES = [
-  { key: 'equity', name: 'Equity position', derive(d, done) {
-      const a = d.assets || {}, l = d.liabilities || {};
-      const assetParts = [num(a.home_value), num(a.investment_property_value), num(a.savings), num(a.shares_value), num(a.business_value), sumArr(a.other, 'value')].filter(v => v !== null);
-      const liabParts = [num(l.mortgage_balance), num(l.hecs_balance), sumArr(l.expensive_debts, 'balance')].filter(v => v !== null);
-      const haveAssets = assetParts.length > 0;
-      const haveLiabs = liabParts.length > 0 || done.includes('liabilities');
-      const pct = (haveAssets ? 50 : 0) + (haveLiabs ? 50 : 0);
-      if (!haveAssets || !haveLiabs) return { state: 'building', pct };
-      const netEquity = assetParts.reduce((x, y) => x + y, 0) - liabParts.reduce((x, y) => x + y, 0);
-      const mortgage = num(l.mortgage_balance);
-      const bits = [];
-      if (mortgage !== null) {
-        const rate = num(l.mortgage_rate_percent);
-        bits.push('mortgage ' + fmt$(mortgage) + (rate !== null ? ' at ' + rate + '%' : ''));
-        const off = num(l.offset_balance);
-        if (off !== null) bits.push('offset ' + fmt$(off));
-      }
-      // Router: a mortgage's rate and structure are checkable facts — broker
-      // territory. No mortgage → nothing here needs a conversation.
-      return mortgage !== null
-        ? { state: 'flag', metric: fmt$(netEquity), unit: 'net position', facts: bits.join(' · '), route: 'Rate and structure are a broker conversation', pct: 100 }
-        : { state: 'calm', metric: fmt$(netEquity), unit: 'net position', facts: 'what you own minus what you owe' + (bits.length ? ' · ' + bits.join(' · ') : ''), pct: 100 };
-    } },
-  { key: 'surplus', name: 'Monthly surplus', derive(d) {
-      const inc = d.income || {};
-      const mIn = deriveMonthlyIncome(inc);
-      const mOut = num(inc.monthly_expenses);
-      const pct = ((mIn !== null ? 1 : 0) + (mOut !== null ? 1 : 0)) * 50;
-      if (mIn === null || mOut === null) return { state: 'building', pct };
-      const s = mIn - mOut;
-      // Router: what spare money does next — or how the cashflow fits
-      // together — is exactly what a planner works through. The figure is
-      // stated; its size is never graded.
-      return { state: 'flag', metric: fmt$(s), unit: '/month',
-        facts: fmt$(mIn) + ' in − ' + fmt$(mOut) + ' out each month',
-        route: 'Where it goes next is a planner conversation', pct: 100 };
-    } },
-  { key: 'buffer', name: 'Emergency buffer', derive(d) {
-      const b = d.buffer || {}, inc = d.income || {};
-      let months = num(b.months_cover);
-      const sav = num(b.accessible_savings);
-      const mOut = num(inc.monthly_expenses);
-      if (months === null && sav !== null && mOut !== null && mOut > 0) months = sav / mOut;
-      const pct = months !== null ? 100 : (sav !== null ? 50 : 0);
-      if (months === null) return { state: 'building', pct };
-      const m = Math.round(months * 10) / 10;
-      // Router: how a buffer should sit — size, where it's parked — is a
-      // personal call worked out with a planner. Stated, never graded.
-      return { state: 'flag', metric: m + (m === 1 ? ' month' : ' months'), unit: 'cover if income paused',
-        facts: sav !== null ? 'accessible savings ' + fmt$(sav) : '',
-        route: 'How a buffer should sit is a planner conversation', pct: 100 };
-    } },
-  { key: 'income', name: 'Income structure', derive(d) {
-      const inc = d.income || {};
-      const sal = num(inc.salary_annual), psal = num(inc.partner_salary_annual), side = num(inc.side_income_annual), oth = num(inc.other_income_annual);
-      const parts = [sal, psal, side, oth].filter(v => v !== null);
-      if (!parts.length) return { state: 'building', pct: 0 };
-      const total = parts.reduce((a, b) => a + b, 0);
-      const shape = [];
-      if (sal !== null) shape.push('salary');
-      if (psal !== null) shape.push('partner salary');
-      if (side !== null && side > 0) shape.push('side income');
-      if (oth !== null && oth > 0) shape.push('other income');
-      // Router: side or business income makes structure an accountant
-      // question. Salary-only → nothing here needs a conversation.
-      const hasNonSalary = (side !== null && side > 0) || (oth !== null && oth > 0);
-      return hasNonSalary
-        ? { state: 'flag', metric: fmt$(total), unit: '/yr household', facts: shape.join(' + '), route: 'How it’s structured is an accountant conversation', pct: 100 }
-        : { state: 'calm', metric: fmt$(total), unit: '/yr household', facts: shape.join(' + '), pct: 100 };
-    } },
-  { key: 'super', name: 'Super', derive(d) {
-      const s = d.super || {};
-      const funds = Array.isArray(s.funds) ? s.funds : [];
-      const total = sumArr(funds, 'balance');
-      const n = funds.length;
-      if (total === null && !n) return { state: 'building', pct: s.multiple_accounts !== undefined ? 40 : 0 };
-
-      // Per-member attribution: consolidation is only a signal when ONE
-      // person holds more than one account. One account each across two
-      // partners is completely normal (super can't merge between spouses).
-      const byOwner = {};
-      let unattributed = 0;
-      funds.forEach(f => {
-        const o = (f && typeof f.owner === 'string') ? f.owner.trim().toLowerCase() : '';
-        if (o) byOwner[o] = (byOwner[o] || 0) + 1; else unattributed++;
-      });
-      const ownerNames = Object.keys(byOwner);
-      const maxPerOwner = ownerNames.length ? Math.max(...ownerNames.map(o => byOwner[o])) : 0;
-      const possess = o => o === 'you' ? 'your' : o === 'partner' ? 'your partner’s' : (o.charAt(0).toUpperCase() + o.slice(1)) + '’s';
-
-      const extras = [];
-      if (s.extra_contributions === true) extras.push('extra contributions');
-      if (s.notes && /insurance/i.test(s.notes)) extras.push('insurance held inside');
-
-      // Single account — no ambiguity, nothing to consolidate.
-      if (n <= 1) {
-        return { state: 'calm', metric: total !== null ? fmt$(total) : '1 account', unit: total !== null ? 'in one account' : '',
-          facts: extras.join(' · '), pct: 100 };
-      }
-
-      const totalMetric = total !== null ? fmt$(total) : n + ' accounts';
-      const totalUnit = total !== null ? 'total across ' + n + ' accounts' : '';
-
-      // One person with more than one account → the real consolidation signal.
-      if (maxPerOwner > 1 || (unattributed === n && s.multiple_accounts === true)) {
-        const whose = ownerNames.length
-          ? ownerNames.map(o => possess(o) + ' ' + byOwner[o] + (byOwner[o] === 1 ? ' account' : ' accounts')).join(' · ')
-          : 'more than one held by one person';
-        return { state: 'flag', metric: totalMetric, unit: totalUnit,
-          facts: [whose].concat(extras).join(' · '),
-          route: 'More than one account for one person is a planner conversation', pct: 100 };
-      }
-
-      // One account each across partners → completely normal.
-      if (unattributed === 0 && maxPerOwner === 1) {
-        const each = ownerNames.length === 2 && ownerNames.includes('you')
-          ? 'one account each across you and ' + ownerNames.filter(o => o !== 'you').map(o => o === 'partner' ? 'your partner' : o.charAt(0).toUpperCase() + o.slice(1)).join('')
-          : 'one account each';
-        return { state: 'calm', metric: totalMetric, unit: totalUnit,
-          facts: [each].concat(extras).join(' · '), pct: 100 };
-      }
-
-      // Multiple accounts but whose they are isn't pinned down yet — the
-      // insight can't distinguish consolidation from a normal couple, so it
-      // stays building (figure still shown, never hidden).
-      return { state: 'building', metric: totalMetric, unit: totalUnit,
-        facts: 'whose accounts these are is still to pin down' + (extras.length ? ' · ' + extras.join(' · ') : ''), pct: 85 };
-    } },
-  { key: 'protect', name: 'Protection & estate', derive(d, done) {
-      const p = d.protection || {}, e = d.estate || {};
-      const items = [
-        ['life cover', p.life_cover_amount], ['income protection', p.income_protection],
-        ['TPD', p.tpd_amount], ['trauma', p.trauma_amount],
-        ['will', e.will], ['power of attorney', e.poa],
-        ['guardianship', e.guardianship], ['super nomination', e.super_nomination]
-      ];
-      let present = 0, absent = 0, unsure = 0, captured = 0;
-      const absentNames = [];
-      for (const [label, v] of items) {
-        if (v === undefined || v === null) continue;
-        captured++;
-        if (v === 'na') continue;
-        if (v === false) { absent++; absentNames.push(label); }
-        else if (v === 'unsure') { unsure++; absentNames.push(label + '?'); }
-        else present++;
-      }
-      const bothDone = done.includes('protection') && done.includes('estate');
-      const pct = bothDone ? 100 : Math.round(captured / 8 * 100);
-      if (!captured) return { state: 'building', pct };
-      if (!bothDone && captured < 3) return { state: 'building', pct };
-      const metric = present + ' in place' + (absent ? ' · ' + absent + ' absent' : '') + (unsure ? ' · ' + unsure + ' unsure' : '');
-      // Router: an absent or unknown document is a fact. Absences point to a
-      // conversation; everything in place → nothing flagged.
-      return (absent || unsure)
-        ? { state: 'flag', metric, unit: '', facts: 'absent: ' + absentNames.slice(0, 5).join(', '), route: 'Cover and paperwork are worth a conversation', pct }
-        : { state: 'calm', metric, unit: '', facts: 'cover and paperwork all captured as in place', pct };
-    } }
-];
+function fmt$(n) { const r = Math.round(n); return (r < 0 ? '-$' + Math.abs(r).toLocaleString('en-AU') : '$' + r.toLocaleString('en-AU')); }
 
 const BADGE_LABEL = { flag: 'Worth a conversation', calm: 'Nothing flagged', building: 'Still building' };
+
+// Whether a domain object carries any substantive (non-underscore) leaf that
+// is not null — i.e. the conversation actually reached it.
+function anyLeaf(o) {
+  if (o === null || o === undefined) return false;
+  if (Array.isArray(o)) return o.some(anyLeaf);
+  if (typeof o === 'object') {
+    return Object.entries(o).some(([k, v]) => !k.startsWith('_') && anyLeaf(v));
+  }
+  return true;
+}
+
+const TILE_DOMAINS = { 1: ['home'], 2: ['income', 'expenses'], 3: ['buffer'], 4: ['super'], 5: ['protection'], 6: ['estate'], 7: ['investments'], 8: ['debts'], 9: ['income'] };
+function tileReached(tileNo, d) {
+  return (TILE_DOMAINS[tileNo] || []).some(k => anyLeaf(d[k]));
+}
+
+// Compact headline per tile for the grid card. Deterministic formatting of
+// captured facts and read-time derivations only — never a characterisation.
+function tileHeadline(tileNo, d, der) {
+  const home = d.home || {}, inc = d.income || {}, exp = d.expenses || {};
+  const buf = d.buffer || {}, sup = d.super || {}, inv = d.investments || {};
+  const debts = d.debts || {}, prot = d.protection || {}, est = d.estate || {};
+  if (tileNo === 1) {
+    if (num(der.home_equity) !== null) return { metric: fmt$(der.home_equity), unit: 'equity in the home', facts: fmt$(home.mortgage_balance) + ' owing' + (num(home.rate_percent) !== null ? ' at ' + home.rate_percent + '%' : '') };
+    if (num(home.value_estimate) !== null) return { metric: fmt$(home.value_estimate), unit: 'home value', facts: '' };
+    return null;
+  }
+  if (tileNo === 2) {
+    if (num(der.surplus_monthly) !== null) {
+      const inTotal = [inc.salary_net_monthly, inc.partner_salary_net_monthly].filter(v => num(v) !== null).reduce((a, b) => a + b, 0);
+      return { metric: fmt$(der.surplus_monthly), unit: '/month left over', facts: fmt$(inTotal) + ' in each month' };
+    }
+    if (num(exp.living_monthly) !== null) return { metric: fmt$(exp.living_monthly), unit: '/month living costs', facts: '' };
+    return null;
+  }
+  if (tileNo === 3) {
+    if (num(der.buffer_months) !== null) return { metric: der.buffer_months + (der.buffer_months === 1 ? ' month' : ' months'), unit: 'cover if income paused', facts: num(buf.accessible_savings) !== null ? 'accessible savings ' + fmt$(buf.accessible_savings) : '' };
+    if (num(buf.accessible_savings) !== null) return { metric: fmt$(buf.accessible_savings), unit: 'accessible savings', facts: '' };
+    return null;
+  }
+  if (tileNo === 4) {
+    const n = Array.isArray(sup.funds) ? sup.funds.length : 0;
+    if (num(der.super_total) !== null) return { metric: fmt$(der.super_total), unit: n > 1 ? 'total across ' + n + ' accounts' : 'in super', facts: sup.extra_contributions === true ? 'extra contributions' : '' };
+    if (n) return { metric: n + (n === 1 ? ' account' : ' accounts'), unit: '', facts: '' };
+    if (sup.multiple_accounts === true) return { metric: 'more than one account', unit: 'details still to gather', facts: '' };
+    return null;
+  }
+  if (tileNo === 5) {
+    const covers = [['life', prot.life], ['income protection', prot.income_protection], ['TPD', prot.tpd], ['trauma', prot.trauma]];
+    let held = 0, absent = 0; const absentNames = [];
+    for (const [label, c] of covers) {
+      if (!c || typeof c !== 'object' || c.held === null || c.held === undefined) continue;
+      if (c.held === true) held++; else { absent++; absentNames.push(label); }
+    }
+    if (!held && !absent) return null;
+    return { metric: held + ' in place' + (absent ? ' · ' + absent + ' none held' : ''), unit: '', facts: absentNames.length ? 'none held: ' + absentNames.join(', ') : '' };
+  }
+  if (tileNo === 6) {
+    const docs = [['will', est.will], ['power of attorney', est.poa], ['guardianship', est.guardianship], ['super nomination', est.super_nomination]];
+    let inPlace = 0, gaps = 0; const gapNames = [];
+    for (const [label, doc] of docs) {
+      if (!doc || typeof doc !== 'object' || doc.in_place === null || doc.in_place === undefined) continue;
+      if (doc.in_place === true) inPlace++;
+      else if (doc.in_place === 'na') continue;
+      else { gaps++; gapNames.push(label + (doc.in_place === 'unsure' ? '?' : '')); }
+    }
+    if (!inPlace && !gaps) return null;
+    return { metric: inPlace + ' in place' + (gaps ? ' · ' + gaps + ' not in place' : ''), unit: '', facts: gapNames.length ? 'not in place: ' + gapNames.join(', ') : '' };
+  }
+  if (tileNo === 7) {
+    const props = Array.isArray(inv.properties) ? inv.properties : [];
+    const holdings = [inv.shares_value, inv.managed_funds_value].filter(v => num(v) !== null);
+    const total = holdings.length ? holdings.reduce((a, b) => a + b, 0) : null;
+    const bits = [];
+    if (props.length) bits.push(props.length + (props.length === 1 ? ' investment property' : ' investment properties'));
+    if (total !== null) return { metric: fmt$(total), unit: 'in shares and funds', facts: bits.join(' · ') };
+    if (props.length) return { metric: bits[0], unit: '', facts: num(props[0].value_estimate) !== null ? 'valued around ' + fmt$(props[0].value_estimate) : '' };
+    return null;
+  }
+  if (tileNo === 8) {
+    if (num(der.debts_total) !== null) {
+      const n = debts.items.length;
+      return { metric: fmt$(der.debts_total), unit: 'across ' + n + (n === 1 ? ' item' : ' items'), facts: num(debts.hecs_balance) !== null && debts.hecs_balance > 0 ? 'HECS held separately' : '' };
+    }
+    return null;
+  }
+  if (tileNo === 9) {
+    const structure = inc.structure != null ? ({ paye: 'salary (PAYE)', sole_trader: 'sole trader', company: 'through a company', trust: 'through a trust', mixed: 'salary + self-employed' })[inc.structure] || inc.structure : null;
+    if (num(der.income_total_annual) !== null) return { metric: fmt$(der.income_total_annual), unit: '/yr household', facts: structure || '' };
+    const netTotal = [inc.salary_net_monthly, inc.partner_salary_net_monthly].filter(v => num(v) !== null);
+    if (netTotal.length) return { metric: fmt$(netTotal.reduce((a, b) => a + b, 0)), unit: '/month take-home', facts: structure || '' };
+    if (structure) return { metric: structure, unit: '', facts: '' };
+    return null;
+  }
+  return null;
+}
+
+let lastTriggers = null;
 
 function renderTiles(picture) {
   const grid = document.getElementById('tilesGrid');
   const d = picture.domains || {};
-  const done = Array.isArray(picture.completed_domains) ? picture.completed_domains : [];
+  const derived = window.finnDerived.derive(d);
+  const triggers = window.finnTriggers.evaluate(d, { derived });
+  lastTriggers = triggers;
   grid.innerHTML = '';
-  TILES.forEach(t => {
-    const r = t.derive(d, done) || { state: 'building', pct: 0 };
+  const ROUTE_ARROW = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  for (const t of triggers.tiles) {
+    if (!t.visible) continue;
+    const reached = tileReached(t.tile, d);
+    const state = t.insights.length ? 'flag' : (reached ? 'calm' : 'building');
+    const head = tileHeadline(t.tile, d, derived);
+    const title = FINN_LIBRARY && FINN_LIBRARY.tiles[String(t.tile)] ? FINN_LIBRARY.tiles[String(t.tile)].title : 'Tile ' + t.tile;
+    const firstInsight = t.insights[0];
+    let routeLabel = '';
+    if (firstInsight && FINN_LIBRARY) {
+      const entry = [].concat(FINN_LIBRARY.insights, FINN_LIBRARY.overrides).find(e => e.id === firstInsight.id);
+      if (entry) routeLabel = entry.action_label;
+    }
     const el = document.createElement('div');
-    el.className = 'tile s-' + (r.state === 'flag' ? 'flag' : r.state === 'calm' ? 'calm' : 'building') + (r.pct >= 100 ? ' done' : '');
-    // Clickable-ready for 3c's detail panel — no panel exists yet.
-    el.setAttribute('data-tile', t.key);
-    el.onclick = () => openDetail(t.key);
-    const ROUTE_ARROW = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+    el.className = 'tile s-' + state + (reached ? ' done' : '');
+    el.setAttribute('data-tile', t.tile);
+    el.onclick = () => openDetail(t.tile);
     el.innerHTML =
-      '<div class="status-row"><span class="badge ' + r.state + '"><span class="d"></span>' + BADGE_LABEL[r.state] + '</span><span class="ico">' + CHEV + '</span></div>' +
-      '<div class="name">' + t.name + '</div>' +
-      (r.metric !== undefined
-        ? '<div class="metric">' + esc(r.metric) + (r.unit ? ' <span class="unit">' + esc(r.unit) + '</span>' : '') + '</div>' +
-          (r.facts ? '<div class="facts">' + esc(r.facts) + '</div>' : '') +
-          (r.route ? '<div class="route">' + ROUTE_ARROW + '<span>' + esc(r.route) + '</span></div>' : '')
+      '<div class="status-row"><span class="badge ' + state + '"><span class="d"></span>' + BADGE_LABEL[state] + '</span><span class="ico">' + CHEV + '</span></div>' +
+      '<div class="name">' + esc(title) + '</div>' +
+      (head
+        ? '<div class="metric">' + esc(head.metric) + (head.unit ? ' <span class="unit">' + esc(head.unit) + '</span>' : '') + '</div>' +
+          (head.facts ? '<div class="facts">' + esc(head.facts) + '</div>' : '')
         : '<div class="metric empty">Still building<span class="ctx">fills in as you talk with Finn</span></div>') +
-      '<div class="complete"><div class="cf" style="width:' + (r.pct || 0) + '%"></div></div>';
+      (routeLabel ? '<div class="route">' + ROUTE_ARROW + '<span>' + esc(routeLabel) + '</span></div>' : '') +
+      '<div class="complete"><div class="cf" style="width:' + (reached ? 100 : 0) + '%"></div></div>';
     grid.appendChild(el);
-  });
+  }
 }
 
 function renderHero(completed) {
@@ -638,6 +606,8 @@ function renderHero(completed) {
   }
 }
 
+let lastPicture = { domains: {}, goals: {}, completed_domains: [] };
+
 async function refreshProgress() {
   const { data } = await finnSupabase.from('picture').select('domains, goals, completed_domains, last_write_status').limit(1);
   const picture = (data && data[0]) ? data[0] : { domains: {}, goals: {}, completed_domains: [] };
@@ -647,325 +617,27 @@ async function refreshProgress() {
   renderTiles(picture);
 }
 
-/* ══════════ DETAIL PANELS + GOAL ROUTING + REFERRAL CARDS (3c) ══════════
-   Read-only over the member's own RLS-scoped picture. Panels show the
-   advice-ready FACTS; routing names the professional TYPE that helps; the
-   referral card is an invitation, never a push. The same locked line as
-   3a/3b: state facts and route to a conversation — never grade, never
-   prescribe. And the two-case routing discipline: a captured goal
-   direction was discovered from the person's OWN words (owned — Case B,
-   full set including execution specialists); no captured goal → Case A,
-   assessor only, never a guessed goal. No handoff mechanics exist in 3c:
-   nothing is sent anywhere, no professional is named as a business. */
-let lastPicture = { domains: {}, goals: {}, completed_domains: [] };
+/* ══════════ DETAIL PANEL (sections A/B/C from the library) ══════════ */
 
-function goalDirs() {
-  const g = lastPicture.goals || {};
-  return Array.isArray(g.directions) ? g.directions.map(x => String(x).toLowerCase()) : [];
-}
-function hasDir(frags) { return goalDirs().some(d => frags.some(f => d.includes(f))); }
-function goalPhrase() {
-  if (hasDir(['kids', 'family'])) return 'setting the kids up';
-  if (hasDir(['property'])) return 'exploring property';
-  if (hasDir(['retire'])) return 'retiring earlier';
-  if (hasDir(['security'])) return 'feeling secure';
-  if (hasDir(['tax'])) return 'keeping tax tidy';
-  if (hasDir(['growth', 'invest'])) return 'growing what you have';
-  return null;
-}
-function resolvedCount() {
+function openDetail(tileNo) {
+  if (!FINN_LIBRARY || !lastTriggers) return;
   const d = lastPicture.domains || {};
-  const done = Array.isArray(lastPicture.completed_domains) ? lastPicture.completed_domains : [];
-  return TILES.filter(t => (t.derive(d, done) || {}).state !== 'building').length;
-}
+  const derived = window.finnDerived.derive(d);
+  const tileResult = lastTriggers.tiles.find(x => x.tile === tileNo);
+  if (!tileResult) return;
+  const reached = tileReached(tileNo, d);
+  const state = tileResult.insights.length ? 'flag' : (reached ? 'calm' : 'building');
+  const tileMeta = FINN_LIBRARY.tiles[String(tileNo)];
 
-const PRO_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c.6-3.7 3.2-6 6.5-6s5.9 2.3 6.5 6"/></svg>';
-
-function pro(name, why) { return { name, why }; }
-
-/* Per-insight panel content: context line, plain meaning, term
-   explanations, advice-ready figure rows, and routing (pros + optional
-   goal-matched referral observation). */
-const PANELS = {
-  equity: {
-    title: 'Equity position',
-    context: 'Everything you own set against everything you owe.',
-    meaning(d, r) {
-      const l = d.liabilities || {};
-      return 'Your net position is the plain sum of it: what you own minus what you owe. ' +
-        (num(l.mortgage_balance) !== null ? 'The mortgage sits inside this, and how it is set up — the rate, and whether savings sit against it — changes what it costs over time.' : 'With no loan against it, this is simply what you have.');
-    },
-    terms: [
-      '<b>Net position</b> — everything you own minus everything you owe.',
-      '<b>Offset</b> — a savings account linked to a home loan; money sitting in it reduces the interest charged.',
-      '<b>Rate</b> — the interest percentage the loan is charged at. Lenders don’t always tell existing customers when a better one exists.'
-    ],
-    figures(d) {
-      const a = d.assets || {}, l = d.liabilities || {};
-      const rows = [];
-      if (num(a.home_value) !== null) rows.push(['Home value', fmt$(a.home_value)]);
-      if (num(a.investment_property_value) !== null) rows.push(['Investment property', fmt$(a.investment_property_value)]);
-      if (num(a.savings) !== null) rows.push(['Savings', fmt$(a.savings)]);
-      if (num(a.shares_value) !== null) rows.push(['Shares and funds', fmt$(a.shares_value)]);
-      if (num(a.business_value) !== null) rows.push(['Business', fmt$(a.business_value)]);
-      if (num(l.mortgage_balance) !== null) rows.push(['Mortgage balance', fmt$(l.mortgage_balance)]);
-      if (num(l.mortgage_rate_percent) !== null) rows.push(['Mortgage rate', l.mortgage_rate_percent + '%']);
-      if (num(l.offset_balance) !== null) rows.push(['Offset balance', fmt$(l.offset_balance)]);
-      (Array.isArray(l.expensive_debts) ? l.expensive_debts : []).forEach(x => {
-        if (x && num(x.balance) !== null) rows.push([(x.type || 'Other debt'), fmt$(x.balance)]);
-      });
-      if (num(l.hecs_balance) !== null && l.hecs_balance > 0) rows.push(['HECS', fmt$(l.hecs_balance)]);
-      return rows;
-    },
-    routing(d, r) {
-      const propertyOwned = hasDir(['property']);
-      if (propertyOwned) {
-        return { pros: [
-          pro('Financial planner', 'helps work out how property would fit alongside everything else in your picture, before anything is committed'),
-          pro('Mortgage broker', 'the borrowing side — what’s workable and how a loan would be structured'),
-          pro('Buyer’s agent / property strategist', 'the search and negotiation side, once you’re actually looking — you’ve said property is a direction you want to explore')
-        ], obs: r.state === 'flag'
-          ? 'There’s <b>' + esc(r.metric) + '</b> in your net position and you’ve said you want to explore property. How the current loan is structured, and how this position could support the next step, is worth discussing with a <b>financial planner</b> and a <b>mortgage broker</b>.'
-          : null };
-      }
-      return { pros: [
-        pro('Mortgage broker', 'checks a loan’s rate and structure against the whole market — that’s exactly their job')
-      ], obs: r.state === 'flag' && goalPhrase()
-        ? 'Your mortgage’s rate and structure are checkable facts, and you’ve told Finn ' + esc(goalPhrase()) + ' matters — making sure the loan is working as hard as it could is worth discussing with a <b>mortgage broker</b>.'
-        : null };
-    }
-  },
-  surplus: {
-    title: 'Monthly surplus',
-    context: 'What’s left after the month’s income covers the month’s spending.',
-    meaning() {
-      return 'A surplus is simply the gap between what comes in and what goes out each month. Over time it’s what funds most financial goals — where it goes next depends entirely on what you want, which is exactly the conversation it points to.';
-    },
-    terms: [
-      '<b>Surplus</b> — what’s left after the month’s income covers the month’s spending.',
-      '<b>Putting it to work</b> — directing leftover money somewhere deliberate (against a loan, into savings, investments or super) rather than letting it drift. Which of those suits you is a professional’s conversation.'
-    ],
-    figures(d) {
-      const inc = d.income || {};
-      const rows = [];
-      if (num(inc.salary_annual) !== null) rows.push(['Salary', fmt$(inc.salary_annual) + ' /yr']);
-      if (num(inc.partner_salary_annual) !== null) rows.push(['Partner salary', fmt$(inc.partner_salary_annual) + ' /yr']);
-      if (num(inc.side_income_annual) !== null) rows.push(['Side income', fmt$(inc.side_income_annual) + ' /yr']);
-      if (num(inc.other_income_annual) !== null) rows.push(['Other income', fmt$(inc.other_income_annual) + ' /yr']);
-      const mIn = deriveMonthlyIncome(inc);
-      if (mIn !== null) rows.push(['Monthly income', fmt$(mIn)]);
-      if (num(inc.monthly_expenses) !== null) rows.push(['Monthly expenses', fmt$(inc.monthly_expenses)]);
-      if (mIn !== null && num(inc.monthly_expenses) !== null) rows.push(['Surplus', fmt$(mIn - inc.monthly_expenses) + ' /mo']);
-      return rows;
-    },
-    routing(d, r) {
-      const taxMinded = hasDir(['tax']);
-      const pros = taxMinded
-        ? [pro('Accountant', 'the tax side of where a surplus goes — structure, timing, what’s deductible'),
-           pro('Financial planner', 'the bigger picture of putting a surplus behind a goal')]
-        : [pro('Financial planner', 'putting a monthly surplus deliberately behind a goal is the bread and butter of what they do')];
-      const gp = goalPhrase();
-      return { pros, obs: r.state === 'flag' && gp
-        ? 'There’s <b>' + esc(r.metric) + '</b> building each month, and you’ve said ' + esc(gp) + ' is what matters. Putting one behind the other is exactly what ' + (taxMinded ? 'a <b>financial planner and accountant</b> help' : 'a <b>financial planner</b> helps') + ' structure — worth discussing.'
-        : null };
-    }
-  },
-  buffer: {
-    title: 'Emergency buffer',
-    context: 'How long the household could keep going if income stopped.',
-    meaning() {
-      return 'This is the resilience number: accessible money divided by monthly expenses gives the months you could cover if income paused. How big a buffer should be, and where it’s parked, is a personal call — the kind worked out with a professional, not a rule.';
-    },
-    terms: [
-      '<b>Emergency buffer</b> — money you can get to quickly, counted in months of expenses it would cover.',
-      '<b>Accessible</b> — in a bank account or similar; not locked in super or property.'
-    ],
-    figures(d) {
-      const b = d.buffer || {}, inc = d.income || {};
-      const rows = [];
-      if (num(b.accessible_savings) !== null) rows.push(['Accessible savings', fmt$(b.accessible_savings)]);
-      if (num(inc.monthly_expenses) !== null) rows.push(['Monthly expenses', fmt$(inc.monthly_expenses)]);
-      let months = num(b.months_cover);
-      if (months === null && num(b.accessible_savings) !== null && num(inc.monthly_expenses) !== null && inc.monthly_expenses > 0) months = b.accessible_savings / inc.monthly_expenses;
-      if (months !== null) rows.push(['Cover', (Math.round(months * 10) / 10) + ' months']);
-      return rows;
-    },
-    routing(d, r) {
-      const gp = goalPhrase();
-      return { pros: [pro('Financial planner', 'helps work out what buffer suits your household and how to build it at a pace that fits')],
-        obs: r.state === 'flag' && gp
-          ? 'Your buffer sits at <b>' + esc(r.metric) + '</b>, and you’ve said ' + esc(gp) + ' matters. How the buffer should sit underneath that is a natural early thing to work through with a <b>financial planner</b> — worth discussing.'
-          : null };
-    }
-  },
-  income: {
-    title: 'Income structure',
-    context: 'Where the household’s income comes from, and in what shape.',
-    meaning(d) {
-      const inc = d.income || {};
-      const side = num(inc.side_income_annual);
-      return side !== null && side > 0
-        ? 'Income arrives in more than one shape here. How non-salary income is structured — sole trader, company, trust — changes its tax treatment, and what suits best changes as it grows.'
-        : 'Income here is salary-shaped, which keeps the tax side simple and the picture easy to read.';
-    },
-    terms: [
-      '<b>Structure</b> — whether income comes as salary, sole trader, company or trust. Each is taxed differently.',
-      '<b>Side income</b> — regular income outside a salary; the part where structure starts to matter.'
-    ],
-    figures(d) { return PANELS.surplus.figures(d).filter(r => r[0] !== 'Monthly expenses' && r[0] !== 'Surplus'); },
-    routing(d, r) {
-      const gp = goalPhrase();
-      return { pros: [pro('Accountant', 'checks the structure still fits as income changes — the how-it-arrives side of the picture')],
-        obs: r.state === 'flag' && gp
-          ? 'There’s non-salary income in the mix, and you’ve said ' + esc(gp) + ' matters. Whether the structure still fits is worth discussing with an <b>accountant</b>.'
-          : null };
-    }
-  },
-  super: {
-    title: 'Super',
-    context: 'Retirement savings — whose accounts, where, and what sits inside them.',
-    meaning(d) {
-      const s = d.super || {};
-      const multi = (Array.isArray(s.funds) && s.funds.filter(f => (f.owner || '').toLowerCase() === 'you').length > 1) || s.multiple_accounts === true;
-      return multi
-        ? 'Each super account charges its own set of fees, so one person holding more than one account can mean paying twice for the same job. Whether combining them suits you depends on things like the insurance held inside each — a professional’s check, not a rule.'
-        : 'Super quietly compounds for decades, which makes it worth knowing what’s there and where.';
-    },
-    terms: [
-      '<b>Rolling over</b> — moving one super account’s balance into another. It can affect insurance held inside the fund, which is why it’s checked before it’s done.',
-      '<b>Insurance inside super</b> — cover paid for out of the fund balance. Many people don’t know they have it.',
-      '<b>Death-benefit nomination</b> — who your super goes to. It isn’t automatically covered by a will.'
-    ],
-    figures(d) {
-      const s = d.super || {};
-      const rows = (Array.isArray(s.funds) ? s.funds : []).map((f, i) => [
-        (f.fund && f.fund !== 'unknown' ? f.fund : 'Fund ' + (i + 1)) + (f.owner ? ' · ' + (String(f.owner).toLowerCase() === 'you' ? 'yours' : String(f.owner).toLowerCase() === 'partner' ? 'partner’s' : f.owner) : ''),
-        num(f.balance) !== null ? fmt$(f.balance) : '—'
-      ]);
-      const total = sumArr(s.funds, 'balance');
-      if (total !== null && rows.length > 1) rows.push(['Total', fmt$(total)]);
-      if (s.extra_contributions !== undefined) rows.push(['Extra contributions', s.extra_contributions ? 'yes' : 'no']);
-      return rows;
-    },
-    routing(d, r) {
-      const gp = goalPhrase();
-      return { pros: [pro('Financial planner', 'untangling multiple accounts — including the insurance inside each — is exactly what they check before anything moves')],
-        obs: r.state === 'flag'
-          ? 'One person here holds more than one super account' + (gp ? ', and you’ve said ' + esc(gp) + ' matters — tidy super sits underneath that' : '') + '. What combining them would mean, including the insurance inside each, is worth discussing with a <b>financial planner</b>.'
-          : null };
-    }
-  },
-  protect: {
-    title: 'Protection & estate',
-    context: 'The cover and the paperwork that protect a household when something goes wrong.',
-    meaning() {
-      return 'Two halves: insurance cover if illness or injury stopped income, and the legal basics — a will, power of attorney, guardianship, and where super goes. These are shown here exactly as captured: in place, absent, or not yet discussed. Absences are facts, not grades.';
-    },
-    terms: [
-      '<b>Income protection</b> — replaces part of your income if you can’t work for a stretch.',
-      '<b>TPD</b> — total and permanent disability cover.',
-      '<b>Trauma</b> — a lump-sum payout on diagnosis of certain serious illnesses.',
-      '<b>Power of attorney</b> — who can legally act for you if you can’t.',
-      '<b>Death-benefit nomination</b> — who your super goes to; separate from a will.'
-    ],
-    figures(d) {
-      const p = d.protection || {}, e = d.estate || {};
-      const show = v => v === undefined || v === null ? ['not yet discussed', true]
-        : v === 'na' ? ['not applicable', true]
-        : v === 'unsure' ? ['unsure', true]
-        : v === false ? ['absent', false]
-        : v === true ? ['in place', false]
-        : [fmt$(v), false];
-      return [
-        ['Life cover', p.life_cover_amount], ['Income protection', p.income_protection],
-        ['TPD', p.tpd_amount], ['Trauma', p.trauma_amount],
-        ['Will', e.will], ['Power of attorney', e.poa],
-        ['Guardianship', e.guardianship], ['Super nomination', e.super_nomination]
-      ].map(([k, v]) => { const [txt, na] = show(v); return [k, txt, na]; });
-    },
-    routing(d, r) {
-      const p = d.protection || {}, e = d.estate || {};
-      const coverGap = [p.life_cover_amount, p.income_protection, p.tpd_amount, p.trauma_amount].some(v => v === false || v === 'unsure');
-      const estateGap = [e.will, e.poa, e.guardianship, e.super_nomination].some(v => v === false || v === 'unsure');
-      const pros = [];
-      if (estateGap) pros.push(pro('Estate lawyer', 'wills, powers of attorney and guardianship — the paperwork half'));
-      if (coverGap) pros.push(pro('Risk (insurance) specialist', 'what cover exists, what’s absent, and what suits the household — the cover half'));
-      if (!pros.length) pros.push(pro('Risk (insurance) specialist or estate lawyer', 'the pair who look after this area when anything changes'));
-      const gp = goalPhrase();
-      return { pros, obs: r.state === 'flag' && gp
-        ? 'There are absences in the cover and paperwork that protect exactly what you’ve said matters — ' + esc(gp) + '. Worth discussing with ' + (estateGap && coverGap ? 'an <b>estate lawyer</b> and a <b>risk specialist</b>' : estateGap ? 'an <b>estate lawyer</b>' : 'a <b>risk specialist</b>') + '.'
-        : null };
-    }
-  }
-};
-
-function openDetail(key) {
-  const cfg = PANELS[key];
-  const tile = TILES.find(t => t.key === key);
-  if (!cfg || !tile) return;
-  const d = lastPicture.domains || {};
-  const done = Array.isArray(lastPicture.completed_domains) ? lastPicture.completed_domains : [];
-  const r = tile.derive(d, done) || { state: 'building', pct: 0 };
-
-  document.getElementById('dpTitle').textContent = cfg.title;
+  document.getElementById('dpTitle').textContent = tileMeta ? tileMeta.title : 'Tile ' + tileNo;
   const badge = document.getElementById('dpBadge');
-  badge.className = 'dp-badge badge ' + r.state;
-  badge.innerHTML = '<span class="d"></span>' + BADGE_LABEL[r.state];
+  badge.className = 'dp-badge badge ' + state;
+  badge.innerHTML = '<span class="d"></span>' + BADGE_LABEL[state];
 
-  let html = '<div class="dp-inner">';
-  // 1. The insight + figure (the headline)
-  if (r.metric !== undefined) {
-    html += '<div class="dp-hero-num">' + esc(r.metric) + (r.unit ? ' <span class="u">' + esc(r.unit) + '</span>' : '') + '</div>';
-  }
-  html += '<div class="dp-context">' + esc(cfg.context) + '</div>';
-
-  // 2 + 3. What you told me | In plain terms — clean two-column grid
-  const figs = cfg.figures(d);
-  html += '<div class="dp-grid">';
-  if (figs.length) {
-    html += '<div class="dp-section"><div class="lbl">What you told me</div><div class="dp-figures">' +
-      figs.map(f => '<div class="dp-figrow"><span class="k">' + esc(f[0]) + '</span><span class="v' + (f[2] ? ' na' : '') + '">' + esc(f[1]) + '</span></div>').join('') +
-      '</div></div>';
-  }
-  html += '<div class="dp-section"><div class="lbl">In plain terms</div><div class="dp-terms">' +
-    cfg.terms.map(t => '<div class="dp-term">' + t + '</div>').join('') + '</div></div>';
-  html += '</div>';
-
-  // 4. Why this is worth a conversation — the education layer's STRUCTURE.
-  // Devon writes the actual education content separately (line-sensitive);
-  // the placeholders below are deliberately unmistakable and must never
-  // ship with improvised financial content in their place.
-  if (r.state === 'flag') {
-    const EDU_BLOCKS = [
-      'Why it matters',
-      'What the benefit could be',
-      'How the professional works',
-      'Why it may cost nothing',
-      'What people often don’t realise'
-    ];
-    html += '<div class="dp-section"><div class="lbl">Why this is worth a conversation</div><div class="dp-edu">' +
-      EDU_BLOCKS.map(h => '<div class="dp-edu-block"><div class="eh">' + h + '</div><div class="edu-placeholder">[Education content to be written — ' + h.toLowerCase() + ' for this insight. Placeholder only; not financial content.]</div></div>').join('') +
-      '</div></div>';
-  }
-
-  if (r.state === 'building') {
-    html += '<div class="dp-section"><div class="dp-building">This area is still building — the figures above fill in as the conversation covers it. Who can help comes into focus once the insight is complete.</div></div>';
-  } else {
-    const route = cfg.routing(d, r);
-    html += '<div class="dp-section"><div class="lbl">Who can help</div><div class="dp-pros">' +
-      route.pros.map(p => '<div class="dp-pro"><div class="ic">' + PRO_ICON + '</div><div class="txt"><b>' + esc(p.name) + '</b> — ' + esc(p.why) + '</div></div>').join('') +
-      '</div>';
-    if (!goalDirs().length) {
-      html += '<div class="dp-goalnote">Pinning down what you want next would sharpen exactly who helps here — that’s a conversation Finn can have with you whenever you’re ready.</div>';
-    }
-    html += '</div>';
-    // Referral card: only once the picture is substantially complete
-    // (≥4 of 6 insights resolved), only on flagged insights, and only when
-    // a goal the person owns makes the observation genuinely theirs.
-    if (route.obs && resolvedCount() >= 4) {
-      html += '<div class="ref-card"><div class="rc-tag">Worth a conversation</div><div class="rc-body">' + route.obs + '</div>' +
-        '<div class="rc-foot">When referrals open, Finn can introduce you to a vetted professional for this — nothing about your picture is ever shared unless you choose it.</div></div>';
-    }
+  let html = '<div class="dp-inner">' +
+    window.finnPanels.renderTile(tileNo, d, derived, tileResult, FINN_LIBRARY);
+  if (state === 'building') {
+    html += '<div class="dp-section"><div class="dp-building">This area is still building — the figures fill in as the conversation covers it.</div></div>';
   }
   html += '</div>';
   document.getElementById('dpBody').innerHTML = html;
@@ -1121,6 +793,10 @@ async function main() {
   const { data: { session: s } } = await finnSupabase.auth.getSession();
   if (!s) { window.location.replace('/app/login/'); return; }
   session = s;
+
+  // The locked library — Devon/Charlie's copy as data. Loaded once; the
+  // dashboard renders nothing insight-shaped without it.
+  FINN_LIBRARY = await (await fetch('/app/shared/finn-library.json')).json();
 
   const [{ data: me }, { data: households }, { data: access }] = await Promise.all([
     finnSupabase.from('members').select('display_name, email').eq('id', s.user.id).maybeSingle(),
