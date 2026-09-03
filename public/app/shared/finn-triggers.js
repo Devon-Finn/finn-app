@@ -93,7 +93,11 @@
     // 2.1 and 2.2 are mutually exclusive by construction (>0 vs <=0).
     fires['2.2'] = num(derived.surplus_monthly) !== null && derived.surplus_monthly <= 0;
     fires['3.1'] = expensesPresent;
-    fires['3.2a'] = home.has_offset === true && buf.linked_to_loan === false && pos(buf.accessible_savings);
+    // 3.2a counts ALL cash held outside the offset, not only the emergency
+    // buffer: a dollar outside an offset behaves the same way whatever it
+    // is earmarked for (field-spec 3.3 explicit non-trigger).
+    fires['3.2a'] = home.has_offset === true && buf.linked_to_loan === false
+      && ((num(buf.accessible_savings) || 0) + (num(buf.other_cash) || 0)) > 0;
     fires['3.2b'] = home.owns_home === true && home.has_offset === false && pos(buf.accessible_savings);
 
     // 4.1 — count(super.funds) > 1 for the SAME owner, OR multiple_accounts

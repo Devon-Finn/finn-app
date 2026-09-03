@@ -458,21 +458,9 @@ function fmt$(n) { const r = Math.round(n); return (r < 0 ? '-$' + Math.abs(r).t
 
 const BADGE_LABEL = { flag: 'Worth a conversation', calm: 'Nothing flagged', building: 'Still building' };
 
-// Whether a domain object carries any substantive (non-underscore) leaf that
-// is not null — i.e. the conversation actually reached it.
-function anyLeaf(o) {
-  if (o === null || o === undefined) return false;
-  if (Array.isArray(o)) return o.some(anyLeaf);
-  if (typeof o === 'object') {
-    return Object.entries(o).some(([k, v]) => !k.startsWith('_') && anyLeaf(v));
-  }
-  return true;
-}
-
-const TILE_DOMAINS = { 1: ['home'], 2: ['income', 'expenses'], 3: ['buffer'], 4: ['super'], 5: ['protection'], 6: ['estate'], 7: ['investments'], 8: ['debts'], 9: ['income'] };
-function tileReached(tileNo, d) {
-  return (TILE_DOMAINS[tileNo] || []).some(k => anyLeaf(d[k]));
-}
+// Whether a tile's domain was reached — one shared definition, in
+// finn-panels.js, used by the grid badges and the panel calm decision.
+function tileReached(tileNo, d) { return window.finnPanels.tileReached(tileNo, d); }
 
 // Compact headline per tile for the grid card. Deterministic formatting of
 // captured facts and read-time derivations only — never a characterisation.

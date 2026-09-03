@@ -13,7 +13,7 @@
       "route_primary/route_also (component-spec 5.2): a fixed property of the insight, never derived from the person. An insight appears once under its primary professional on the who-to-see view; route_also professionals are named inline beneath it, never given a duplicate entry.",
       "no_referral: true means the entry has NO action button, NO route_primary and NO professional card. Where a counsellor appears in its copy, they are named as available, never prescribed.",
       "section_b is absent ONLY where a calc block demonstrates the same mechanic (tiles 1 and 2). On tiles 3-9 the mechanic is about what a product does, not how numbers relate, so section_b stays (component-spec 4.1).",
-      "Each tile carries a calm block {statement, why, what_would_change[], closing} rendered when the tile has figures and zero insights. why is a property of the situation type, never a judgment of the person; what_would_change lists circumstances; closing says why each matters. Never a tick, never green, never a completion state (component-spec 3.6, education-library 6.2).",
+      "Only tiles 1, 4, 6 and 9 can go calm and carry a calm block {statement, why, what_would_change[], closing}, rendered when the tile has figures and zero insights. Tiles 2, 3, 5, 7 and 8 can never go calm (every computable state there fires something or is still building) and the renderer must never expect a block for them. why is a property of the situation type, never a judgment of the person. Never a tick, never green, never a completion state; the status flag is neutral grey Nothing flagged (component-spec 3.6, education-library 6.2).",
       "professionals: cost belongs to the professional, not the insight. cost_pill and cost_line render once on the who-to-see view, never per insight (component-spec 2.6)."
     ]
   },
@@ -58,41 +58,51 @@
   "tiles": {
     "1": {
       "title": "Your home and mortgage",
-      "calm": { "statement": "[Not provided - being written. Do not invent.]", "why": "[Not provided - being written. Do not invent.]", "what_would_change": [], "closing": "[Not provided - being written. Do not invent.]" }
+      "calm": {
+        "statement": "Nothing here routes to anyone.",
+        "why": "With no loan against the place there's no rate to review, no structure to look at and no lender in the picture. A home owned outright is the simplest position this tile can hold.",
+        "what_would_change": ["Borrowing against the property for any reason", "Buying somewhere else while keeping this one", "Using what you own of it to fund something"],
+        "closing": "Any of those brings a lender back into the picture, and that's when a broker becomes useful again."
+      }
     },
     "2": {
-      "title": "What's left over each month",
-      "calm": { "statement": "[Not provided - being written. Do not invent.]", "why": "[Not provided - being written. Do not invent.]", "what_would_change": [], "closing": "[Not provided - being written. Do not invent.]" }
+      "title": "What's left over each month"
     },
     "3": {
       "title": "Your safety net",
-      "section_b": "Your safety net is money you could reach quickly, without selling anything or asking anyone's permission. The months figure is that amount divided by what a month of your life costs, so it's expressed as time rather than dollars. It counts only money you already hold. Credit you could draw on isn't included, because that belongs to a lender rather than to you.",
-      "calm": { "statement": "[Not provided - being written. Do not invent.]", "why": "[Not provided - being written. Do not invent.]", "what_would_change": [], "closing": "[Not provided - being written. Do not invent.]" }
+      "section_b": "Your safety net is money you could reach quickly, without selling anything or asking anyone's permission. The months figure is that amount divided by what a month of your life costs, so it's expressed as time rather than dollars. It counts only money you already hold. Credit you could draw on isn't included, because that belongs to a lender rather than to you."
     },
     "4": {
       "title": "Your super",
       "section_b": "Super is money held for you until retirement, in one account or several. Each account charges its own fees, taken out of the balance rather than billed to you, so they're easy not to notice. Accounts can also hold insurance inside them, with the premiums coming out of the balance the same way.",
-      "calm": { "statement": "[Not provided - being written. Do not invent.]", "why": "[Not provided - being written. Do not invent.]", "what_would_change": [], "closing": "[Not provided - being written. Do not invent.]" }
+      "calm": {
+        "statement": "Nothing here routes to anyone.",
+        "why": "One account each. Fees come out of one balance rather than several, and there's no second account quietly holding cover you'd forgotten about. That's the simplest way super can sit.",
+        "what_would_change": ["Changing jobs, where a new employer opens their default fund", "Starting to work for yourself", "Turning up an old account you'd lost track of"],
+        "closing": "Super accounts open far more easily than they close. A new job with a new default fund is how most people end up with two without ever deciding to."
+      }
     },
     "5": {
       "title": "Protection",
-      "section_b": "Life cover pays a lump sum if you die. Total and permanent disability cover pays if you're permanently unable to work again. Income protection is a different thing again, it replaces part of your income month to month while you're unable to work, and stops when you go back. They're three separate events, and holding cover for one doesn't cover you for the others.",
-      "calm": { "statement": "[Not provided - being written. Do not invent.]", "why": "[Not provided - being written. Do not invent.]", "what_would_change": [], "closing": "[Not provided - being written. Do not invent.]" }
+      "section_b": "Life cover pays a lump sum if you die. Total and permanent disability cover pays if you're permanently unable to work again. Income protection is a different thing again, it replaces part of your income month to month while you're unable to work, and stops when you go back. They're three separate events, and holding cover for one doesn't cover you for the others."
     },
     "6": {
       "title": "Your will and estate",
       "section_b": "A will directs what happens to what you own. An enduring power of attorney lets someone you choose make decisions on your behalf if you're unable to, while you're still alive, which a will doesn't cover. Guardianship names who would raise your children. A super nomination directs your super, which is dealt with separately from your will.",
-      "calm": { "statement": "[Not provided - being written. Do not invent.]", "why": "[Not provided - being written. Do not invent.]", "what_would_change": [], "closing": "[Not provided - being written. Do not invent.]" }
+      "calm": {
+        "statement": "Nothing here routes to anyone.",
+        "why": "A will, an enduring power of attorney, guardianship and a super nomination, all in place and none of them old enough to have drifted from what you'd want. That's the full set.",
+        "what_would_change": ["A child arriving", "A separation, or a new relationship", "Buying or selling a property", "Your super nomination reaching three years old"],
+        "closing": "The nomination is the one with a clock on it. Most expire after three years unless the fund offers a non-lapsing one, and nothing tells you when that happens."
+      }
     },
     "7": {
       "title": "Your investments",
-      "section_b": "An investment property has its own value, its own loan and its own equity, in the same way your home does. The rent it earns is income, and the interest on its loan is treated differently at tax time from the interest on the loan for the home you live in. For shares and funds, what they earn is taxed at the marginal rate of whoever the asset is held by, so whose name is on it changes what it costs.",
-      "calm": { "statement": "[Not provided - being written. Do not invent.]", "why": "[Not provided - being written. Do not invent.]", "what_would_change": [], "closing": "[Not provided - being written. Do not invent.]" }
+      "section_b": "An investment property has its own value, its own loan and its own equity, in the same way your home does. The rent it earns is income, and the interest on its loan is treated differently at tax time from the interest on the loan for the home you live in. For shares and funds, what they earn is taxed at the marginal rate of whoever the asset is held by, so whose name is on it changes what it costs."
     },
     "8": {
       "title": "Your other debts",
-      "section_b": "The minimum repayment on a credit card is calculated as a small percentage of the balance, which means most of an early payment goes to interest rather than the debt. It's why a balance at 20% moves slowly even when the minimum is met every month.",
-      "calm": { "statement": "[Not provided - being written. Do not invent.]", "why": "[Not provided - being written. Do not invent.]", "what_would_change": [], "closing": "[Not provided - being written. Do not invent.]" }
+      "section_b": "The minimum repayment on a credit card is calculated as a small percentage of the balance, which means most of an early payment goes to interest rather than the debt. It's why a balance at 20% moves slowly even when the minimum is met every month."
     },
     "9": {
       "title": "How your income is made up",
@@ -128,21 +138,21 @@
     },
     {
       "id": "1.2",
-      "title": "Your offset account",
+      "title": "An offset account with nothing in it",
       "tile": 1,
       "variant": null,
       "route_primary": "mortgage_broker",
       "route_also": [],
       "position_line": {
-        "template": "Your offset account holds {offset_balance}, against a loan balance of {mortgage_balance}.",
-        "fields": ["home.offset_balance", "home.mortgage_balance", "home.package_fee_annual"]
+        "template": "You have an offset account attached to your loan, with nothing currently sitting in it.",
+        "fields": ["home.has_offset", "home.offset_balance"]
       },
       "blocks": {
-        "why": "An offset account is one of the most useful features a home loan can have, and also one of the most misunderstood. Money sitting in your offset reduces the interest charged on your mortgage while staying completely available to you, you can spend it any time. Because it works quietly in the background, a lot of people either aren't using one when they could be, or aren't using the one they have as well as they could.",
-        "turn_up": "How your everyday money and savings sit around your loan can make a steady difference over time, without locking anything away or changing how you live. It's easy to set up well once you understand it, and easy to leave alone if you don't.",
-        "dont_realise": "An offset usually comes as part of a package the loan charges you for, often a few hundred dollars a year. That's fine when there's money sitting in it. When the balance is low, the feature can quietly cost more than it saves, and it keeps charging either way. Most people never think of an offset as something with a price on it.\n\nAnd as with any broker conversation, they're paid by the lender, so understanding your own loan usually costs you nothing.",
-        "how_professional": "A broker can walk you through how your specific offset works and how your accounts sit around your loan, so you can see what it's doing and what your options are.",
-        "nothing_to_prepare": "You don't need to understand offsets before you go, that's the whole point of the conversation. Finn passes them the picture you've built, and they take it from there. No homework, and no feeling that you're behind."
+        "why": "An offset account is one of the most useful features a home loan can have, and it only does anything when there's money in it. Every dollar in an offset comes off the balance your loan charges interest on, while staying completely available to you. An empty one does none of that, and it usually isn't free.",
+        "turn_up": "Sometimes the account was set up at settlement and never used, because nobody explained what it was for. Sometimes the money that would sit in it is somewhere else entirely. Either way it's a short conversation, and it's the kind of thing a broker sorts out in one call.",
+        "dont_realise": "An offset usually comes as part of a package the loan charges you for, often a few hundred dollars a year. That fee is charged whether the account is working hard or sitting empty. Most people never think of an offset as something with a price on it, which is how an unused one goes years without anyone noticing.",
+        "how_professional": "A broker can tell you what your particular package costs, what the offset is actually attached to, and how your accounts could sit around the loan. This is routine work for them.",
+        "nothing_to_prepare": "You don't need to understand offsets before you go, that's the whole point of the conversation. Finn passes on how your accounts currently sit, and they explain the rest in ordinary terms. No homework."
       },
       "action_label": "Find a mortgage broker"
     },

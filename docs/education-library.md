@@ -196,26 +196,29 @@ This is the bit people quietly dread, sitting across from someone and worrying t
 
 ---
 
-### 1.2 — Your offset account → mortgage broker
+### 1.2 — An offset account with nothing in it → mortgage broker
+
+Fires on has_offset = true AND offset_balance = 0. Someone using their offset has no question to take anyone, and judging whether their balance is "enough" would be an evaluation.
+
+**Position line**
+You have an offset account attached to your loan, with nothing currently sitting in it.
 
 **Why this is worth a conversation**
-An offset account is one of the most useful features a home loan can have, and also one of the most misunderstood. Money sitting in your offset reduces the interest charged on your mortgage while staying completely available to you, you can spend it any time. Because it works quietly in the background, a lot of people either aren't using one when they could be, or aren't using the one they have as well as they could.
+An offset account is one of the most useful features a home loan can have, and it only does anything when there's money in it. Every dollar in an offset comes off the balance your loan charges interest on, while staying completely available to you. An empty one does none of that, and it usually isn't free.
 
 **What a look at this can turn up**
-How your everyday money and savings sit around your loan can make a steady difference over time, without locking anything away or changing how you live. It's easy to set up well once you understand it, and easy to leave alone if you don't.
+Sometimes the account was set up at settlement and never used, because nobody explained what it was for. Sometimes the money that would sit in it is somewhere else entirely. Either way it's a short conversation, and it's the kind of thing a broker sorts out in one call.
 
 **The part most people don't realise**
-An offset usually comes as part of a package the loan charges you for, often a few hundred dollars a year. That's fine when there's money sitting in it. When the balance is low, the feature can quietly cost more than it saves, and it keeps charging either way. Most people never think of an offset as something with a price on it.
-
-And as with any broker conversation, they're paid by the lender, so understanding your own loan usually costs you nothing.
+An offset usually comes as part of a package the loan charges you for, often a few hundred dollars a year. That fee is charged whether the account is working hard or sitting empty. Most people never think of an offset as something with a price on it, which is how an unused one goes years without anyone noticing.
 
 **How a mortgage broker helps here**
-A broker can walk you through how your specific offset works and how your accounts sit around your loan, so you can see what it's doing and what your options are.
+A broker can tell you what your particular package costs, what the offset is actually attached to, and how your accounts could sit around the loan. This is routine work for them.
 
 **There's nothing you need to know or prepare**
-You don't need to understand offsets before you go, that's the whole point of the conversation. Finn passes them the picture you've built, and they take it from there. No homework, and no feeling that you're behind.
+You don't need to understand offsets before you go, that's the whole point of the conversation. Finn passes on how your accounts currently sit, and they explain the rest in ordinary terms. No homework.
 
-→ *Find a mortgage broker*
+→ Find a mortgage broker
 
 ---
 
@@ -847,6 +850,46 @@ Structure per tile: `statement`, `why`, `what_would_change[]`, `closing`.
 
 **Never** a tick, a green anything, "you're in good shape", or a completion state. The `why` describes a property of the situation type, never a judgment of the person.
 
+### Which tiles can actually go calm
+
+Only four. Tiles 2, 3, 5, 7 and 8 can never go calm and need no copy — the renderer should never expect a block for them.
+
+- 2 — 2.1 fires on positive surplus, 2.2 on zero or negative. Every computable surplus routes somewhere. A null surplus is "still building", not calm.
+- 3 — 3.1 fires wherever expenses were captured.
+- 5 — 5.1 fires wherever the protection domain was reached.
+- 7 and 8 — conditional tiles. If the tile shows, holdings or debts exist, so something fires. Hardship on Tile 8 substitutes the counsellor route rather than emptying it.
+
+### Tile 1 — home and mortgage
+
+- **statement** — Nothing here routes to anyone.
+- **why** — With no loan against the place there's no rate to review, no structure to look at and no lender in the picture. A home owned outright is the simplest position this tile can hold.
+- **what_would_change**
+  - Borrowing against the property for any reason
+  - Buying somewhere else while keeping this one
+  - Using what you own of it to fund something
+- **closing** — Any of those brings a lender back into the picture, and that's when a broker becomes useful again.
+
+### Tile 4 — your super
+
+- **statement** — Nothing here routes to anyone.
+- **why** — One account each. Fees come out of one balance rather than several, and there's no second account quietly holding cover you'd forgotten about. That's the simplest way super can sit.
+- **what_would_change**
+  - Changing jobs, where a new employer opens their default fund
+  - Starting to work for yourself
+  - Turning up an old account you'd lost track of
+- **closing** — Super accounts open far more easily than they close. A new job with a new default fund is how most people end up with two without ever deciding to.
+
+### Tile 6 — your will and estate
+
+- **statement** — Nothing here routes to anyone.
+- **why** — A will, an enduring power of attorney, guardianship and a super nomination, all in place and none of them old enough to have drifted from what you'd want. That's the full set.
+- **what_would_change**
+  - A child arriving
+  - A separation, or a new relationship
+  - Buying or selling a property
+  - Your super nomination reaching three years old
+- **closing** — The nomination is the one with a clock on it. Most expire after three years unless the fund offers a non-lapsing one, and nothing tells you when that happens.
+
 ### Tile 9 — how your income is made up
 
 - **statement** — Nothing here routes to anyone.
@@ -857,10 +900,6 @@ Structure per tile: `statement`, `why`, `what_would_change[]`, `closing`.
   - Rent from a property
   - Money paid through a trust or a company
 - **closing** — Each of those brings tax you settle yourself rather than an employer settling it, and super nobody pays for you unless you arrange it. That's when this becomes an accountant's conversation.
-
-### Tiles 1 to 8
-
-*[Not provided — being written. Do not invent.]*
 
 ---
 

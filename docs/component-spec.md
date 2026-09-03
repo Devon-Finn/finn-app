@@ -188,6 +188,10 @@ Collapsed by default. Summary carries the insight headline, a one-line hook draw
 
 Body order: why · what a look turns up · **the knowledge block** · how the professional works · cost · promise · action.
 
+**Cost renders once per professional per tile**, on the first card that routes to them, using the same first-encounter logic as the term handovers. The destination chip carries the pill (`Mortgage broker · usually free`) on every card, so the expectation is set even on a collapsed one; the full `cost_line` appears only once. Three broker insights on Tile 1 produce three chips and one cost line.
+
+On the who-to-see view the cost line renders once per professional card, which is a different surface and not a repeat.
+
 **The knowledge block is the only place emphasis is spent.** White inset on the warm ground, forest heading. It is the block someone paid $97 for.
 
 ## 3.3 Step rail

@@ -337,7 +337,7 @@ A visible tile with no firing insight is a valid and intended state. It shows th
 | 2.1 | Spare money | `surplus_monthly > 0` | `surplus_monthly` | Planner / accountant |
 | 2.2 | Nothing left over | `surplus_monthly <= 0` **and** computable (never on null) | `surplus_monthly`, `debts.items[]` | **No paid referral.** Education, with the counsellor named as available. |
 | 3.1 | How long it would last | Always, where `expenses` is present | `buffer_months`, `context.children`, `income.structure` | Planner |
-| 3.2a | Where it sits — has offset | `has_offset = true` AND `buffer.linked_to_loan = false` AND `accessible_savings > 0` | `accessible_savings`, `offset_balance` | Mortgage broker |
+| 3.2a | Where it sits — has offset | `has_offset = true` AND `buffer.linked_to_loan = false` AND `(accessible_savings + other_cash) > 0` | `accessible_savings`, `other_cash`, `offset_balance` | Mortgage broker |
 | 3.2b | Where it sits — no offset | `owns_home = true` AND `has_offset = false` AND `accessible_savings > 0` | `accessible_savings` | Mortgage broker |
 | 4.1 | More than one super account | `count(super.funds) > 1` for the same owner **OR** `super.multiple_accounts = true` | `funds[]`, `multiple_accounts`, `has_insurance` | Planner |
 | 5.1 | Household cover | Any field in `protection` is non-null, i.e. the domain was actually reached | `protection.*`, `context`, `mortgage_balance` | Risk specialist / planner |
@@ -358,6 +358,7 @@ Recorded because a lawyer will ask, and because they are easy to reintroduce by 
 - **No insight fires on portfolio composition.** Allocation is displayed as fact and never evaluated.
 - **1.2 does not fire merely because an offset exists.** Someone with money in their offset already has the arrangement working and has no question to take anyone. Deciding whether their balance is "enough" to justify the package fee would be an evaluation of their position. An offset holding nothing is a different thing: the fee is charged and the benefit is zero, which is mechanically true whatever their circumstances. The package-fee knowledge otherwise lives in 1.1, where a broker reviewing the loan would look at it anyway.
 - **2.1 and 2.2 are mutually exclusive, and neither fires on a null surplus.** A null means the inputs were ambiguous, not that the money is tight. Assert the exclusivity in tests.
+- **3.2a counts all cash held outside the offset, not only the emergency buffer.** A dollar outside an offset behaves the same way whatever it is earmarked for. Before `other_cash` existed the insight could only see the buffer portion, which was a third of some households' actual position.
 - **No insight fires on a domain that was never reached.** An all-null domain means the conversation didn't get there, not that the answer is no. Finn cannot say something is worth a conversation when it has no idea what the person holds. This is the `null` vs `false` convention applied to triggering, and it is why 5.1 conditions on the protection domain having been asked rather than firing always.
 
 ## 3.4 Precedence

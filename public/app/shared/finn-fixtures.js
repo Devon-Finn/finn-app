@@ -150,6 +150,16 @@
       mustNotFire: ['2.1', '8.1a'],
     },
     {
+      name: '3.2a-other-cash — cash beyond the buffer alone fires the broadened 3.2a',
+      domains: {
+        home: { owns_home: true, value_estimate: 780000, mortgage_balance: 460000, rate_percent: 6.2, has_offset: true, offset_balance: 15000, _confidence: 'stated' },
+        buffer: { accessible_savings: null, where_held: null, linked_to_loan: false, other_cash: 12000, other_cash_where_held: 'term deposit', _confidence: 'stated' },
+        estate: { ...estateQuiet, _confidence: 'stated' },
+      },
+      expect: ['1.1', '1.3', '3.2a'],
+      mustNotFire: ['1.2', '3.2b'],
+    },
+    {
       name: '5.1-reached — protection reached with a confirmed absence fires',
       domains: {
         protection: { life: { held: false, amount: null, inside_super: null }, tpd: { held: null, amount: null, inside_super: null }, income_protection: { held: null, amount: null, inside_super: null }, trauma: { held: null, amount: null, inside_super: null }, _confidence: 'stated' },

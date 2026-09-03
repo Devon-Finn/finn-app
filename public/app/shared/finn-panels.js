@@ -82,6 +82,22 @@
     trust: 'income through a trust', mixed: 'a mix of salary and self-employed income',
   };
 
+  /* Whether a tile's domain was actually reached in conversation: any
+     substantive (non-underscore) leaf is non-null. Shared by the grid
+     badges and the panel's calm-versus-building decision. */
+  const TILE_DOMAINS = { 1: ['home'], 2: ['income', 'expenses'], 3: ['buffer'], 4: ['super'], 5: ['protection'], 6: ['estate'], 7: ['investments'], 8: ['debts'], 9: ['income'] };
+  function anyLeaf(o) {
+    if (o === null || o === undefined) return false;
+    if (Array.isArray(o)) return o.some(anyLeaf);
+    if (typeof o === 'object') {
+      return Object.entries(o).some(([k, v]) => !k.startsWith('_') && anyLeaf(v));
+    }
+    return true;
+  }
+  function tileReached(tileNo, d) {
+    return (TILE_DOMAINS[tileNo] || []).some(k => anyLeaf((d || {})[k]));
+  }
+
   /* Reference block builder: fields render with their values where known;
      the summary carries the count of what is missing. */
   function refBlock(label, fields) {
@@ -466,8 +482,23 @@
     });
   }
 
+  /* The calm state (component-spec 4.2, education-library 6.2): renders in
+     place of the insight stack when a tile has figures and zero insights.
+     Only tiles 1, 4, 6 and 9 can go calm and carry a block; the other five
+     can never go calm, so no block is expected for them. Never a tick,
+     never green — the component enforces the palette, the status flag
+     stays neutral grey Nothing flagged. */
+  function calmSection(tileNo, tileResult, domains, library) {
+    if (!tileResult || tileResult.insights.length) return '';
+    if (!tileReached(tileNo, domains)) return ''; // still building, not calm
+    const tileMeta = library && library.tiles && library.tiles[String(tileNo)];
+    if (!tileMeta || !tileMeta.calm) return '';
+    const html = C().calmBlock(tileMeta.calm);
+    return html ? '<div class="fp-section fp-calmwrap">' + html + '</div>' : '';
+  }
+
   function insightsSection(tileResult, domains, derived, library) {
-    if (!tileResult || !tileResult.insights.length) return ''; // calm state arrives in Step 5
+    if (!tileResult || !tileResult.insights.length) return '';
     const all = [].concat(arr(library && library.insights), arr(library && library.overrides));
     const costShown = new Set(); // once per professional per TILE
     const cards = tileResult.insights
@@ -576,6 +607,7 @@
       html += '<div class="fp-section fp-b"><h4 class="fp-calchead">What these products actually do</h4><p>' + esc(tileMeta.section_b) + '</p></div>';
     }
     html += insightsSection(tileResult, domains, derived, library);
+    html += calmSection(tileNo, tileResult, domains, library);
     html += '</article>';
     return html;
   }
@@ -593,5 +625,5 @@
     return html;
   }
 
-  window.finnPanels = { renderDashboard, renderTile, renderWhoToSee, fillPositionLine, slotValues };
+  window.finnPanels = { renderDashboard, renderTile, renderWhoToSee, tileReached, fillPositionLine, slotValues };
 })();
