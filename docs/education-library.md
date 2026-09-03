@@ -168,6 +168,9 @@ Offset balance                      $8,400
 Term remaining                    23 years
 ```
 
+**Section B — how a home loan works**
+Your equity is the part of the property you own outright, which is the value less what's still owing. The rate is what the loan costs you to carry, and on a variable rate it can move. An offset account reduces the balance interest is charged on by whatever is sitting in it, and the money stays available to you the whole time.
+
 ---
 
 ### 1.1 — Your rate and how the loan is set up → mortgage broker
@@ -233,13 +236,29 @@ A mortgage broker can tell you what a lender would actually consider and on what
 **There's nothing you need to know or prepare**
 You don't need to know what any of the options are called, or to have decided anything. Plenty of people have this conversation purely to find out what their position allows and what it would actually mean. Finn passes on the whole picture, so it starts from something real.
 
-→ *Find the right professional*
+→ *Find a mortgage broker*
 
 > **Build note.** "Paying the mortgage down faster" is a goal, not an insight. If it surfaces in conversation it belongs in goal-routing at layer three, not as a fourth stacked insight here. Three broker insights on one tile is the outer limit.
 
 ---
 
 # TILE 2 — WHAT'S LEFT OVER EACH MONTH
+
+**Section A — your position**
+
+```
+Take-home pay, both of you       $9,920/month
+Living costs                     $4,900/month
+Housing repayment                $3,890/month
+Minimum payments, other debts    $1,484/month
+
+What's left over                  -$354/month
+```
+
+**Section B — how this figure is worked out**
+What's left over is what remains once everything that has to be paid has been paid. The figure here starts from take-home pay rather than gross, then takes off your living costs, your housing repayment, and the minimum payments on any other debts you carry. It doesn't account for the irregular things, the car registration or the school costs that land a few times a year, so the real figure across a full year is usually a little lower.
+
+---
 
 ### 2.1 — What your spare money could be doing → financial planner / accountant
 
@@ -278,6 +297,9 @@ Where it sits                     savings account, not linked to the loan
 ```
 
 The months figure is arithmetic on their own data, so it is pure fact. It hits harder than any benchmark would, and it lets the planner supply the target.
+
+**Section B — what this figure counts**
+Your safety net is money you could reach quickly, without selling anything or asking anyone's permission. The months figure is that amount divided by what a month of your life costs, so it's expressed as time rather than dollars. It counts only money you already hold. Credit you could draw on isn't included, because that belongs to a lender rather than to you.
 
 ---
 
@@ -334,6 +356,25 @@ Shorter, and it hands the whole question over. Suggesting a person would be bett
 ---
 
 # TILE 4 — YOUR SUPER
+
+**Section A — your position**
+
+```
+Your super
+  Fund not identified           $118,000    insurance inside: not known
+  Old job                        $41,000    insurance inside: not known
+
+Partner's super
+  Employer default               $55,000    insurance inside: not known
+
+Total                           $214,000
+Extra contributions             none recorded
+```
+
+**Section B — how super accounts work**
+Super is money held for you until retirement, in one account or several. Each account charges its own fees, taken out of the balance rather than billed to you, so they're easy not to notice. Accounts can also hold insurance inside them, with the premiums coming out of the balance the same way.
+
+---
 
 ### 4.1 — More than one super account → financial planner
 
@@ -471,6 +512,9 @@ Investment property           $640,000    estimated value
 Shares and ETFs                $84,200    held in one name
 Managed funds                 none recorded
 ```
+
+**Section B — how these work**
+An investment property has its own value, its own loan and its own equity, in the same way your home does. The rent it earns is income, and the interest on its loan is treated differently at tax time from the interest on the loan for the home you live in. For shares and funds, what they earn is taxed at the marginal rate of whoever the asset is held by, so whose name is on it changes what it costs.
 
 ---
 
@@ -617,6 +661,9 @@ Employer super                  paid on the salary portion only
 ```
 
 The tile shows for everyone, because the total is a number most households have never seen in one place, and seeing it is worth something regardless of whether anything routes from it. Two PAYG salaries and nothing else produces a clean tile and no referral.
+
+**Section B — how these are treated differently**
+Income from an employer has tax taken out before it reaches you, and the employer pays super on top of it. Income you earn for yourself arrives whole, with the tax on it settled later, and no super attached unless you arrange it yourself. The total here is annual and before tax, so it won't match what actually lands in your account each month.
 
 ---
 

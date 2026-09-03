@@ -338,8 +338,8 @@ A visible tile with no firing insight is a valid and intended state. It shows th
 | 3.1 | How long it would last | Always, where `expenses` is present | `buffer_months`, `context.children`, `income.structure` | Planner |
 | 3.2a | Where it sits — has offset | `has_offset = true` AND `buffer.linked_to_loan = false` AND `accessible_savings > 0` | `accessible_savings`, `offset_balance` | Mortgage broker |
 | 3.2b | Where it sits — no offset | `owns_home = true` AND `has_offset = false` AND `accessible_savings > 0` | `accessible_savings` | Mortgage broker |
-| 4.1 | More than one super account | `count(super.funds) > 1` for the same owner, OR `multiple_accounts = true` | `funds[]`, `has_insurance` | Planner |
-| 5.1 | Household cover | Any field in `protection` is non-null (the domain was reached) | `protection.*`, `context`, `mortgage_balance` | Risk specialist / planner |
+| 4.1 | More than one super account | `count(super.funds) > 1` for the same owner **OR** `super.multiple_accounts = true` | `funds[]`, `multiple_accounts`, `has_insurance` | Planner |
+| 5.1 | Household cover | Any field in `protection` is non-null, i.e. the domain was actually reached | `protection.*`, `context`, `mortgage_balance` | Risk specialist / planner |
 | 6.1 | Will and legal basics | Any of the four `in_place = false`, OR `will.last_updated` older than 5 years | `estate.*`, `context.children` | Estate lawyer |
 | 7.1 | Investment property | `investments.properties[]` non-empty | property fields, `rental_income_annual` | Broker / planner / accountant |
 | 7.2 | Investments and how they fit | `shares_value > 0` OR `managed_funds_value > 0` | `shares_value`, `held_in` | Planner |
@@ -355,7 +355,7 @@ Recorded because a lawyer will ask, and because they are easy to reintroduce by 
 - **Nothing fires on `extra_contributions = false`.** Super contributions as a tax lever is product advice. Finn shows the income and leaves that door for the planner.
 - **No insight fires on a comparison to a benchmark.** There are no benchmarks in this system.
 - **No insight fires on portfolio composition.** Allocation is displayed as fact and never evaluated.
-- **No insight fires on a domain that was never reached.** An all-null domain means the conversation never got there, not that they hold nothing. Finn cannot say something is worth a conversation about a position it knows nothing about. Fixture H fires zero insights.
+- **No insight fires on a domain that was never reached.** An all-null domain means the conversation didn't get there, not that the answer is no. Finn cannot say something is worth a conversation when it has no idea what the person holds. This is the `null` vs `false` convention applied to triggering, and it is why 5.1 conditions on the protection domain having been asked rather than firing always.
 
 ## 3.4 Precedence
 
@@ -436,7 +436,7 @@ Each step is one Claude Code prompt. Do not combine them.
 |---|---|---|
 | 1 | Migrate the capture schema to Part 2 | New domains exist; legacy records identifiable via `includes_housing` and the retyped protection shape |
 | 2 | Extend the 3a system prompt to collect the new fields | Context, expenses split, `has_offset`, investment property, income structure, hardship signal all captured in conversation |
-| 3 | Land the library as a content file per Part 4 | Twelve entries, no copy in components |
+| 3 | Land the library as a content file per Part 4 | Fifteen entries plus the hardship override, no copy in components |
 | 4 | Build the trigger engine as a pure function | All eight fixtures in 3.6 pass |
 | 5 | Build the panel components, sections A/B/C | Renders fixture H without crashing or inventing zeroes |
 | 6 | Wire it together and merge `clarity-3b` | End to end on all fixtures |
@@ -447,4 +447,4 @@ Each step is one Claude Code prompt. Do not combine them.
 
 ---
 
-*Companion to Finn-Insight-Education-Library.md. Twelve insights, nine tiles, one deterministic path from data to display.*
+*Companion to Finn-Insight-Education-Library.md. Thirteen insights, nine tiles, one deterministic path from data to display.*

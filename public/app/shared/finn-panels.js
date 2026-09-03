@@ -171,6 +171,8 @@
       rows.push(row('Partner take-home', money(inc.partner_salary_net_monthly) !== null ? money(inc.partner_salary_net_monthly) + '/month' : null));
       rows.push(row('Living costs', money(exp.living_monthly) !== null ? money(exp.living_monthly) + '/month' + (exp.includes_housing === true ? ' · includes housing' : '') : null));
       if (exp.includes_housing !== true) rows.push(row('Housing repayment', money(exp.housing_repayment_monthly) !== null ? money(exp.housing_repayment_monthly) + '/month' : null));
+      const mins = arr(d.debts && d.debts.items).map(it => num(it && it.minimum_monthly)).filter(v => v !== null);
+      if (mins.length) rows.push(row('Minimum payments, other debts', money(mins.reduce((a, b) => a + b, 0)) + '/month'));
       rows.push(row('Left over', money(der.surplus_monthly) !== null ? money(der.surplus_monthly) + '/month' : null));
     } else if (tileNo === 3) {
       rows.push(row('Accessible savings', money(buf.accessible_savings)));
