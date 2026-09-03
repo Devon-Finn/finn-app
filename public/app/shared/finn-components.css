@@ -150,6 +150,13 @@ button.fc-term:focus-visible { outline: 2px solid var(--fc-forest); outline-offs
 .fp-insights .fc-gap { margin-top: 10px; }
 .fp-dashboard { display: grid; gap: 18px; }
 
+/* ── Who to see (finn-panels renderWhoToSee, component-spec 4.3) ── */
+.fp-who { display: flex; flex-direction: column; gap: 14px; }
+.fp-who .fc-pro { margin: 0; }
+.fp-who-empty { background: var(--fc-surface, #fff); border: 1px dashed var(--fc-rule, #e6e0d6); border-radius: 10px; padding: 14px 16px; font-size: 13.5px; color: var(--fc-mid, #5c5a55); }
+.fp-howworks p { font-size: 13px; line-height: 1.6; color: var(--fc-mid, #5c5a55); margin: 8px 0 0; }
+.fp-cost { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+
 /* ── Term popover (finn-terms.js) — glossary then why, never the
       handover sentence ── */
 .fc-termpop { position: absolute; z-index: 60; background: var(--fc-surface, #fff); border: 1px solid var(--fc-rule, #e6e0d6); border-radius: 10px; padding: 12px 14px; box-shadow: var(--fc-shadow, 0 8px 24px rgba(28,25,23,.12)); font-size: 12.5px; line-height: 1.55; }

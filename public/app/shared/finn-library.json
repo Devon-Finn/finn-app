@@ -437,6 +437,7 @@
   "overrides": [
     {
       "id": "hardship",
+      "title": "If money is tight right now",
       "tile": 8,
       "variant": null,
       "route_primary": "financial_counsellor",

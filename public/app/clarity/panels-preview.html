@@ -59,7 +59,11 @@
     window.finnTerms.init({ terms: termsData.terms, handed: {}, onHandover: null });
     const fx = fixtures[Number(sel.value)];
     const out = document.getElementById('out');
-    out.innerHTML = window.finnPanels.renderDashboard(fx.domains, { yearNow: 2026, library, terms: window.finnTerms });
+    const derived = window.finnDerived.derive(fx.domains);
+    const triggers = window.finnTriggers.evaluate(fx.domains, { yearNow: 2026, derived });
+    out.innerHTML = window.finnPanels.renderDashboard(fx.domains, { yearNow: 2026, derived, triggers, library, terms: window.finnTerms }) +
+      '<h2 style="font-size:15px;margin:26px 0 10px">Who to see (component-spec 4.3)</h2>' +
+      window.finnPanels.renderWhoToSee(triggers, library);
     window.finnTerms.processContainer(out);
   }
   sel.addEventListener('change', render);

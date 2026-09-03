@@ -226,6 +226,11 @@
   }
   *:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 
+  /* ── Dashboard tabs: Your picture | Who to see (component-spec 4.3) ── */
+  .dash-tabs{display:flex; gap:8px; margin-bottom:16px;}
+  .dash-tabs button{font-family:inherit; font-size:13px; font-weight:600; padding:8px 14px; border-radius:20px; border:1px solid var(--rule); background:var(--surface); color:var(--mid); cursor:pointer;}
+  .dash-tabs button.on{background:var(--accent); border-color:var(--accent); color:#fff;}
+
   /* ── Panel sections inside the detail panel (styles live in
         finn-components.css; only page-specific integration here) ── */
   .fp-tile{background:transparent;}
@@ -278,6 +283,10 @@
 
       <div class="dash">
         <div class="dash-inner">
+          <div class="dash-tabs" role="tablist">
+            <button id="dtPicture" class="on" role="tab" aria-selected="true" onclick="setDashView('picture')">Your picture</button>
+            <button id="dtWho" role="tab" aria-selected="false" onclick="setDashView('who')">Who to see</button>
+          </div>
           <div class="hero">
             <div class="lead">Your Clarity Session</div>
             <div class="headline" id="heroLine">Your picture's <span class="fr">being built</span>.</div>
@@ -287,7 +296,8 @@
             </div>
           </div>
           <div class="tiles" id="tilesGrid"></div>
-          <div class="dash-note"><b>Built from your real figures as you talk.</b> A warm edge means an area is worth a conversation with the right professional — it's never a judgment of your numbers. Tap any tile for the full detail.</div>
+          <div class="dash-note" id="dashNote"><b>Built from your real figures as you talk.</b> A warm edge means an area is worth a conversation with the right professional — it's never a judgment of your numbers. Tap any tile for the full detail.</div>
+          <div id="whoView" class="fc" style="display:none"></div>
         </div>
       </div>
 
@@ -603,6 +613,27 @@ async function refreshProgress() {
   const completed = Array.isArray(picture.completed_domains) ? picture.completed_domains : [];
   renderHero(completed);
   renderTiles(picture);
+  renderWhoView();
+}
+
+/* ── Who to see: a second lens on the same data, peer to the tile grid ── */
+function renderWhoView() {
+  if (!FINN_LIBRARY || !lastTriggers) return;
+  document.getElementById('whoView').innerHTML =
+    window.finnPanels.renderWhoToSee(lastTriggers, FINN_LIBRARY);
+}
+
+function setDashView(v) {
+  const who = v === 'who';
+  document.getElementById('dtPicture').classList.toggle('on', !who);
+  document.getElementById('dtPicture').setAttribute('aria-selected', String(!who));
+  document.getElementById('dtWho').classList.toggle('on', who);
+  document.getElementById('dtWho').setAttribute('aria-selected', String(who));
+  document.querySelector('.hero').style.display = who ? 'none' : '';
+  document.getElementById('tilesGrid').style.display = who ? 'none' : '';
+  document.getElementById('dashNote').style.display = who ? 'none' : '';
+  document.getElementById('whoView').style.display = who ? '' : 'none';
+  if (who) renderWhoView();
 }
 
 /* ══════════ DETAIL PANEL (sections A/B/C from the library) ══════════ */
