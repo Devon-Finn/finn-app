@@ -392,6 +392,34 @@ attachBtn.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); fileInput.value = ''; });
 document.getElementById('attachRemove').addEventListener('click', clearAttachment);
 
+// Paste a screenshot straight into the chat — Finn's ask literally says
+// "paste it in", so the composer honours it. A clipboard image becomes the
+// pending attachment through the same read-and-discard path as the picker.
+document.addEventListener('paste', e => {
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.kind === 'file' && FILE_TYPES.includes(item.type)) {
+      const f = item.getAsFile();
+      if (f) {
+        e.preventDefault();
+        handleFile(new File([f], f.name && f.name !== 'image.png' ? f.name : 'pasted screenshot.png', { type: f.type }));
+      }
+      return;
+    }
+  }
+});
+
+// Drag-and-drop onto the conversation — "drop the file here" is in the ask
+// copy too. Same single-file, same types, same path.
+const convoEl = document.querySelector('.convo');
+['dragover', 'dragenter'].forEach(ev => convoEl.addEventListener(ev, e => { e.preventDefault(); }));
+convoEl.addEventListener('drop', e => {
+  e.preventDefault();
+  const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+
 function clearAttachment() {
   pendingFile = null;
   attachChip.classList.remove('on');
