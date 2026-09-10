@@ -348,14 +348,13 @@ let busy = false;
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function scrollChat() { messagesEl.scrollTop = messagesEl.scrollHeight; }
 
-// Strip the machine blocks from display. The capture is applied
-// server-side; the visible reply ends at the earliest machine marker
-// ([RESOLVE] lines precede [CAPTURE] when the model classifies outliers).
+// Strip the machine blocks from display. [RESOLVE] lines are removed
+// wherever they appear (the model sometimes talks on after one), and the
+// visible reply ends where [CAPTURE] begins.
 function visibleText(fullText) {
-  const cuts = ['[CAPTURE]', '[RESOLVE]']
-    .map(m => fullText.indexOf(m)).filter(i => i !== -1);
-  const idx = cuts.length ? Math.min(...cuts) : -1;
-  return (idx === -1 ? fullText : fullText.slice(0, idx)).trim();
+  const noResolves = fullText.replace(/^\[RESOLVE\][^\n]*$/gm, '').replace(/\n{3,}/g, '\n\n');
+  const idx = noResolves.indexOf('[CAPTURE]');
+  return (idx === -1 ? noResolves : noResolves.slice(0, idx)).trim();
 }
 
 // Pull [RESOLVE] {json} blocks (outlier classifications) out of a reply.
