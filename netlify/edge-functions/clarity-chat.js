@@ -1,4 +1,5 @@
 import { bankExportsPromptSection } from "./lib/finn-bank-exports.js";
+import { FIELD_REGISTRY, persistenceGate } from "./lib/finn-field-registry.js";
 
 // Clarity-chat edge function — the paid Clarity Session conversation (3a).
 //
@@ -258,6 +259,7 @@ Rules for the block:
 - "goals": loose directions only, e.g. {"directions":["security-leaning","kids-setup"],"notes":"wants to feel less exposed; kids' schooling on their mind"}. Include only when goals content actually surfaced this turn.
 - "completed_domains": the full cumulative list of AREA labels now covered or deliberately skipped, including "goals" when goals have been drawn out. Area labels are unchanged: income, assets, liabilities, buffer, protection, estate, super, goals — where "income" includes the household context and expenses, "assets" covers home and investments, and "liabilities" covers debts. A skipped area still counts as completed for progress.
 - "session_complete": true only when all eight areas are covered or consciously skipped and you have wrapped up warmly. Otherwise false.
+- "refusals": an array of field ids, included ONLY when, this turn, you offered the retrieval path for a document-backed field and the person declined it or gave the figure from memory anyway (e.g. ["home.mortgage_balance"]). This is the record that the path was offered and declined; the write boundary REFUSES a document-backed figure committed below its confidence floor without one. Never include a field you did not offer the path for, and never treat a refusal as permission to stop offering the upload later if the document surfaces. Field ids: domain.field, nested as domain.parent.field, array items as domain.list[].field.
 - If a turn captured nothing (a clarifying question, a boundary deflection), emit {"domains":{},"goals":{},"completed_domains":[<current cumulative list>],"session_complete":false}.
 - The block records only; it never justifies loosening any boundary above.
 
@@ -904,6 +906,38 @@ async function applyCapture(householdId, picture, capture, logId) {
     patch = translateLegacyDomains(patch);
   }
   const merged = deepMerge(baseDomains, patch);
+
+  /* ── THE PERSISTENCE GATE (capture-conduct step 2) ──
+     Runs in the request path, after the write-ahead raw insert and before
+     the validated merge commits, so a gate failure quarantines the item
+     rather than losing it. A retrievable field below its confidence floor
+     needs a standing refusal record (path offered, declined); a field
+     with requires needs every required field present in the merged
+     picture. Not answered stays open — never a nearest-fit value. */
+  const priorRefusals = (Array.isArray(picture.refusals) ? picture.refusals : [])
+    .map(r => r && r.field).filter(Boolean);
+  const newRefusals = (Array.isArray(capture.refusals) ? capture.refusals : [])
+    .filter(f => typeof f === "string" && FIELD_REGISTRY[f]);
+  const refusalSet = new Set([...priorRefusals, ...newRefusals]);
+  const gate = persistenceGate(patch, merged, refusalSet);
+  if (!gate.ok) {
+    console.error(
+      "[Finn clarity] GATE — capture-conduct violation, picture write refused for household " + householdId +
+      ". Nothing is lost: the raw capture is in capture_log. " + JSON.stringify(gate.errors)
+    );
+    if (logId) {
+      await markCaptureLog(logId, "refused", { errors: gate.errors, merged_domains: merged });
+    } else {
+      await insertCaptureLog(householdId, null, capture, "refused");
+    }
+    await setWriteStatusFalse(householdId);
+    return;
+  }
+  const refusalsOut = newRefusals.length
+    ? [...(Array.isArray(picture.refusals) ? picture.refusals : []),
+       ...newRefusals.filter(f => !priorRefusals.includes(f)).map(f => ({ field: f, at: new Date().toISOString() }))]
+    : undefined;
+
   const check = validateDomainsV2(merged);
   if (!check.ok) {
     // 1. Loud, greppable log line — the alert signal.
@@ -934,6 +968,7 @@ async function applyCapture(householdId, picture, capture, logId) {
     goals,
     completed_domains: completed,
     schema_version: 2,
+    ...(refusalsOut ? { refusals: refusalsOut } : {}),
     last_write_status: { ok: true, at: new Date().toISOString() },
     updated_at: new Date().toISOString(),
   });
@@ -1014,7 +1049,7 @@ export default async function handler(request, context) {
 
   // ── Server-side context: picture state + snapshot carry-over. ──
   let picture = { domains: {}, goals: {}, completed_domains: [] };
-  const picRes = await sbFetch(`/rest/v1/picture?household_id=eq.${auth.householdId}&select=domains,goals,completed_domains,schema_version`);
+  const picRes = await sbFetch(`/rest/v1/picture?household_id=eq.${auth.householdId}&select=domains,goals,completed_domains,schema_version,refusals`);
   if (picRes.ok) {
     const rows = await picRes.json();
     if (rows.length) picture = rows[0];
