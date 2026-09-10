@@ -182,6 +182,11 @@
     const debts = d.debts || {}, prot = d.protection || {}, est = d.estate || {};
     const ctx = d.context || {};
     const hand = id => (terms && terms.handoverFor) ? terms.handoverFor(id) : '';
+    // Confidence renders in the label, never as a badge or a colour
+    // (component-spec 2.1): a figure captured as "estimated" carries it in
+    // its own label; document and stated carry nothing, the unremarkable
+    // case. Applies to captured figures, not derived results.
+    const conf = (dom, label) => dom && dom._confidence === 'estimated' ? label + ', your estimate' : label;
     let html = '';
 
     if (tileNo === 1) {
@@ -195,21 +200,21 @@
         html += C().figureHero(money(home.value_estimate), 'is what the home is worth, on your', 'estimate.');
       }
       html += calcSection('What you own of it', [
-        { label: 'Value, your estimate', op: '', value: money(home.value_estimate), missing: money(home.value_estimate) === null },
-        { label: 'Loan balance', op: '−', value: money(home.mortgage_balance), missing: money(home.mortgage_balance) === null },
+        { label: conf(home, 'Value'), op: '', value: money(home.value_estimate), missing: money(home.value_estimate) === null },
+        { label: conf(home, 'Loan balance'), op: '−', value: money(home.mortgage_balance), missing: money(home.mortgage_balance) === null },
         { label: 'What you own of it', op: '=', value: money(der.home_equity), missing: money(der.home_equity) === null, result: true },
       ], hand('equity'));
       html += calcSection('How much of the place is borrowed', [
-        { label: 'What you still owe', op: '', value: money(home.mortgage_balance), missing: money(home.mortgage_balance) === null },
-        { label: 'What the property is worth', op: '÷', value: money(home.value_estimate), missing: money(home.value_estimate) === null },
+        { label: conf(home, 'What you still owe'), op: '', value: money(home.mortgage_balance), missing: money(home.mortgage_balance) === null },
+        { label: conf(home, 'What the property is worth'), op: '÷', value: money(home.value_estimate), missing: money(home.value_estimate) === null },
         { label: 'How much of the place is borrowed', op: '=', value: rate(der.lvr_percent), missing: rate(der.lvr_percent) === null, result: true },
       ], hand('lvr'));
       if (home.has_offset === true) {
         const chargedOn = (num(home.mortgage_balance) !== null && num(home.offset_balance) !== null)
           ? money(home.mortgage_balance - home.offset_balance) : null;
         html += calcSection('What interest is charged on', [
-          { label: 'Loan balance', op: '', value: money(home.mortgage_balance), missing: money(home.mortgage_balance) === null },
-          { label: 'In your offset', op: '−', value: money(home.offset_balance), missing: money(home.offset_balance) === null },
+          { label: conf(home, 'Loan balance'), op: '', value: money(home.mortgage_balance), missing: money(home.mortgage_balance) === null },
+          { label: conf(home, 'In your offset'), op: '−', value: money(home.offset_balance), missing: money(home.offset_balance) === null },
           { label: 'What interest is charged on', op: '=', value: chargedOn, missing: chargedOn === null, result: true },
         ], hand('offset'));
       }
@@ -231,11 +236,11 @@
       const takeHome = takeHomeKnown.length ? takeHomeKnown.reduce((a, b) => a + b, 0) : null;
       const mins = arr(debts.items).map(it => num(it && it.minimum_monthly)).filter(v => v !== null);
       const rows = [
-        { label: 'Take-home pay, both of you', op: '', value: money(takeHome), missing: takeHome === null },
-        { label: 'Living costs', op: '−', value: money(exp.living_monthly) ? money(exp.living_monthly) + (exp.includes_housing === true ? ' · includes housing' : '') : null, missing: money(exp.living_monthly) === null },
+        { label: conf(inc, 'Take-home pay, both of you'), op: '', value: money(takeHome), missing: takeHome === null },
+        { label: conf(exp, 'Living costs'), op: '−', value: money(exp.living_monthly) ? money(exp.living_monthly) + (exp.includes_housing === true ? ' · includes housing' : '') : null, missing: money(exp.living_monthly) === null },
       ];
       if (exp.includes_housing !== true) {
-        rows.push({ label: 'Housing repayment', op: '−', value: money(exp.housing_repayment_monthly), missing: money(exp.housing_repayment_monthly) === null });
+        rows.push({ label: conf(exp, 'Housing repayment'), op: '−', value: money(exp.housing_repayment_monthly), missing: money(exp.housing_repayment_monthly) === null });
       }
       if (mins.length) rows.push({ label: 'Minimum payments, other debts', op: '−', value: money(mins.reduce((a, b) => a + b, 0)) });
       rows.push({ label: 'What’s left over', op: '=', value: money(der.surplus_monthly), missing: money(der.surplus_monthly) === null, result: true });
@@ -255,7 +260,7 @@
       const housing = exp.includes_housing === true ? 0 : num(exp.housing_repayment_monthly);
       const monthCost = (num(exp.living_monthly) !== null && housing !== null) ? exp.living_monthly + housing : null;
       html += calcSection('How long it would last', [
-        { label: 'Accessible savings', op: '', value: money(buf.accessible_savings), missing: money(buf.accessible_savings) === null },
+        { label: conf(buf, 'Accessible savings'), op: '', value: money(buf.accessible_savings), missing: money(buf.accessible_savings) === null },
         { label: 'What a month costs', op: '÷', value: money(monthCost), missing: monthCost === null },
         { label: 'How long it would last', op: '=', value: num(der.buffer_months) !== null ? der.buffer_months + ' months' : null, missing: num(der.buffer_months) === null, result: true },
       ]);
@@ -276,7 +281,7 @@
           title: (text(f && f.fund) && f.fund !== 'unknown' ? f.fund : 'Fund ' + (i + 1)) +
             (text(f && f.owner) ? ' · ' + (String(f.owner).toLowerCase() === 'you' ? 'yours' : String(f.owner).toLowerCase() === 'partner' ? 'partner’s' : f.owner) : ''),
           rows: [
-            { label: 'Balance', op: '', value: money(f && f.balance), missing: money(f && f.balance) === null },
+            { label: conf(sup, 'Balance'), op: '', value: money(f && f.balance), missing: money(f && f.balance) === null },
             { label: 'Insurance inside', op: '', value: f && f.has_insurance === true ? 'yes' : f && f.has_insurance === false ? 'no' : null, missing: !(f && typeof f.has_insurance === 'boolean') },
           ],
         }));
@@ -296,10 +301,10 @@
 
     else if (tileNo === 5) {
       html += '<div class="fp-teach"><h4 class="fp-calchead">The cover you hold</h4>' + statusList([
-        ['Life cover', coverDisplay(prot.life)],
-        ['TPD cover', coverDisplay(prot.tpd)],
-        ['Income protection', coverDisplay(prot.income_protection)],
-        ['Trauma cover', coverDisplay(prot.trauma)],
+        [conf(prot, 'Life cover'), coverDisplay(prot.life)],
+        [conf(prot, 'TPD cover'), coverDisplay(prot.tpd)],
+        [conf(prot, 'Income protection'), coverDisplay(prot.income_protection)],
+        [conf(prot, 'Trauma cover'), coverDisplay(prot.trauma)],
       ]) + '</div>';
       const kids = arr(ctx.children);
       const hh = [];
@@ -342,8 +347,8 @@
         const items = props.map((p, i) => ({
           title: text(p && p.held_in) ? 'Investment property' + (props.length > 1 ? ' ' + (i + 1) : '') + ' · held in ' + p.held_in : 'Investment property' + (props.length > 1 ? ' ' + (i + 1) : ''),
           rows: [
-            { label: 'Value, your estimate', op: '', value: money(p && p.value_estimate), missing: money(p && p.value_estimate) === null },
-            { label: 'Loan against it', op: '−', value: money(p && p.loan_balance), missing: money(p && p.loan_balance) === null },
+            { label: conf(inv, 'Value'), op: '', value: money(p && p.value_estimate), missing: money(p && p.value_estimate) === null },
+            { label: conf(inv, 'Loan against it'), op: '−', value: money(p && p.loan_balance), missing: money(p && p.loan_balance) === null },
             { label: 'Equity', op: '=', value: num(der.property_equity && der.property_equity[i]) !== null ? money(der.property_equity[i]) : null, missing: num(der.property_equity && der.property_equity[i]) === null, result: true },
           ],
         }));
@@ -355,8 +360,8 @@
         html += '<div class="fp-teach"><h4 class="fp-calchead">What each property is worth to you</h4>' + C().repeatingItems(items, aggRows) + '</div>';
       }
       html += '<div class="fp-teach"><h4 class="fp-calchead">Held outside property</h4>' + statusList([
-        ['Shares and ETFs', money(inv.shares_value) ? money(inv.shares_value) + (text(inv.held_in) ? ' · held in ' + text(inv.held_in) : '') : null],
-        ['Managed funds', money(inv.managed_funds_value)],
+        [conf(inv, 'Shares and ETFs'), money(inv.shares_value) ? money(inv.shares_value) + (text(inv.held_in) ? ' · held in ' + text(inv.held_in) : '') : null],
+        [conf(inv, 'Managed funds'), money(inv.managed_funds_value)],
       ]) + '</div>';
       html += refBlock('The rest of the property details', props.length ? props.flatMap((p, i) => [
         ['Rate' + (props.length > 1 ? ', property ' + (i + 1) : ''), rate(p && p.rate_percent)],
@@ -376,7 +381,7 @@
         const cards = items.map(it => ({
           title: TYPE_LABELS[it && it.type] || 'Debt',
           rows: [
-            { label: 'Balance', op: '', value: money(it && it.balance), missing: money(it && it.balance) === null },
+            { label: conf(debts, 'Balance'), op: '', value: money(it && it.balance), missing: money(it && it.balance) === null },
             { label: 'Rate', op: '', value: rate(it && it.rate_percent), missing: rate(it && it.rate_percent) === null },
             { label: 'Minimum repayment', op: '', value: money(it && it.minimum_monthly) ? money(it.minimum_monthly) + '/month' : null, missing: money(it && it.minimum_monthly) === null },
           ],
@@ -386,7 +391,7 @@
         ]) + '</div>';
       }
       html += refBlock('Held separately', [
-        ['HECS', money(debts.hecs_balance)],
+        [conf(debts, 'HECS'), money(debts.hecs_balance)],
       ]);
     }
 
@@ -397,17 +402,17 @@
       const annualKnown = [inc.salary_gross_annual, inc.partner_salary_gross_annual, inc.business_income_annual, inc.rental_income_annual, inc.other_income_annual].some(v => num(v) !== null);
       if (annualKnown) {
         const rows = [];
-        if (num(inc.salary_gross_annual) !== null) rows.push({ label: 'Salary', op: rows.length ? '+' : '', value: money(inc.salary_gross_annual) });
-        if (num(inc.partner_salary_gross_annual) !== null) rows.push({ label: 'Partner salary', op: rows.length ? '+' : '', value: money(inc.partner_salary_gross_annual) });
-        if (num(inc.business_income_annual) !== null) rows.push({ label: 'Business income', op: rows.length ? '+' : '', value: money(inc.business_income_annual) });
-        if (num(inc.rental_income_annual) !== null) rows.push({ label: 'Rental income', op: rows.length ? '+' : '', value: money(inc.rental_income_annual) });
-        if (num(inc.other_income_annual) !== null) rows.push({ label: 'Other income', op: rows.length ? '+' : '', value: money(inc.other_income_annual) });
+        if (num(inc.salary_gross_annual) !== null) rows.push({ label: conf(inc, 'Salary'), op: rows.length ? '+' : '', value: money(inc.salary_gross_annual) });
+        if (num(inc.partner_salary_gross_annual) !== null) rows.push({ label: conf(inc, 'Partner salary'), op: rows.length ? '+' : '', value: money(inc.partner_salary_gross_annual) });
+        if (num(inc.business_income_annual) !== null) rows.push({ label: conf(inc, 'Business income'), op: rows.length ? '+' : '', value: money(inc.business_income_annual) });
+        if (num(inc.rental_income_annual) !== null) rows.push({ label: conf(inc, 'Rental income'), op: rows.length ? '+' : '', value: money(inc.rental_income_annual) });
+        if (num(inc.other_income_annual) !== null) rows.push({ label: conf(inc, 'Other income'), op: rows.length ? '+' : '', value: money(inc.other_income_annual) });
         rows.push({ label: 'Across the year', op: '=', value: money(der.income_total_annual), missing: money(der.income_total_annual) === null, result: true });
         html += calcSection('How the income is made up', rows);
       } else {
         html += '<div class="fp-teach"><h4 class="fp-calchead">How the income is made up</h4>' + statusList([
-          ['Take-home pay', money(inc.salary_net_monthly) ? money(inc.salary_net_monthly) + '/month' : null],
-          ['Partner take-home', money(inc.partner_salary_net_monthly) ? money(inc.partner_salary_net_monthly) + '/month' : null],
+          [conf(inc, 'Take-home pay'), money(inc.salary_net_monthly) ? money(inc.salary_net_monthly) + '/month' : null],
+          [conf(inc, 'Partner take-home'), money(inc.partner_salary_net_monthly) ? money(inc.partner_salary_net_monthly) + '/month' : null],
         ]) + '</div>';
       }
       html += refBlock('How it’s set up', [

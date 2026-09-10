@@ -78,7 +78,7 @@ Conventions used throughout:
 
 - `null` means **not yet asked**. `false` / `0` means **asked and answered in the negative**. The distinction matters: a tile must be able to say "none recorded" rather than implying a zero the person never confirmed.
 - Money is a whole-dollar integer, never a string.
-- Every domain carries `_confidence` so the panel can mark an estimate as an estimate.
+- Every domain carries `_confidence`, four-state, so the panel can mark an estimate as an estimate and the professional knows which figures are hard: `"document"` (read from a payslip, statement, portal or policy schedule the person provided), `"stated"` (the person knew it and said it, no document), `"estimated"` (no document exists, or it couldn't be reached), `"inferred"` (solely for `flags.hardship`, which is written from Finn's read, never from asking).
 - Anything derivable is derived at read time, never stored. Derived values are listed in Part 2.10 and must not appear in the capture schema.
 
 ## 2.1 `context` — NEW

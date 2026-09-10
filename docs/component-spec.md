@@ -106,6 +106,8 @@ What you own of it            =   $338,000
 - A missing value renders `none recorded` in muted weight, **never `$0`**.
 - Nested calcs (item, then aggregate) use the same grammar indented one level.
 
+**Confidence renders in the label, never as a badge or a colour.** A figure captured as "estimated" carries it in its own label, the way the property value already does: "Living costs, your estimate". Figures sourced from a document or stated by the person carry nothing, because that is the unremarkable case. Never a coloured marker, never an icon, never a legend — data quality is a completeness signal and it renders as words, not as severity.
+
 **Use it wherever numbers relate to each other.** Equity, LVR, interest-charged-on, surplus, buffer months, super total, debts total, income total. If a figure is derived, show the derivation.
 
 **Do not use it** for a flat list of unrelated fields. That is the reference block.
