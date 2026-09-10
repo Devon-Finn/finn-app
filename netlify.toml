@@ -26,6 +26,12 @@
   path = "/api/clarity-chat"
   function = "clarity-chat"
 
+# CSV transaction import: deterministic parse/summarise for living costs.
+# Same JWT gate; read-and-discard, nothing stored.
+[[edge_functions]]
+  path = "/api/import-transactions"
+  function = "import-transactions"
+
 [[headers]]
   for = "/*"
   [headers.values]

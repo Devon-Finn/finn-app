@@ -278,7 +278,7 @@
             <button class="send" id="sendBtn" aria-label="Send">↑</button>
           </div>
         </div>
-        <input type="file" id="fileInput" accept="application/pdf,image/png,image/jpeg,image/webp" style="display:none">
+        <input type="file" id="fileInput" accept="application/pdf,image/png,image/jpeg,image/webp,text/csv,.csv" style="display:none">
       </div>
 
       <div class="dash">
@@ -326,6 +326,7 @@
 <script src="/app/shared/finn-panels.js"></script>
 <script src="/app/shared/finn-components.js"></script>
 <script src="/app/shared/finn-terms.js"></script>
+<script src="/app/shared/finn-transactions.js"></script>
 <script>
 'use strict';
 /* Clarity Session conversation (build 3a — Layer 1: collection).
@@ -347,11 +348,25 @@ let busy = false;
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function scrollChat() { messagesEl.scrollTop = messagesEl.scrollHeight; }
 
-// Strip the machine block from display. The capture is applied server-side;
-// the visible reply ends where [CAPTURE] begins.
+// Strip the machine blocks from display. The capture is applied
+// server-side; the visible reply ends at the earliest machine marker
+// ([RESOLVE] lines precede [CAPTURE] when the model classifies outliers).
 function visibleText(fullText) {
-  const idx = fullText.indexOf('[CAPTURE]');
+  const cuts = ['[CAPTURE]', '[RESOLVE]']
+    .map(m => fullText.indexOf(m)).filter(i => i !== -1);
+  const idx = cuts.length ? Math.min(...cuts) : -1;
   return (idx === -1 ? fullText : fullText.slice(0, idx)).trim();
+}
+
+// Pull [RESOLVE] {json} blocks (outlier classifications) out of a reply.
+function extractResolves(fullText) {
+  const out = {};
+  const re = /\[RESOLVE\]\s*(\{[^\n]*\})/g;
+  let m;
+  while ((m = re.exec(fullText)) !== null) {
+    try { Object.assign(out, JSON.parse(m[1])); } catch {}
+  }
+  return out;
 }
 
 function renderFinn(el, text) {
@@ -422,6 +437,7 @@ convoEl.addEventListener('drop', e => {
 
 function clearAttachment() {
   pendingFile = null;
+  pendingCsvs = [];
   attachChip.classList.remove('on');
 }
 
@@ -433,9 +449,56 @@ function attachNote(text) {
   scrollChat();
 }
 
+/* ── CSV transaction imports (living costs) ──
+   CSVs never go inline to the model: they go to /api/import-transactions,
+   where CODE parses and totals deterministically, and only the SUMMARY
+   reaches the conversation. Files accumulate for the session (a later
+   batch re-runs the whole computation with every file, per the spec) and
+   live only in memory — read and discarded, never stored. */
+let pendingCsvs = [];   // attached, not yet sent
+let sessionCsvs = [];   // all csvs sent this session, for whole-set recompute
+let lastTxSummary = null;
+let txResolutions = {};
+let txResultSent = false;
+
+function isCsvFile(f) {
+  return f.type === 'text/csv' || /\.csv$/i.test(f.name || '');
+}
+
+function updateAttachChip() {
+  if (pendingCsvs.length) {
+    document.getElementById('attachName').textContent =
+      pendingCsvs.length === 1 ? pendingCsvs[0].name : pendingCsvs.length + ' statements';
+    attachChip.classList.add('on');
+  } else if (pendingFile) {
+    document.getElementById('attachName').textContent = pendingFile.name;
+    attachChip.classList.add('on');
+  } else {
+    attachChip.classList.remove('on');
+  }
+}
+
 function handleFile(f) {
+  if (isCsvFile(f)) {
+    if (f.size > MAX_FILE_BYTES) {
+      attachNote('That file is a bit big for me (over 8 MB). Try exporting a shorter date range and sending it in pieces.');
+      return;
+    }
+    if (pendingCsvs.length + sessionCsvs.length >= 6) {
+      attachNote('That\'s the most statements I can take in one go (6). Send these through first and we can add more after.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      pendingCsvs.push({ name: f.name, csv_text: String(reader.result) });
+      updateAttachChip();
+      inputEl.focus();
+    };
+    reader.readAsText(f);
+    return;
+  }
   if (!FILE_TYPES.includes(f.type)) {
-    attachNote('I can read a PDF or an image (PNG or JPG) — a statement or a screenshot works perfectly.');
+    attachNote('I can read a PDF, an image (PNG or JPG), or a CSV export of transactions — a statement or a screenshot works perfectly.');
     return;
   }
   if (f.size > MAX_FILE_BYTES) {
@@ -445,8 +508,7 @@ function handleFile(f) {
   const reader = new FileReader();
   reader.onload = () => {
     pendingFile = { name: f.name, media_type: f.type, data: String(reader.result).split(',')[1] };
-    document.getElementById('attachName').textContent = f.name;
-    attachChip.classList.add('on');
+    updateAttachChip();
     inputEl.focus();
   };
   reader.readAsDataURL(f);
@@ -704,18 +766,19 @@ function checkWriteStatus(turnStartedAt) {
   scrollChat();
 }
 
-async function talk(userText, hidden, file) {
+async function talk(userText, hidden, file, machineBlock, displayLabel) {
   const turnStartedAt = Date.now();
   busy = true;
   sendBtn.disabled = true;
-  if (!hidden) addUser(userText, file && file.name);
+  if (!hidden) addUser(userText, displayLabel || (file && file.name));
 
-  let content = userText;
+  const sentText = machineBlock ? (userText ? userText + '\n\n' : '') + machineBlock : userText;
+  let content = sentText;
   if (file) {
     const block = file.media_type === 'application/pdf'
       ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: file.data } }
       : { type: 'image', source: { type: 'base64', media_type: file.media_type, data: file.data } };
-    content = [block, { type: 'text', text: userText || "Here you go, I've attached it." }];
+    content = [block, { type: 'text', text: sentText || "Here you go, I've attached it." }];
   }
   history.push({ role: 'user', content });
 
@@ -788,15 +851,65 @@ async function talk(userText, hidden, file) {
     await refreshProgress();
     checkWriteStatus(turnStartedAt);
   }, 1200);
+
+  // CSV outlier classifications: the model emits [RESOLVE] blocks as the
+  // person answers. When every outlier is resolved, CODE computes the
+  // final figure (finn-transactions.js — the model never does the
+  // division) and hands the result back as a machine turn for the
+  // composition statement and the capture.
+  if (lastTxSummary && !txResultSent) {
+    Object.assign(txResolutions, extractResolves(fullText));
+    const outstanding = lastTxSummary.outliers.filter(o => !txResolutions[o.id]);
+    if (!outstanding.length) {
+      const result = window.finnTransactions.applyResolutions(lastTxSummary, txResolutions);
+      if (!result.error) {
+        txResultSent = true;
+        talk('', true, null, '[TRANSACTION RESULT] ' + JSON.stringify(result));
+      }
+    }
+  }
 }
 
-function handleSend() {
+async function handleSend() {
   const text = inputEl.value.trim();
-  if ((!text && !pendingFile) || busy) return;
+  if ((!text && !pendingFile && !pendingCsvs.length) || busy) return;
   const file = pendingFile;
+  const csvs = pendingCsvs;
   clearAttachment();
   inputEl.value = '';
   inputEl.style.height = 'auto';
+
+  if (csvs.length) {
+    // Whole-set recompute: every CSV from this session goes back through
+    // the deterministic endpoint together, so the figure is always built
+    // from one pass (transfer and card dedupe need the full set).
+    const allCsvs = sessionCsvs.concat(csvs);
+    busy = true; sendBtn.disabled = true;
+    const label = csvs.length === 1 ? csvs[0].name : csvs.length + ' statements';
+    try {
+      const { data: { session: s } } = await finnSupabase.auth.getSession();
+      const res = await fetch('/api/import-transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + s.access_token },
+        body: JSON.stringify({ files: allCsvs }),
+      });
+      const body = await res.json();
+      busy = false; sendBtn.disabled = false;
+      if (!res.ok) {
+        attachNote('I couldn\'t read that export: ' + (body.detail || body.error) + '. A fresh CSV export from the bank usually fixes it.');
+        return;
+      }
+      sessionCsvs = allCsvs;
+      lastTxSummary = body.summary;
+      txResolutions = {};
+      txResultSent = false;
+      talk(text, false, null, '[TRANSACTION SUMMARY] ' + JSON.stringify(body.summary), label);
+    } catch (err) {
+      busy = false; sendBtn.disabled = false;
+      attachNote('The import didn\'t go through just then. Mind trying that send again?');
+    }
+    return;
+  }
   talk(text, false, file);
 }
 sendBtn.addEventListener('click', handleSend);

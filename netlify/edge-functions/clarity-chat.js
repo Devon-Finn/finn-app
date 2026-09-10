@@ -259,7 +259,14 @@ Rules for the block:
 - "completed_domains": the full cumulative list of AREA labels now covered or deliberately skipped, including "goals" when goals have been drawn out. Area labels are unchanged: income, assets, liabilities, buffer, protection, estate, super, goals — where "income" includes the household context and expenses, "assets" covers home and investments, and "liabilities" covers debts. A skipped area still counts as completed for progress.
 - "session_complete": true only when all eight areas are covered or consciously skipped and you have wrapped up warmly. Otherwise false.
 - If a turn captured nothing (a clarifying question, a boundary deflection), emit {"domains":{},"goals":{},"completed_domains":[<current cumulative list>],"session_complete":false}.
-- The block records only; it never justifies loosening any boundary above.`;
+- The block records only; it never justifies loosening any boundary above.
+
+**TRANSACTION SUMMARY PROTOCOL (machine blocks — the person never sees these):**
+When a user turn contains [TRANSACTION SUMMARY] {json}, code has already parsed their bank CSVs deterministically: totals, recurring groups, cross-account transfers and card payments already excluded. You NEVER do arithmetic on it — no summing, no averaging, no division; a model adding up transactions is approximately right and unverifiable, which is exactly what this path exists to remove. Your job is ONLY the questions code can't answer:
+- Walk the "outliers" one at a time, one open thread, in plain language. A large_one_off: is it a yearly bill that'll come around again, or a one-off ("there's a $4,000 payment to X in March — a yearly premium that recurs, or a one-off?"). A housing_candidate: is this the mortgage or rent (captured separately, never in living costs)? A transfer_suspect: is this money moving between their own accounts?
+- As answers land, emit resolve lines, each on its own line immediately BEFORE the [CAPTURE] block: [RESOLVE] {"o1":"one_off","r2":"housing"} — categories are exactly recurring_annual | one_off | housing | internal_transfer. You may batch several answered ids in one line. Never invent an id and never resolve an unanswered outlier.
+- If the summary has coverage_short true, say plainly the export covered less than a year and the figure will be an estimate until a fuller export sharpens it.
+When a user turn contains [TRANSACTION RESULT] {json}, code has applied their answers and done the division. State the composition plainly, two facts, no adjustment, no verdict, in this shape: "That works out at $X a month across the year. About $Y a month of that was one-off spending — <the one-off labels in plain words> — so a typical month is quieter than that, and a year has things like them in it." (Where one_off_monthly is 0, just state the monthly figure.) Then capture: expenses.living_monthly from the result, includes_housing false, housing_repayment_monthly where the result carries housing_monthly, and the domain _confidence from the result's confidence field. The figures come from the result verbatim — you never recompute them.`;
 
 /* ════════════════════ Supabase helpers (service role) ════════════════════ */
 async function sbFetch(path, init = {}) {
@@ -692,9 +699,16 @@ function emDashScrubStream(onDone) {
     return s.replace(/\s*—\s*/g, () => { substitutions++; return ", "; });
   }
 
+  // Machine text starts at the earliest of [CAPTURE] or [RESOLVE] — the
+  // resolve block is JSON too and must never be scrubbed.
+  function machineIx(s) {
+    const cuts = [s.indexOf("[CAPTURE]"), s.indexOf("[RESOLVE]")].filter(i => i !== -1);
+    return cuts.length ? Math.min(...cuts) : -1;
+  }
+
   function scrubDelta(text) {
     const full = seenText + text;
-    const markerIx = full.indexOf("[CAPTURE]");
+    const markerIx = machineIx(full);
     let out;
     if (markerIx === -1) {
       out = scrub(heldWs + text);
@@ -722,7 +736,7 @@ function emDashScrubStream(onDone) {
   const SOFTENERS = /\b(roughly|approximately|ballpark|a rough idea|if you know it)\b/i;
   const FACT_KEYWORDS = /\b(rate|balance|owing|term|repayment|cover|super balance)\b/i;
   function logSofteners() {
-    const ix = seenText.indexOf("[CAPTURE]");
+    const ix = machineIx(seenText);
     const visible = ix === -1 ? seenText : seenText.slice(0, ix);
     for (const sentence of visible.split(/(?<=[.!?])\s+/)) {
       if (SOFTENERS.test(sentence) && FACT_KEYWORDS.test(sentence)) {
