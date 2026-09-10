@@ -169,7 +169,8 @@ function normDesc(s) {
 
 const TRANSFER_RE = /(transfer (to|from)|internal transfer|\btfr\b|linked ac|own account)/i;
 const HOUSING_RE = /(rent(al)?\b|mortgage|home ?loan|loan (repay|pymt|payment)|\bathena\b|\bunloan\b)/i;
-const CARD_PAYMENT_RE = /((credit ?card|mastercard|visa|amex|card) ?(payment|pymt|autopay)|payment to .{0,20}card|bpay .{0,20}card)/i;
+// Both word orders: "MASTERCARD PAYMENT" and "PAYMENT MASTERCARD 1234".
+const CARD_PAYMENT_RE = /((credit ?card|mastercard|visa|amex|card) ?(payment|pymt|autopay)|(payment|pymt) ?(of|to)? ?.{0,15}\b(credit ?card|mastercard|visa|amex|card)\b|bpay .{0,20}card\b)/i;
 
 const DAY = 86400000;
 
