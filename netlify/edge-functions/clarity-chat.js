@@ -1,4 +1,4 @@
-import { bankExportsPromptSection } from "./finn-bank-exports.js";
+import { bankExportsPromptSection } from "./lib/finn-bank-exports.js";
 
 // Clarity-chat edge function — the paid Clarity Session conversation (3a).
 //

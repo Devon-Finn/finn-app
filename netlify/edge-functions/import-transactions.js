@@ -19,7 +19,7 @@
 //   → 422 { error, detail }              parse rejection, specific
 //   → 401 / 403 / 4xx as clarity-chat
 
-import { parseCsvText, summarise } from "./finn-csv-engine.js";
+import { parseCsvText, summarise } from "./lib/finn-csv-engine.js";
 
 const MAX_FILES = 6;
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
