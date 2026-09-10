@@ -673,7 +673,7 @@ function parseCapture(fullText) {
    days are legitimate. Every substitution is counted and logged so the
    leak rate stays visible over time instead of being silently papered
    over. */
-function emDashScrubStream() {
+function emDashScrubStream(onDone) {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   let lineBuf = "";
@@ -749,12 +749,22 @@ function emDashScrubStream() {
         controller.enqueue(encoder.encode(outLine + "\n"));
       }
     },
-    flush(controller) {
+    async flush(controller) {
       if (lineBuf) controller.enqueue(encoder.encode(lineBuf));
       if (substitutions > 0) {
         console.log(`[Finn clarity] em-dash substitutions in visible reply: ${substitutions}`);
       }
       logSofteners();
+      // WRITE-AHEAD: awaited here, in the request path, so the stream does
+      // not close until the raw capture is on disk. A few milliseconds of
+      // tail latency buys a capture that can never vanish.
+      if (typeof onDone === "function") {
+        try {
+          await onDone(seenText);
+        } catch (err) {
+          console.error("[Finn clarity] write-ahead onDone failed (fallback path will retry):", err);
+        }
+      }
     },
   });
 }
@@ -789,13 +799,65 @@ async function accumulateStreamText(stream) {
   return fullText;
 }
 
+/* ── Write-ahead capture log (Devon's ruling) ──
+   The raw capture is persisted the instant it arrives — awaited in the
+   request path, before the stream closes — then validated, merged and
+   committed as a second step. A raw insert can't fail validation, so a
+   capture can never silently vanish. Validation failures (refused) and
+   non-validation failures (failed) now share one path, and
+   last_write_status is honest about every outcome so the existing
+   refused-write notice covers both. A 'received' row older than a few
+   minutes is itself the recovery queue. */
+
+async function insertCaptureLog(householdId, rawText, capture, status) {
+  const res = await sbFetch(`/rest/v1/capture_log`, {
+    method: "POST",
+    headers: { "Prefer": "return=representation" },
+    body: JSON.stringify({
+      household_id: householdId,
+      raw_text: rawText ?? null,
+      capture: capture ?? null,
+      status: status ?? "received",
+    }),
+  });
+  if (!res.ok) {
+    console.error(`[Finn clarity] WRITE-AHEAD INSERT FAILED — ${res.status}: ${await res.text()}`);
+    return null;
+  }
+  const rows = await res.json();
+  return rows && rows[0] ? rows[0].id : null;
+}
+
+async function markCaptureLog(logId, status, extra) {
+  if (!logId) return;
+  const res = await sbFetch(`/rest/v1/capture_log?id=eq.${logId}`, {
+    method: "PATCH",
+    headers: { "Prefer": "return=minimal" },
+    body: JSON.stringify({ status, resolved_at: new Date().toISOString(), ...(extra || {}) }),
+  });
+  if (!res.ok) console.error(`[Finn clarity] capture_log mark ${status} failed — ${res.status}`);
+}
+
+// Member-readable status carries a boolean and a timestamp ONLY — error
+// detail stays server-side (capture_log + logs). Fires the existing
+// session sys-note for refused AND failed writes alike.
+async function setWriteStatusFalse(householdId) {
+  const at = new Date().toISOString();
+  const st = await sbFetch(`/rest/v1/picture?household_id=eq.${householdId}`, {
+    method: "PATCH",
+    headers: { "Prefer": "return=minimal" },
+    body: JSON.stringify({ last_write_status: { ok: false, at }, updated_at: at }),
+  });
+  if (!st.ok) console.error(`[Finn clarity] last_write_status update failed — ${st.status}`);
+}
+
 // Apply a parsed capture to the household's picture row (and completion stub).
 // Schema v2 path: the stored row is lazily upgraded v1→v2 on its first new
 // write, the incoming capture (still emitted in the legacy shape by the
 // untouched 3a prompt) is translated, and the merged result is validated
 // against Part 2 before anything is written. A write that fails validation
 // is REFUSED and logged loudly — never stored malformed.
-async function applyCapture(householdId, picture, capture) {
+async function applyCapture(householdId, picture, capture, logId) {
   // Defensive re-homing: the model occasionally emits a domain as a SIBLING
   // of "domains" instead of inside it. Ignoring unexpected top-level keys
   // would be silent data loss, so unambiguous domain names are folded back
@@ -826,31 +888,20 @@ async function applyCapture(householdId, picture, capture) {
   const merged = deepMerge(baseDomains, patch);
   const check = validateDomainsV2(merged);
   if (!check.ok) {
-    const at = new Date().toISOString();
     // 1. Loud, greppable log line — the alert signal.
     console.error(
-      "[Finn clarity] QUARANTINE — schema v2 validation failed, picture write REFUSED for household " + householdId +
-      ". Nothing is lost: the rejected payload is quarantined and the session UI is told. Problems: " + JSON.stringify(check.errors)
+      "[Finn clarity] REFUSED — schema v2 validation failed, picture write refused for household " + householdId +
+      ". Nothing is lost: the raw capture is in capture_log and the session UI is told. Problems: " + JSON.stringify(check.errors)
     );
-    // 2. Quarantine the rejected payload — a refused write must never mean
-    //    silent data loss.
-    const q = await sbFetch(`/rest/v1/picture_quarantine`, {
-      method: "POST",
-      headers: { "Prefer": "return=minimal" },
-      body: JSON.stringify({ household_id: householdId, capture: capture ?? null, merged_domains: merged, errors: check.errors }),
-    });
-    if (!q.ok) console.error(`[Finn clarity] QUARANTINE INSERT FAILED — ${q.status}: ${await q.text()}`);
-    // 3. Tell the session: last_write_status is member-readable via RLS, so
-    //    the UI can say "that didn't save" instead of carrying on as though
-    //    it did. domains/schema_version are NOT touched on this path.
-    // Member-readable status carries a boolean and a timestamp ONLY —
-    // validator error detail stays server-side (quarantine + logs).
-    const st = await sbFetch(`/rest/v1/picture?household_id=eq.${householdId}`, {
-      method: "PATCH",
-      headers: { "Prefer": "return=minimal" },
-      body: JSON.stringify({ last_write_status: { ok: false, at }, updated_at: at }),
-    });
-    if (!st.ok) console.error(`[Finn clarity] last_write_status update failed — ${st.status}`);
+    // 2. Mark the write-ahead row refused (or insert one directly if the
+    //    write-ahead itself failed — a refusal must never mean silent loss).
+    if (logId) {
+      await markCaptureLog(logId, "refused", { errors: check.errors, merged_domains: merged });
+    } else {
+      await insertCaptureLog(householdId, null, capture, "refused");
+    }
+    // 3. Tell the session — domains/schema_version are NOT touched here.
+    await setWriteStatusFalse(householdId);
     return;
   }
   const domains = check.value;
@@ -860,22 +911,33 @@ async function applyCapture(householdId, picture, capture) {
   const VALID = ["income", "assets", "liabilities", "buffer", "protection", "estate", "super", "goals"];
   const completed = [...new Set([...prevDone, ...newDone])].filter(d => VALID.includes(d));
 
-  const res = await sbFetch(`/rest/v1/picture?household_id=eq.${householdId}`, {
+  const pictureBody = JSON.stringify({
+    domains,
+    goals,
+    completed_domains: completed,
+    schema_version: 2,
+    last_write_status: { ok: true, at: new Date().toISOString() },
+    updated_at: new Date().toISOString(),
+  });
+  const patchPicture = () => sbFetch(`/rest/v1/picture?household_id=eq.${householdId}`, {
     method: "PATCH",
     headers: { "Prefer": "return=minimal" },
-    body: JSON.stringify({
-      domains,
-      goals,
-      completed_domains: completed,
-      schema_version: 2,
-      last_write_status: { ok: true, at: new Date().toISOString() },
-      updated_at: new Date().toISOString(),
-    }),
+    body: pictureBody,
   });
+  let res = await patchPicture();
   if (!res.ok) {
-    console.error(`[Finn clarity] picture save failed — ${res.status}: ${await res.text()}`);
+    console.error(`[Finn clarity] picture save failed — ${res.status}: ${await res.text()} — retrying once`);
+    res = await patchPicture();
+  }
+  if (!res.ok) {
+    // Non-validation failure: the raw capture is safe in capture_log, the
+    // row is marked, and the session is told — never a silent loss.
+    console.error(`[Finn clarity] FAILED — picture save failed after retry (${res.status}) for household ${householdId}; capture preserved in capture_log`);
+    await markCaptureLog(logId, "failed", { errors: [`picture save failed: ${res.status}`] });
+    await setWriteStatusFalse(householdId);
     return;
   }
+  await markCaptureLog(logId, "applied");
 
   // Completion stub: set the 60-day clock once, at first completion.
   // Fully wired with payment in step 4.
@@ -1010,15 +1072,58 @@ export default async function handler(request, context) {
 
   const [clientStream, saveStream] = upstream.body.tee();
 
-  context.waitUntil(
-    accumulateStreamText(saveStream).then(fullText => {
-      const capture = parseCapture(fullText);
-      if (capture) return applyCapture(auth.householdId, picture, capture);
-      console.error("[Finn clarity] no capture block in reply — nothing saved this turn");
-    })
-  );
+  // Write-ahead handshake: the scrub's flush inserts the raw capture in the
+  // REQUEST PATH (awaited before the stream closes) and hands the log id to
+  // the apply chain. If the client disconnects mid-stream, flush never runs,
+  // but the tee'd save branch still drains the full model output — the
+  // fallback below inserts the raw row itself before applying, so the
+  // disconnect-still-saves property is preserved.
+  let resolveWriteAhead;
+  const writeAhead = new Promise(resolve => { resolveWriteAhead = resolve; });
+  const scrubbed = clientStream.pipeThrough(emDashScrubStream(async fullText => {
+    const idx = fullText.indexOf("[CAPTURE]");
+    if (idx === -1) { resolveWriteAhead({ logId: null, capture: null, hasMarker: false }); return; }
+    const capture = parseCapture(fullText);
+    const logId = await insertCaptureLog(auth.householdId, fullText.slice(idx), capture);
+    resolveWriteAhead({ logId, capture, hasMarker: true });
+  }));
 
-  return new Response(clientStream.pipeThrough(emDashScrubStream()), {
+  context.waitUntil((async () => {
+    // Always drain the save branch: it is the source of truth when the
+    // client disconnects, and an undrained tee branch buffers forever.
+    const fullText = await accumulateStreamText(saveStream);
+    const flushRes = await Promise.race([
+      writeAhead,
+      new Promise(resolve => setTimeout(() => resolve(null), 2000)),
+    ]);
+    const idx = fullText.indexOf("[CAPTURE]");
+    if (idx === -1) {
+      console.error("[Finn clarity] no capture block in reply — nothing saved this turn");
+      return;
+    }
+    let logId = flushRes ? flushRes.logId : null;
+    let capture = flushRes && flushRes.hasMarker ? flushRes.capture : parseCapture(fullText);
+    if (!logId) {
+      // Client disconnected before flush, or the write-ahead insert failed:
+      // land the raw row now, before any apply step can fail.
+      logId = await insertCaptureLog(auth.householdId, fullText.slice(idx), capture);
+    }
+    if (!capture) {
+      console.error("[Finn clarity] REFUSED — capture block did not parse; raw preserved in capture_log");
+      await markCaptureLog(logId, "refused", { errors: ["capture block did not parse"] });
+      await setWriteStatusFalse(auth.householdId);
+      return;
+    }
+    try {
+      await applyCapture(auth.householdId, picture, capture, logId);
+    } catch (err) {
+      console.error("[Finn clarity] FAILED — capture apply threw; raw preserved in capture_log:", err);
+      await markCaptureLog(logId, "failed", { errors: [String((err && err.message) || err)] });
+      await setWriteStatusFalse(auth.householdId);
+    }
+  })());
+
+  return new Response(scrubbed, {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
