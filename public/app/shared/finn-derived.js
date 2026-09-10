@@ -75,10 +75,13 @@
     const super_total = Array.isArray(sup.funds)
       ? sumKnown(sup.funds.map(f => f && f.balance)) : null;
 
-    // income_total_annual = sum of all annual income fields
+    // income_total_annual = sum of all annual income fields, including the
+    // typed income.other[] array (capture-conduct correction 4).
+    const otherAnnual = Array.isArray(inc.other)
+      ? sumKnown(inc.other.map(o => o && o.amount_annual)) : null;
     const income_total_annual = sumKnown([
       inc.salary_gross_annual, inc.partner_salary_gross_annual,
-      inc.business_income_annual, inc.rental_income_annual, inc.other_income_annual
+      inc.business_income_annual, inc.rental_income_annual, otherAnnual
     ]);
 
     // property_equity — per investment property: value_estimate − loan_balance

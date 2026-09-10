@@ -344,6 +344,10 @@ const sendBtn = document.getElementById('sendBtn');
 let session = null;
 let history = [];      // visible conversation, sent to the edge function
 let busy = false;
+// Conversation id: scopes path_served events and refusal validity on the
+// server (capture-conduct). One per page load; a new visit is a new
+// session, so expired refusals get the path offered once more.
+const conversationId = crypto.randomUUID();
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function scrollChat() { messagesEl.scrollTop = messagesEl.scrollHeight; }
@@ -792,7 +796,7 @@ async function talk(userText, hidden, file, machineBlock, displayLabel) {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + s.access_token
       },
-      body: JSON.stringify({ messages: history })
+      body: JSON.stringify({ messages: history, session_id: conversationId })
     });
     if (!res.ok) throw new Error('clarity-chat ' + res.status);
 

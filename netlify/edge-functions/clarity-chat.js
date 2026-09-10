@@ -242,7 +242,7 @@ JSON shape:
 Rules for the block:
 - "domains": include ONLY fields the person actually provided or corrected THIS turn, under these domain keys and exact shapes (this is the storage schema — writes that do not match it are refused):
   context: adults, children (array of {age}), owner_age, partner_age, work_intent ("both continuing"/"one reducing"/"one stopping"/"unsure"), horizon_years
-  income: salary_gross_annual, salary_net_monthly, partner_salary_gross_annual, partner_salary_net_monthly, business_income_annual, rental_income_annual, other_income_annual, structure ("paye"/"sole_trader"/"company"/"trust"/"mixed"), entity ({type, name} where a company or trust exists), employer_super_on (array naming the income streams employer super is paid on, e.g. ["salary","partner_salary"])
+  income: salary_gross_annual, salary_net_monthly, partner_salary_gross_annual, partner_salary_net_monthly, business_income_annual, rental_income_annual, other (array of {type, label, amount_annual} where type is "rental_residential"/"rental_commercial"/"dividends"/"distributions"/"trust_distribution"/"business_profit"/"government"/"family_support" and label is what it is in their words — every other regular source lands here, typed, never lumped), structure ("paye"/"sole_trader"/"company"/"trust"/"mixed"), entity ({type, name} where a company or trust exists), employer_super_on (array naming the income streams employer super is paid on, e.g. ["salary","partner_salary"])
   expenses: living_monthly (EXCLUDING housing debt repayments), includes_housing (explicit true/false — NEVER omitted or null when living_monthly is captured: false when the figure excludes housing as you asked, true only when the person genuinely can only give an all-in figure), housing_repayment_monthly
   home: owns_home, value_estimate, value_source, mortgage_balance, rate_percent, rate_type, lender, with_lender_since, repayment_monthly, term_remaining_years, has_offset (ONLY ever from asking the offset question — never inferred from any balance), offset_balance, package_fee_annual
   buffer: accessible_savings, where_held, linked_to_loan, counts_credit_as_buffer
@@ -345,13 +345,16 @@ const V2_ENUMS = {
   // component-spec 5.1: a holiday house is neither the home they live in
   // nor an investment, and needs somewhere to go.
   property_use: ["investment", "holiday", "other"],
+  // capture-conduct correction 4: other income is TYPED, each source
+  // carrying its own retrieval state in the field registry.
+  other_income_type: ["rental_residential", "rental_commercial", "dividends", "distributions", "trust_distribution", "business_profit", "government", "family_support"],
 };
 const COVER = { held: BOOL, amount: MONEY, inside_super: BOOL };
 const ESTATE_DOC = { in_place: "docstate", last_updated: STR };
 
 const V2_SCHEMA = {
   context: { adults: INT, children: { array: { age: INT } }, owner_age: INT, partner_age: INT, work_intent: { enum: "work_intent" }, horizon_years: INT },
-  income: { salary_gross_annual: MONEY, salary_net_monthly: MONEY, partner_salary_gross_annual: MONEY, partner_salary_net_monthly: MONEY, business_income_annual: MONEY, rental_income_annual: MONEY, other_income_annual: MONEY, structure: { enum: "structure" }, entity: { object: { type: STR, name: STR } }, employer_super_on: { array: STR } },
+  income: { salary_gross_annual: MONEY, salary_net_monthly: MONEY, partner_salary_gross_annual: MONEY, partner_salary_net_monthly: MONEY, business_income_annual: MONEY, rental_income_annual: MONEY, other: { array: { type: { enum: "other_income_type" }, label: STR, amount_annual: MONEY } }, structure: { enum: "structure" }, entity: { object: { type: STR, name: STR } }, employer_super_on: { array: STR } },
   expenses: { living_monthly: MONEY, includes_housing: BOOL, housing_repayment_monthly: MONEY },
   home: { owns_home: BOOL, value_estimate: MONEY, value_source: STR, mortgage_balance: MONEY, rate_percent: RATE, rate_type: STR, lender: STR, with_lender_since: STR, repayment_monthly: MONEY, term_remaining_years: INT, has_offset: BOOL, offset_balance: MONEY, package_fee_annual: MONEY },
   buffer: { accessible_savings: MONEY, where_held: STR, linked_to_loan: BOOL, counts_credit_as_buffer: BOOL, other_cash: MONEY, other_cash_where_held: STR },
@@ -483,7 +486,7 @@ function isV2Domains(d) {
   const e = d.estate;
   if (e && ["will", "poa", "guardianship", "super_nomination"].some(k => e[k] && typeof e[k] === "object")) return true;
   const inc = d.income;
-  if (inc && ["salary_gross_annual", "salary_net_monthly", "partner_salary_gross_annual", "partner_salary_net_monthly", "business_income_annual", "rental_income_annual", "structure", "entity", "employer_super_on"].some(k => k in inc)) return true;
+  if (inc && ["salary_gross_annual", "salary_net_monthly", "partner_salary_gross_annual", "partner_salary_net_monthly", "business_income_annual", "rental_income_annual", "other", "structure", "entity", "employer_super_on"].some(k => k in inc)) return true;
   const b = d.buffer;
   if (b && ["where_held", "linked_to_loan", "counts_credit_as_buffer", "other_cash", "other_cash_where_held"].some(k => k in b)) return true;
   const s = d.super;
@@ -527,12 +530,14 @@ function translateLegacyDomains(v1) {
   const inc = v1.income, a = v1.assets, l = v1.liabilities, b = v1.buffer, p = v1.protection, e = v1.estate, s = v1.super;
 
   if (inc) {
-    const consumed = new Set(["salary_annual", "partner_salary_annual", "side_income_annual", "other_income_annual", "monthly_expenses"]);
+    const consumed = new Set(["salary_annual", "partner_salary_annual", "side_income_annual", "monthly_expenses"]);
     const o = {};
     if ("salary_annual" in inc) o.salary_gross_annual = inc.salary_annual;
     if ("partner_salary_annual" in inc) o.partner_salary_gross_annual = inc.partner_salary_annual;
     if ("side_income_annual" in inc) o.business_income_annual = inc.side_income_annual;
-    if ("other_income_annual" in inc) o.other_income_annual = inc.other_income_annual;
+    // Legacy other_income_annual has no type and income.other[] items may
+    // never take a nearest-fit type (no_default) — it goes to _unmapped via
+    // stashUnmapped rather than being guessed into the typed array.
     if (typeof inc.notes === "string") o._notes = inc.notes;
     if (Object.keys(o).length) out.income = o;
     if ("monthly_expenses" in inc) {
@@ -829,7 +834,7 @@ async function accumulateStreamText(stream) {
    refused-write notice covers both. A 'received' row older than a few
    minutes is itself the recovery queue. */
 
-async function insertCaptureLog(householdId, rawText, capture, status) {
+async function insertCaptureLog(householdId, rawText, capture, status, sessionId) {
   const res = await sbFetch(`/rest/v1/capture_log`, {
     method: "POST",
     headers: { "Prefer": "return=representation" },
@@ -838,6 +843,7 @@ async function insertCaptureLog(householdId, rawText, capture, status) {
       raw_text: rawText ?? null,
       capture: capture ?? null,
       status: status ?? "received",
+      session_id: sessionId ?? null,
     }),
   });
   if (!res.ok) {
@@ -877,7 +883,7 @@ async function setWriteStatusFalse(householdId) {
 // untouched 3a prompt) is translated, and the merged result is validated
 // against Part 2 before anything is written. A write that fails validation
 // is REFUSED and logged loudly — never stored malformed.
-async function applyCapture(householdId, picture, capture, logId) {
+async function applyCapture(householdId, picture, capture, logId, sessionId) {
   // Defensive re-homing: the model occasionally emits a domain as a SIBLING
   // of "domains" instead of inside it. Ignoring unexpected top-level keys
   // would be silent data loss, so unambiguous domain names are folded back
@@ -907,19 +913,31 @@ async function applyCapture(householdId, picture, capture, logId) {
   }
   const merged = deepMerge(baseDomains, patch);
 
-  /* ── THE PERSISTENCE GATE (capture-conduct step 2) ──
+  /* ── THE PERSISTENCE GATE (capture-conduct step 2, corrections 1-2) ──
      Runs in the request path, after the write-ahead raw insert and before
      the validated merge commits, so a gate failure quarantines the item
-     rather than losing it. A retrievable field below its confidence floor
-     needs a standing refusal record (path offered, declined); a field
-     with requires needs every required field present in the merged
-     picture. Not answered stays open — never a nearest-fit value. */
-  const priorRefusals = (Array.isArray(picture.refusals) ? picture.refusals : [])
-    .map(r => r && r.field).filter(Boolean);
-  const newRefusals = (Array.isArray(capture.refusals) ? capture.refusals : [])
-    .filter(f => typeof f === "string" && FIELD_REGISTRY[f]);
-  const refusalSet = new Set([...priorRefusals, ...newRefusals]);
-  const gate = persistenceGate(patch, merged, refusalSet);
+     rather than losing it.
+
+     Refusals are CODE-WITNESSED and SESSION-SCOPED: a refusal is valid
+     only where a path_served event (written by code when path text was
+     served, from build step 4) exists for that field id in THIS session.
+     Refusals from earlier sessions have expired — the field is offered
+     once more. Until step 4 exists no path_served rows do, so no refusal
+     is valid: correct and intended. */
+  const claimedRefusals = new Set([
+    ...(Array.isArray(picture.refusals) ? picture.refusals : [])
+      .filter(r => r && r.field && sessionId && r.session_id === sessionId).map(r => r.field),
+    ...(Array.isArray(capture.refusals) ? capture.refusals : [])
+      .filter(f => typeof f === "string" && FIELD_REGISTRY[f]),
+  ]);
+  let validRefusals = new Set();
+  if (claimedRefusals.size && sessionId) {
+    const servedRes = await sbFetch(
+      `/rest/v1/capture_log?household_id=eq.${householdId}&session_id=eq.${sessionId}&status=eq.path_served&select=field_id`);
+    const served = servedRes.ok ? new Set((await servedRes.json()).map(r => r.field_id)) : new Set();
+    validRefusals = new Set([...claimedRefusals].filter(f => served.has(f)));
+  }
+  const gate = persistenceGate(patch, merged, validRefusals);
   if (!gate.ok) {
     console.error(
       "[Finn clarity] GATE — capture-conduct violation, picture write refused for household " + householdId +
@@ -928,15 +946,22 @@ async function applyCapture(householdId, picture, capture, logId) {
     if (logId) {
       await markCaptureLog(logId, "refused", { errors: gate.errors, merged_domains: merged });
     } else {
-      await insertCaptureLog(householdId, null, capture, "refused");
+      await insertCaptureLog(householdId, null, capture, "refused", sessionId);
     }
     await setWriteStatusFalse(householdId);
     return;
   }
-  const refusalsOut = newRefusals.length
-    ? [...(Array.isArray(picture.refusals) ? picture.refusals : []),
-       ...newRefusals.filter(f => !priorRefusals.includes(f)).map(f => ({ field: f, at: new Date().toISOString() }))]
-    : undefined;
+  // Persist this session's newly recorded refusals (session-tagged) and
+  // prune expired ones: a refusal from another session whose field is
+  // still below its floor is cleared, so the path is offered once more.
+  const capRefusals = (Array.isArray(capture.refusals) ? capture.refusals : [])
+    .filter(f => typeof f === "string" && FIELD_REGISTRY[f]);
+  const existing = Array.isArray(picture.refusals) ? picture.refusals : [];
+  const kept = existing.filter(r => r && r.field && (!sessionId || r.session_id === sessionId));
+  const keptFields = new Set(kept.map(r => r.field));
+  const added = capRefusals.filter(f => !keptFields.has(f))
+    .map(f => ({ field: f, at: new Date().toISOString(), session_id: sessionId }));
+  const refusalsOut = (added.length || kept.length !== existing.length) ? [...kept, ...added] : undefined;
 
   const check = validateDomainsV2(merged);
   if (!check.ok) {
@@ -950,7 +975,7 @@ async function applyCapture(householdId, picture, capture, logId) {
     if (logId) {
       await markCaptureLog(logId, "refused", { errors: check.errors, merged_domains: merged });
     } else {
-      await insertCaptureLog(householdId, null, capture, "refused");
+      await insertCaptureLog(householdId, null, capture, "refused", sessionId);
     }
     // 3. Tell the session — domains/schema_version are NOT touched here.
     await setWriteStatusFalse(householdId);
@@ -1038,6 +1063,11 @@ export default async function handler(request, context) {
   if (!Array.isArray(payload.messages) || payload.messages.length === 0) {
     return json({ error: "messages_required" }, 400);
   }
+  // Session id: scopes path_served events and refusal validity. A refusal
+  // is only honoured within the session it was witnessed in.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const sessionId = typeof payload.session_id === "string" && UUID_RE.test(payload.session_id)
+    ? payload.session_id : null;
   const messages = [];
   for (const m of payload.messages.slice(-40)) {
     if (!m || (m.role !== "user" && m.role !== "assistant")) continue;
@@ -1137,7 +1167,7 @@ export default async function handler(request, context) {
     const idx = fullText.indexOf("[CAPTURE]");
     if (idx === -1) { resolveWriteAhead({ logId: null, capture: null, hasMarker: false }); return; }
     const capture = parseCapture(fullText);
-    const logId = await insertCaptureLog(auth.householdId, fullText.slice(idx), capture);
+    const logId = await insertCaptureLog(auth.householdId, fullText.slice(idx), capture, "received", sessionId);
     resolveWriteAhead({ logId, capture, hasMarker: true });
   }));
 
@@ -1159,7 +1189,7 @@ export default async function handler(request, context) {
     if (!logId) {
       // Client disconnected before flush, or the write-ahead insert failed:
       // land the raw row now, before any apply step can fail.
-      logId = await insertCaptureLog(auth.householdId, fullText.slice(idx), capture);
+      logId = await insertCaptureLog(auth.householdId, fullText.slice(idx), capture, "received", sessionId);
     }
     if (!capture) {
       console.error("[Finn clarity] REFUSED — capture block did not parse; raw preserved in capture_log");
@@ -1168,7 +1198,7 @@ export default async function handler(request, context) {
       return;
     }
     try {
-      await applyCapture(auth.householdId, picture, capture, logId);
+      await applyCapture(auth.householdId, picture, capture, logId, sessionId);
     } catch (err) {
       console.error("[Finn clarity] FAILED — capture apply threw; raw preserved in capture_log:", err);
       await markCaptureLog(logId, "failed", { errors: [String((err && err.message) || err)] });

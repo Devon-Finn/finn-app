@@ -399,14 +399,18 @@
       if (money(der.income_total_annual)) {
         html += C().figureHero(money(der.income_total_annual), 'is what comes in across the household each', 'year.');
       }
-      const annualKnown = [inc.salary_gross_annual, inc.partner_salary_gross_annual, inc.business_income_annual, inc.rental_income_annual, inc.other_income_annual].some(v => num(v) !== null);
+      const annualKnown = [inc.salary_gross_annual, inc.partner_salary_gross_annual, inc.business_income_annual, inc.rental_income_annual].some(v => num(v) !== null)
+        || arr(inc.other).some(o => num(o && o.amount_annual) !== null);
       if (annualKnown) {
         const rows = [];
         if (num(inc.salary_gross_annual) !== null) rows.push({ label: conf(inc, 'Salary'), op: rows.length ? '+' : '', value: money(inc.salary_gross_annual) });
         if (num(inc.partner_salary_gross_annual) !== null) rows.push({ label: conf(inc, 'Partner salary'), op: rows.length ? '+' : '', value: money(inc.partner_salary_gross_annual) });
         if (num(inc.business_income_annual) !== null) rows.push({ label: conf(inc, 'Business income'), op: rows.length ? '+' : '', value: money(inc.business_income_annual) });
         if (num(inc.rental_income_annual) !== null) rows.push({ label: conf(inc, 'Rental income'), op: rows.length ? '+' : '', value: money(inc.rental_income_annual) });
-        if (num(inc.other_income_annual) !== null) rows.push({ label: conf(inc, 'Other income'), op: rows.length ? '+' : '', value: money(inc.other_income_annual) });
+        for (const o of arr(inc.other)) {
+          if (num(o && o.amount_annual) === null) continue;
+          rows.push({ label: conf(inc, text(o.label) || String(o.type || 'Other income').replace(/_/g, ' ')), op: rows.length ? '+' : '', value: money(o.amount_annual) });
+        }
         rows.push({ label: 'Across the year', op: '=', value: money(der.income_total_annual), missing: money(der.income_total_annual) === null, result: true });
         html += calcSection('How the income is made up', rows);
       } else {
