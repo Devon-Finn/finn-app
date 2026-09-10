@@ -25,7 +25,7 @@ One entry per capturable field, in one file, keyed by field id. This is the sing
 ```
 income.employment.net_monthly:
   label:          "what actually lands in your account"
-  retrievable:    true                  // a document exists in the real world
+  retrieval:      required              // a document exists in the real world
   evidence:       [payslip, bank_statement_credit]
   paths:          ["payslip"]           // ids into the retrieval file
   accepts_upload: true
@@ -35,7 +35,7 @@ income.employment.net_monthly:
   feeds:          [income_total_annual]
 
 home.value:
-  retrievable:    true
+  retrieval:      required
   evidence:       [lender_valuation, rates_notice, portal_estimate, appraisal]
   paths:          ["home_value"]
   accepts_upload: true
@@ -45,12 +45,14 @@ home.value:
   feeds:          [home_equity, lvr_percent]
 
 expenses.discretionary_monthly:
-  retrievable:    false                 // genuinely a forward pattern
+  retrieval:      none                  // genuinely a forward pattern
   confidence_floor: stated
   softeners:      permitted
 ```
 
-**`retrievable` is a gate, not a hint.** A field marked retrievable **cannot be written below its confidence floor** unless a refusal record exists against it: the person was offered the path, and declined. The write fails otherwise. This is enforced at the persistence boundary, not in the prompt.
+**Retrieval is three-state, and it is a gate, not a hint.** Every field carries `retrieval: required | offered | none`. `required` serves the path and enforces the confidence floor: the field **cannot be written below its floor** unless a valid refusal record exists against it — the person was served the path, and declined. `offered` serves the path and accepts a stated answer with no refusal record. `none` means no document exists in the real world. The write fails otherwise. This is enforced at the persistence boundary, not in the prompt.
+
+**The same-trip rule.** A field that sits on a document the person is already being sent to for a `required` field is itself `required`. `offered` is reserved for fields whose document exists but demands a separate trip.
 
 That single rule kills the entire class. A home value, a loan balance, an ETF balance can never again be silently guessed. If it happens, the write throws and it appears in a log, rather than appearing in a walk three weeks later.
 
@@ -151,7 +153,7 @@ What the model no longer decides: the words used to ask for a fact, whether a re
 
 ## SEQUENCE
 
-1. Field registry, with `retrievable`, `confidence_floor`, `softeners`, `requires`, `feeds`.
+1. Field registry, with `retrieval`, `confidence_floor`, `softeners`, `requires`, `feeds`.
 2. Persistence gate. The floor and the `requires` enforced at the write boundary. **This is the piece that makes everything else structural rather than aspirational.**
 3. Retrieval path file, with home value, loan details and investment platforms as the first three entries alongside the existing bank exports.
 4. Templated asks assembled from the registry.

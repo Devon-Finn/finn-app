@@ -82,6 +82,32 @@
     trust: 'income through a trust', mixed: 'a mix of salary and self-employed income',
   };
 
+  const INCOME_SOURCE_LABELS = {
+    rental_residential: 'Rental income', rental_commercial: 'Commercial rent',
+    dividends: 'Dividends', distributions: 'Distributions',
+    trust_distribution: 'Trust distributions', business_profit: 'Business income',
+    director_fee: 'Director fees', government: 'Government payments', other: 'Other income',
+  };
+
+  // Plain-words name for an open reconciliation item (derived.income_unreconciled).
+  function openItemLabel(id, domains) {
+    const d = domains || {};
+    if (/^prop-(\d+)$/.test(id)) {
+      const n = Number(id.slice(5));
+      const props = (d.investments && Array.isArray(d.investments.properties)) ? d.investments.properties : [];
+      return (props.length > 1 ? 'investment property ' + n : 'the investment property') + ', no rent recorded against it yet';
+    }
+    if (id === 'entity') {
+      const e = d.income && d.income.entity;
+      const name = e && typeof e === 'object' && e.name ? e.name : (e && e.type ? 'the ' + e.type : 'the company or trust');
+      return name + ', nothing recorded coming out of it yet';
+    }
+    if (id === 'holdings') return 'the share portfolio, no dividends or distributions recorded yet';
+    if (id === 'business') return 'the business, no business income recorded yet';
+    if (id.indexOf('legacy:') === 0) return 'an earlier figure (' + id.slice(7).replace(/_/g, ' ') + ') that needs re-capturing';
+    return id;
+  }
+
   /* Whether a tile's domain was actually reached in conversation: any
      substantive (non-underscore) leaf is non-null. Shared by the grid
      badges and the panel's calm-versus-building decision. */
@@ -146,7 +172,15 @@
       nomination_display: estateDisplay(est.super_nomination) ?? undefined,
       property_value: firstProp ? money(firstProp.value_estimate) : null,
       property_loan: firstProp ? money(firstProp.loan_balance) : null,
-      rental_income_annual: money(inc.rental_income_annual),
+      rental_income_annual: (function () {
+        // Rental income now lives in typed income.other[] entries; the old
+        // scalar is read only from not-yet-migrated rows.
+        const rentals = (Array.isArray(inc.other) ? inc.other : [])
+          .filter(o => o && ['rental_residential', 'rental_commercial'].includes(o.source || o.type))
+          .map(o => o.amount_annual).filter(v => num(v) !== null);
+        if (rentals.length) return money(rentals.reduce((a, b) => a + b, 0));
+        return money(inc.rental_income_annual);
+      })(),
       investments_total_display: invParts.length ? money(invParts.reduce((a, b) => a + b, 0)) : null,
       held_in: text(inv.held_in) && esc(text(inv.held_in)),
       debts_total: money(der.debts_total),
@@ -396,23 +430,35 @@
     }
 
     else if (tileNo === 9) {
-      if (money(der.income_total_annual)) {
+      const openItems = arr(der.income_unreconciled);
+      if (money(der.income_total_annual) && !openItems.length) {
         html += C().figureHero(money(der.income_total_annual), 'is what comes in across the household each', 'year.');
       }
-      const annualKnown = [inc.salary_gross_annual, inc.partner_salary_gross_annual, inc.business_income_annual, inc.rental_income_annual].some(v => num(v) !== null)
+      const annualKnown = [inc.salary_gross_annual, inc.partner_salary_gross_annual].some(v => num(v) !== null)
         || arr(inc.other).some(o => num(o && o.amount_annual) !== null);
       if (annualKnown) {
         const rows = [];
         if (num(inc.salary_gross_annual) !== null) rows.push({ label: conf(inc, 'Salary'), op: rows.length ? '+' : '', value: money(inc.salary_gross_annual) });
         if (num(inc.partner_salary_gross_annual) !== null) rows.push({ label: conf(inc, 'Partner salary'), op: rows.length ? '+' : '', value: money(inc.partner_salary_gross_annual) });
-        if (num(inc.business_income_annual) !== null) rows.push({ label: conf(inc, 'Business income'), op: rows.length ? '+' : '', value: money(inc.business_income_annual) });
-        if (num(inc.rental_income_annual) !== null) rows.push({ label: conf(inc, 'Rental income'), op: rows.length ? '+' : '', value: money(inc.rental_income_annual) });
         for (const o of arr(inc.other)) {
           if (num(o && o.amount_annual) === null) continue;
-          rows.push({ label: conf(inc, text(o.label) || String(o.type || 'Other income').replace(/_/g, ' ')), op: rows.length ? '+' : '', value: money(o.amount_annual) });
+          const src = o.source || o.type;
+          let label = INCOME_SOURCE_LABELS[src] || text(o.label) || String(src || 'Other income').replace(/_/g, ' ');
+          // basis renders in the label, never netted silently
+          if (o.basis === 'gross') label += ', before costs';
+          else if (o.basis === 'net_of_costs') label += ', after costs';
+          rows.push({ label: conf(inc, label), op: rows.length ? '+' : '', value: money(o.amount_annual) });
         }
-        rows.push({ label: 'Across the year', op: '=', value: money(der.income_total_annual), missing: money(der.income_total_annual) === null, result: true });
+        const totalIncomplete = openItems.length > 0;
+        rows.push({ label: totalIncomplete ? 'Recorded so far' : 'Across the year', op: '=', value: money(der.income_total_annual), missing: money(der.income_total_annual) === null, result: true });
         html += calcSection('How the income is made up', rows);
+        // The reconciliation pass names what's still open: the total is
+        // never presented as complete while a producer has no income entry
+        // and no explicit zero against it.
+        if (totalIncomplete) {
+          html += '<div class="fp-teach"><p class="fp-intro">This isn’t the full picture yet. Still open: ' +
+            openItems.map(id => esc(openItemLabel(id, domains))).join('; ') + '.</p></div>';
+        }
       } else {
         html += '<div class="fp-teach"><h4 class="fp-calchead">How the income is made up</h4>' + statusList([
           [conf(inc, 'Take-home pay'), money(inc.salary_net_monthly) ? money(inc.salary_net_monthly) + '/month' : null],

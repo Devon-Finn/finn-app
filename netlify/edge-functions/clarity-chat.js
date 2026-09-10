@@ -242,7 +242,7 @@ JSON shape:
 Rules for the block:
 - "domains": include ONLY fields the person actually provided or corrected THIS turn, under these domain keys and exact shapes (this is the storage schema — writes that do not match it are refused):
   context: adults, children (array of {age}), owner_age, partner_age, work_intent ("both continuing"/"one reducing"/"one stopping"/"unsure"), horizon_years
-  income: salary_gross_annual, salary_net_monthly, partner_salary_gross_annual, partner_salary_net_monthly, business_income_annual, rental_income_annual, other (array of {type, label, amount_annual} where type is "rental_residential"/"rental_commercial"/"dividends"/"distributions"/"trust_distribution"/"business_profit"/"government"/"family_support" and label is what it is in their words — every other regular source lands here, typed, never lumped), structure ("paye"/"sole_trader"/"company"/"trust"/"mixed"), entity ({type, name} where a company or trust exists), employer_super_on (array naming the income streams employer super is paid on, e.g. ["salary","partner_salary"])
+  income: salary_gross_annual, salary_net_monthly, partner_salary_gross_annual, partner_salary_net_monthly, other (array of {source, linked_asset_id, entity, amount_annual, basis} — EVERY non-salary regular source lands here, typed, never lumped. source is "rental_residential"/"rental_commercial"/"dividends"/"distributions"/"trust_distribution"/"business_profit"/"director_fee"/"government"/"other". linked_asset_id ties the entry to what produces it: "prop-1"/"prop-2" in the order the investment properties were captured, "entity" for the company or trust, "holdings" for the share portfolio, null where nothing in the picture produces it. entity is whose hands it arrives in: "personal"/"joint"/"company"/"trust"/"smsf"/"unknown". basis is "gross" or "net_of_costs" — always ask which the figure is; where they give gross rent and costs, state both and record the gross figure with basis "gross" — never net them yourself and never characterise the gearing), structure ("paye"/"sole_trader"/"company"/"trust"/"mixed"), entity ({type, name} where a company or trust exists), employer_super_on (array naming the income streams employer super is paid on, e.g. ["salary","partner_salary"])
   expenses: living_monthly (EXCLUDING housing debt repayments), includes_housing (explicit true/false — NEVER omitted or null when living_monthly is captured: false when the figure excludes housing as you asked, true only when the person genuinely can only give an all-in figure), housing_repayment_monthly
   home: owns_home, value_estimate, value_source, mortgage_balance, rate_percent, rate_type, lender, with_lender_since, repayment_monthly, term_remaining_years, has_offset (ONLY ever from asking the offset question — never inferred from any balance), offset_balance, package_fee_annual
   buffer: accessible_savings, where_held, linked_to_loan, counts_credit_as_buffer
@@ -250,7 +250,7 @@ Rules for the block:
   protection: life / tpd / income_protection / trauma, each exactly {held, amount, inside_super}. held true with amount null is a valid and common state (they have it, they don't know how much).
   estate: will / poa / guardianship each {in_place, last_updated}; super_nomination {in_place, last_updated, binding}. in_place is true/false/"unsure"/"na"; last_updated is a rough date or period in their words ("2019", "before the kids").
   investments: shares_value, held_in (whose name), managed_funds_value, properties (array of {value_estimate, loan_balance, rate_percent, repayment_type, rent_monthly, held_in})
-  debts: items (array of {type, balance, rate_percent, minimum_monthly} where type is "credit_card"/"personal_loan"/"car_loan"/"bnpl"/"tax_debt"/"other"), hecs_balance (always separate — never one of the items)
+  debts: items (array of {type, purpose, borrower, security, is_split, parent_loan_id, balance, rate_percent, minimum_monthly}). type is the PRODUCT: "home_loan"/"investment_property_loan"/"loan_split"/"line_of_credit"/"commercial_loan"/"business_loan"/"equipment_finance"/"car_loan"/"personal_loan"/"credit_card"/"bnpl"/"hecs_help"/"tax_debt"/"family_loan"/"other". purpose is what the money was used for: "owner_occupied"/"investment_property"/"commercial_property"/"investment_shares"/"business_operating"/"vehicle"/"personal"/"education"/"tax"/"mixed"/"unknown". Purpose is NEVER inferred from product: where a debt is not plainly the loan on the home they live in, ask two things — what it is, and what the money was used for — and do not write type until purpose and borrower are answered (the write is refused otherwise; "unknown" is a legitimate answer when they genuinely don't know, a specific guess never is). "personal_loan" means a personal loan and nothing else. borrower is whose name the borrowing is in: "personal"/"joint"/"company"/"trust"/"smsf"/"partnership"/"unknown" — borrowing inside a company or trust is not personal household debt. security is "property_home"/"property_investment"/"property_commercial"/"vehicle"/"business_assets"/"unsecured"/"other". is_split true with parent_loan_id naming the loan it splits from where the debt is a split of a larger facility. hecs_balance (always separate — never one of the items)
   flags: hardship, hardship_signal — see the hardship rule below.
   Every domain you update this turn also carries _confidence, three-state: "document" when the figures were read from a payslip, statement, portal or policy schedule the person provided; "stated" when the person knew it and said it, no document; "estimated" when no document exists or it couldn't be reached. The professional receiving the picture needs to know which figures are hard, so never write "stated" for a figure you read off a document, and never write "document" for a remembered number. ("inferred" exists solely for flags.hardship, which is written from your read, never from asking.) Freeform nuance goes in _notes per domain (for human reading only — it never drives what the person is shown). Numbers as plain whole-dollar numbers, rates as percent numbers, no strings for money, no dollar signs. Nothing invented: if they did not say it, it is not in the block.
   Every field lives in EXACTLY the domain listed above — never place a field under a different domain, even when the conversation surfaced them together. In particular: structure, entity and employer_super_on belong to income, NEVER to context, even though the work setup comes up during the household opening. A field under the wrong domain causes the whole write to be refused and that turn's facts to be lost, so check placement before you emit the block.
@@ -336,7 +336,13 @@ const MONEY = "money", RATE = "rate", BOOL = "bool", INT = "int", STR = "str";
 const V2_ENUMS = {
   work_intent: ["both continuing", "one reducing", "one stopping", "unsure"],
   structure: ["paye", "sole_trader", "company", "trust", "mixed"],
-  debt_type: ["credit_card", "personal_loan", "car_loan", "bnpl", "tax_debt", "other"],
+  // field-spec Part 2 (Sept 2026 fold): debts carry product and purpose
+  // separately. Purpose is NEVER inferred from product; type carries
+  // requires [purpose, borrower] in the field registry, enforced.
+  debt_type: ["home_loan", "investment_property_loan", "loan_split", "line_of_credit", "commercial_loan", "business_loan", "equipment_finance", "car_loan", "personal_loan", "credit_card", "bnpl", "hecs_help", "tax_debt", "family_loan", "other"],
+  debt_purpose: ["owner_occupied", "investment_property", "commercial_property", "investment_shares", "business_operating", "vehicle", "personal", "education", "tax", "mixed", "unknown"],
+  debt_borrower: ["personal", "joint", "company", "trust", "smsf", "partnership", "unknown"],
+  debt_security: ["property_home", "property_investment", "property_commercial", "vehicle", "business_assets", "unsecured", "other"],
   // Three-state per Devon's ruling: document (read from a provided
   // payslip/statement/portal/schedule), stated (they knew it and said it),
   // estimated (no document exists or it couldn't be reached). "inferred"
@@ -345,16 +351,25 @@ const V2_ENUMS = {
   // component-spec 5.1: a holiday house is neither the home they live in
   // nor an investment, and needs somewhere to go.
   property_use: ["investment", "holiday", "other"],
-  // capture-conduct correction 4: other income is TYPED, each source
-  // carrying its own retrieval state in the field registry.
-  other_income_type: ["rental_residential", "rental_commercial", "dividends", "distributions", "trust_distribution", "business_profit", "government", "family_support"],
+  // field-spec Part 2 (Sept 2026 fold): income beyond salary is one typed
+  // array, each entry linked to its producing asset and carrying whose
+  // hands it arrives in and whether the figure is gross or net of costs.
+  // Gross rent and costs are never netted silently.
+  other_income_source: ["rental_residential", "rental_commercial", "dividends", "distributions", "trust_distribution", "business_profit", "director_fee", "government", "other"],
+  income_entity: ["personal", "joint", "company", "trust", "smsf", "unknown"],
+  income_basis: ["gross", "net_of_costs"],
 };
 const COVER = { held: BOOL, amount: MONEY, inside_super: BOOL };
 const ESTATE_DOC = { in_place: "docstate", last_updated: STR };
 
 const V2_SCHEMA = {
   context: { adults: INT, children: { array: { age: INT } }, owner_age: INT, partner_age: INT, work_intent: { enum: "work_intent" }, horizon_years: INT },
-  income: { salary_gross_annual: MONEY, salary_net_monthly: MONEY, partner_salary_gross_annual: MONEY, partner_salary_net_monthly: MONEY, business_income_annual: MONEY, rental_income_annual: MONEY, other: { array: { type: { enum: "other_income_type" }, label: STR, amount_annual: MONEY } }, structure: { enum: "structure" }, entity: { object: { type: STR, name: STR } }, employer_super_on: { array: STR } },
+  // Legacy business_income_annual / rental_income_annual scalars are gone
+  // from the schema (field-spec Part 2 fold): every non-salary source is a
+  // typed income.other[] entry. Stored scalars migrate via
+  // migrateIncomeShape — to income._unmapped and flags.income_unreconciled,
+  // never silently dropped from a total.
+  income: { salary_gross_annual: MONEY, salary_net_monthly: MONEY, partner_salary_gross_annual: MONEY, partner_salary_net_monthly: MONEY, other: { array: { source: { enum: "other_income_source" }, linked_asset_id: STR, entity: { enum: "income_entity" }, amount_annual: MONEY, basis: { enum: "income_basis" } } }, structure: { enum: "structure" }, entity: { object: { type: STR, name: STR } }, employer_super_on: { array: STR } },
   expenses: { living_monthly: MONEY, includes_housing: BOOL, housing_repayment_monthly: MONEY },
   home: { owns_home: BOOL, value_estimate: MONEY, value_source: STR, mortgage_balance: MONEY, rate_percent: RATE, rate_type: STR, lender: STR, with_lender_since: STR, repayment_monthly: MONEY, term_remaining_years: INT, has_offset: BOOL, offset_balance: MONEY, package_fee_annual: MONEY },
   buffer: { accessible_savings: MONEY, where_held: STR, linked_to_loan: BOOL, counts_credit_as_buffer: BOOL, other_cash: MONEY, other_cash_where_held: STR },
@@ -362,8 +377,8 @@ const V2_SCHEMA = {
   protection: { life: { object: COVER }, tpd: { object: COVER }, income_protection: { object: COVER }, trauma: { object: COVER } },
   estate: { will: { object: ESTATE_DOC }, poa: { object: ESTATE_DOC }, guardianship: { object: ESTATE_DOC }, super_nomination: { object: { ...ESTATE_DOC, binding: BOOL } } },
   investments: { shares_value: MONEY, held_in: STR, managed_funds_value: MONEY, properties: { array: { value_estimate: MONEY, loan_balance: MONEY, rate_percent: RATE, repayment_type: STR, rent_monthly: MONEY, held_in: STR, use: { enum: "property_use" } } } },
-  debts: { items: { array: { type: { enum: "debt_type" }, balance: MONEY, rate_percent: RATE, minimum_monthly: MONEY } }, hecs_balance: MONEY },
-  flags: { hardship: BOOL, hardship_signal: STR },
+  debts: { items: { array: { type: { enum: "debt_type" }, purpose: { enum: "debt_purpose" }, borrower: { enum: "debt_borrower" }, security: { enum: "debt_security" }, is_split: BOOL, parent_loan_id: STR, balance: MONEY, rate_percent: RATE, minimum_monthly: MONEY } }, hecs_balance: MONEY },
+  flags: { hardship: BOOL, hardship_signal: STR, income_unreconciled: { array: STR } },
 };
 
 // Validate + normalise one value against a field spec. Returns the
@@ -504,6 +519,63 @@ function v2DebtType(s) {
   return "other";
 }
 
+/* ── income shape migration (field-spec Part 2 fold, Sept 2026) ──
+   The income domain lost its business_income_annual / rental_income_annual
+   scalars and income.other[] changed shape ({type,label,amount_annual} →
+   {source,linked_asset_id,entity,amount_annual,basis}). Rows and patches
+   carrying the old shape are migrated here.
+
+   The migration must not reintroduce the omission bug the reconciliation
+   exists to catch: NOTHING is dropped. Old array items re-type 1:1 (the
+   source enum is a superset except family_support, which is "other" by
+   definition of the new enum); entity becomes "unknown" and basis null —
+   honest not-yet-asked states, never guesses. The scalars cannot be
+   re-typed without guessing (rental: residential or commercial is exactly
+   the guess that caused the walk finding), so their figures land pathed in
+   income._unmapped AND are named in flags.income_unreconciled — they
+   render as open items and no income total presents as complete while
+   they stand. */
+function migrateIncomeShape(domains) {
+  const inc = domains && domains.income;
+  if (!inc || typeof inc !== "object") return domains;
+  const oldShape = "business_income_annual" in inc || "rental_income_annual" in inc ||
+    (Array.isArray(inc.other) && inc.other.some(it => it && typeof it === "object" && "type" in it && !("source" in it)));
+  if (!oldShape) return domains;
+  const out = { ...domains, income: { ...inc } };
+  const o = out.income;
+  const un = () => (o._unmapped = { ...(o._unmapped || {}) });
+  const open = new Set(Array.isArray(domains.flags?.income_unreconciled) ? domains.flags.income_unreconciled : []);
+  if ("business_income_annual" in o) {
+    if (o.business_income_annual !== null && o.business_income_annual !== undefined) {
+      un()["income.business_income_annual"] = o.business_income_annual;
+      open.add("legacy:business_income_annual");
+    }
+    delete o.business_income_annual;
+  }
+  if ("rental_income_annual" in o) {
+    if (o.rental_income_annual !== null && o.rental_income_annual !== undefined) {
+      un()["income.rental_income_annual"] = o.rental_income_annual;
+      open.add("legacy:rental_income_annual");
+    }
+    delete o.rental_income_annual;
+  }
+  if (Array.isArray(o.other)) {
+    o.other = o.other.map((item, i) => {
+      if (!item || typeof item !== "object" || !("type" in item) || "source" in item) return item;
+      const source = item.type === "family_support" ? "other" : item.type;
+      if (typeof source === "string" && V2_ENUMS.other_income_source.includes(source)) {
+        if (typeof item.label === "string" && item.label) un()["income.other[" + i + "].label"] = item.label;
+        return { source, linked_asset_id: null, entity: "unknown", amount_annual: item.amount_annual ?? null, basis: null };
+      }
+      un()["income.other[" + i + "]"] = item;
+      open.add("legacy:income.other[" + i + "]");
+      return undefined;
+    }).filter(x => x !== undefined);
+  }
+  if (open.size) out.flags = { ...(domains.flags || {}), income_unreconciled: [...open] };
+  return out;
+}
+
 function v2Cover(vAmount, globalInsideSuper) {
   if (vAmount === undefined) return undefined;               // not mentioned
   if (vAmount === null) return { held: null, amount: null, inside_super: null };   // not yet asked
@@ -592,9 +664,13 @@ function translateLegacyDomains(v1) {
     const consumed = new Set(["mortgage_balance", "mortgage_rate_percent", "offset_balance", "expensive_debts", "hecs_balance"]);
     const debts = {};
     if (Array.isArray(l.expensive_debts)) {
+      // purpose and borrower were never captured in v1 — "unknown" is the
+      // legitimate, reachable value for exactly this (never a nearest fit),
+      // and it satisfies the enforced requires on type so translation
+      // itself cannot trip the gate.
       debts.items = l.expensive_debts
         .filter(x => x && typeof x === "object")
-        .map(x => ({ type: v2DebtType(x.type), balance: typeof x.balance === "number" ? Math.round(x.balance) : null, rate_percent: null, minimum_monthly: null }));
+        .map(x => ({ type: v2DebtType(x.type), purpose: "unknown", borrower: "unknown", balance: typeof x.balance === "number" ? Math.round(x.balance) : null, rate_percent: null, minimum_monthly: null }));
     }
     if ("hecs_balance" in l) debts.hecs_balance = l.hecs_balance; // separate, never in debt totals
     if (typeof l.notes === "string") debts._notes = l.notes;
@@ -907,10 +983,12 @@ async function applyCapture(householdId, picture, capture, logId, sessionId) {
   if ((picture.schema_version ?? 1) < 2 && !isV2Domains(baseDomains)) {
     baseDomains = translateLegacyDomains(baseDomains);
   }
+  baseDomains = migrateIncomeShape(baseDomains);
   let patch = capture.domains ?? {};
   if (Object.keys(patch).length && !isV2Domains(patch)) {
     patch = translateLegacyDomains(patch);
   }
+  patch = migrateIncomeShape(patch);
   const merged = deepMerge(baseDomains, patch);
 
   /* ── THE PERSISTENCE GATE (capture-conduct step 2, corrections 1-2) ──

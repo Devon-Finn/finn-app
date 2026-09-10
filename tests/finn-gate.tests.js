@@ -43,19 +43,39 @@ export function runGateTests(mod) {
   t('never-asked-skipped',
     persistenceGate({ flags: { hardship: true, _confidence: 'inferred' } }, { flags: { hardship: true } }, new Set()).ok);
 
-  /* ── retrieval_by_type: income.other[] ── */
+  /* ── retrieval_by_type: income.other[] (source-keyed since the Part 2 fold) ── */
   t('other-government-stated-passes',
-    persistenceGate({ income: { other: [{ type: 'government', label: 'FTB', amount_annual: 8000 }], structure: 'paye', _confidence: 'stated' } },
+    persistenceGate({ income: { other: [{ source: 'government', entity: 'personal', amount_annual: 8000 }], structure: 'paye', _confidence: 'stated' } },
       { income: { structure: 'paye' } }, new Set()).ok);
   t('other-dividends-stated-blocked',
-    persistenceGate({ income: { other: [{ type: 'dividends', label: 'VAS', amount_annual: 3000 }], _confidence: 'stated' } },
+    persistenceGate({ income: { other: [{ source: 'dividends', linked_asset_id: 'holdings', amount_annual: 3000 }], _confidence: 'stated' } },
       { income: {} }, new Set()).errors.join().includes('income.other[].amount_annual'));
-  t('other-unknown-type-strictest',
+  t('other-unknown-source-strictest',
     persistenceGate({ income: { other: [{ amount_annual: 3000 }], _confidence: 'stated' } },
       { income: {} }, new Set()).errors.join().includes('income.other[].amount_annual'));
   t('other-dividends-document-passes',
-    persistenceGate({ income: { other: [{ type: 'dividends', label: 'VAS', amount_annual: 3000 }], _confidence: 'document' } },
+    persistenceGate({ income: { other: [{ source: 'dividends', linked_asset_id: 'holdings', amount_annual: 3000 }], _confidence: 'document' } },
       { income: {} }, new Set()).ok);
+  t('other-director-fee-stated-blocked',
+    persistenceGate({ income: { other: [{ source: 'director_fee', entity: 'company', amount_annual: 20000 }], _confidence: 'stated' } },
+      { income: {} }, new Set()).errors.join().includes('income.other[].amount_annual'));
+  t('other-other-source-stated-passes',
+    persistenceGate({ income: { other: [{ source: 'other', entity: 'personal', amount_annual: 5000 }], _confidence: 'stated' } },
+      { income: {} }, new Set()).ok);
+
+  /* ── debts.items[].type requires [purpose, borrower] — ENFORCED, item-sibling ── */
+  t('debt-type-without-purpose-blocked',
+    persistenceGate({ debts: { items: [{ type: 'personal_loan', balance: 9800 }], _confidence: 'document' } },
+      { debts: { items: [{ type: 'personal_loan', balance: 9800 }] } }, new Set()).errors.join().includes('purpose'));
+  t('debt-type-with-purpose-borrower-passes',
+    persistenceGate({ debts: { items: [{ type: 'personal_loan', purpose: 'vehicle', borrower: 'personal', balance: 9800 }], _confidence: 'document' } },
+      { debts: {} }, new Set()).ok);
+  t('debt-type-unknown-values-pass',   // "unknown" is a legitimate, reachable value
+    persistenceGate({ debts: { items: [{ type: 'other', purpose: 'unknown', borrower: 'unknown', balance: 500 }], _confidence: 'document' } },
+      { debts: {} }, new Set()).ok);
+  t('debt-purpose-not-in-merged-only',  // sibling requires check the ITEM, not the merged picture
+    persistenceGate({ debts: { items: [{ type: 'loan_split', balance: 80000 }], _confidence: 'document' } },
+      { debts: { items: [{ type: 'home_loan', purpose: 'owner_occupied', borrower: 'joint' }] } }, new Set()).errors.join().includes('borrower'));
 
   /* ── correction 6: the forced-refusal fixture ──
      A scripted session where the person declines a required field twice. */
@@ -101,7 +121,34 @@ export function runGateTests(mod) {
   t('no-required-with-stated-floor-noop',
     entries.filter(([, e]) => e.retrieval === 'required').every(([, e]) => e.confidence_floor !== 'stated'));
   t('debts-item-subfields-individually-registered',
-    ['type', 'balance', 'rate_percent', 'minimum_monthly'].every(f => FIELD_REGISTRY['debts.items[].' + f]));
+    ['type', 'purpose', 'borrower', 'security', 'is_split', 'parent_loan_id', 'balance', 'rate_percent', 'minimum_monthly']
+      .every(f => FIELD_REGISTRY['debts.items[].' + f]));
+  t('income-other-subfields-new-shape',
+    ['source', 'linked_asset_id', 'entity', 'basis', 'amount_annual'].every(f => FIELD_REGISTRY['income.other[].' + f])
+    && !FIELD_REGISTRY['income.other[].type'] && !FIELD_REGISTRY['income.other[].label']);
+  t('legacy-income-scalars-deregistered',
+    !FIELD_REGISTRY['income.business_income_annual'] && !FIELD_REGISTRY['income.rental_income_annual']);
+  // The same-trip promotions (Devon, Sept 2026): all required, all floored
+  // at document.
+  const PROMOTED = [
+    'protection.life.inside_super', 'protection.tpd.inside_super',
+    'protection.trauma.inside_super', 'protection.income_protection.inside_super',
+    'estate.super_nomination.in_place', 'estate.super_nomination.binding',
+    'estate.super_nomination.last_updated', 'home.has_offset', 'buffer.linked_to_loan',
+    'super.funds[].fund', 'super.extra_contributions', 'income.employer_super_on',
+    'investments.properties[].repayment_type',
+  ];
+  t('same-trip-promotions-required-document',
+    PROMOTED.every(id => FIELD_REGISTRY[id] && FIELD_REGISTRY[id].retrieval === 'required' && FIELD_REGISTRY[id].confidence_floor === 'document'));
+  // The separate-trip fields stay offered.
+  const STAY_OFFERED = ['home.package_fee_annual', 'debts.hecs_balance',
+    'estate.will.last_updated', 'estate.poa.last_updated', 'estate.guardianship.last_updated'];
+  t('separate-trip-fields-stay-offered',
+    STAY_OFFERED.every(id => FIELD_REGISTRY[id] && FIELD_REGISTRY[id].retrieval === 'offered'));
+  t('debt-type-requires-enforced-not-pending',
+    (() => { const e = FIELD_REGISTRY['debts.items[].type'];
+      return !e.requires_pending_schema && Array.isArray(e.requires) &&
+        e.requires.includes('purpose') && e.requires.includes('borrower'); })());
 
-  return { pass: failures.length === 0, total: 23, failures };
+  return { pass: failures.length === 0, total: 34, failures };
 }

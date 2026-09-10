@@ -19,13 +19,13 @@
    figures), never_asked (flags.*: written from the model's read).
 
    retrieval_by_type: for income.other[].amount_annual the retrieval state
-   depends on the item's type — rental and investment and entity income are
-   required; government and family support have no document.
+   depends on the item's source (type_key names the discriminator) — rental,
+   investment and entity income are required; government and "other" have
+   no document.
 
-   PENDING SCHEMA: debts.items[].type carries no_default with purpose and
-   borrower requires from the capture-accuracy addendum; those fields do
-   not exist in the v2 schema yet, so they are recorded as
-   requires_pending_schema and not enforced.
+   Item-sibling requires: a require with no dot in it (e.g. "purpose" on
+   debts.items[].type) must be present on the same array item, not in the
+   merged picture. Enforced since the field-spec Part 2 schema fold.
 
    Confidence order for the floor: (missing) < estimated < stated < document. */
 
@@ -45,11 +45,11 @@ export const FIELD_REGISTRY = {
   "income.salary_net_monthly": { label: "what actually lands in your account", retrieval: "required", evidence: ["payslip", "bank_statement_credit"], paths: ["payslip"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", requires: ["income.structure"], feeds: ["surplus_monthly"] },
   "income.partner_salary_gross_annual": { label: "your partner's salary before tax", retrieval: "required", evidence: ["payslip"], paths: ["payslip"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", requires: ["income.structure"], feeds: ["income_total_annual"] },
   "income.partner_salary_net_monthly": { label: "what lands in your partner's account", retrieval: "required", evidence: ["payslip", "bank_statement_credit"], paths: ["payslip"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", requires: ["income.structure"], feeds: ["surplus_monthly"] },
-  "income.business_income_annual": { label: "what the business brings in across a year", retrieval: "required", evidence: ["bank_statements_12m", "tax_return"], paths: ["business_income"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", requires: ["income.structure"], feeds: ["income_total_annual"] },
-  "income.rental_income_annual": { label: "the rent that comes in across a year", retrieval: "required", evidence: ["lease", "agent_statement", "bank_statement_credit"], paths: ["rental_income"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", feeds: ["income_total_annual"] },
-  "income.other[].type":  { label: "what kind of income it is", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true },
-  "income.other[].label": { label: "what it is, in their words", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
-  "income.other[].amount_annual": { label: "what it brings in across a year", accepts_upload: true, confidence_floor: "document", softeners: "forbidden", feeds: ["income_total_annual"],
+  "income.other[].source": { label: "what kind of income it is", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true },
+  "income.other[].linked_asset_id": { label: "which asset or entity it comes from", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
+  "income.other[].entity": { label: "whose hands it arrives in", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true },
+  "income.other[].basis": { label: "whether that figure is before or after costs", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true },
+  "income.other[].amount_annual": { label: "what it brings in across a year", accepts_upload: true, confidence_floor: "document", softeners: "forbidden", feeds: ["income_total_annual"], type_key: "source",
     retrieval_by_type: {
       rental_residential: { retrieval: "required", evidence: ["lease", "agent_statement"], paths: ["rental_income"] },
       rental_commercial:  { retrieval: "required", evidence: ["lease", "agent_statement"], paths: ["rental_income"] },
@@ -57,12 +57,13 @@ export const FIELD_REGISTRY = {
       distributions:      { retrieval: "required", evidence: ["platform_statement", "annual_tax_statement"], paths: ["investment_platform"] },
       trust_distribution: { retrieval: "required", evidence: ["distribution_statement", "tax_return"], paths: ["business_income"] },
       business_profit:    { retrieval: "required", evidence: ["bank_statements_12m", "tax_return"], paths: ["business_income"] },
+      director_fee:       { retrieval: "required", evidence: ["payslip", "tax_return"], paths: ["business_income"] },
       government:         { retrieval: "none", confidence_floor: "stated" },
-      family_support:     { retrieval: "none", confidence_floor: "stated" },
+      other:              { retrieval: "none", confidence_floor: "stated" },
     } },
   "income.structure":     { label: "how the income is earned", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true },
   "income.entity":        { label: "any company or trust in the picture", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
-  "income.employer_super_on": { label: "which pay has employer super on it", retrieval: "offered", evidence: ["payslip"], paths: ["payslip"], accepts_upload: true, confidence_floor: "stated", softeners: "forbidden" },
+  "income.employer_super_on": { label: "which pay has employer super on it", retrieval: "required", evidence: ["payslip"], paths: ["payslip"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
 
   /* ── expenses ── */
   "expenses.living_monthly": { label: "what actually goes out in a month", retrieval: "required", evidence: ["bank_statements_12m", "spending_summary"], paths: ["living_costs"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", requires: ["expenses.includes_housing"], feeds: ["surplus_monthly", "buffer_months"] },
@@ -80,39 +81,39 @@ export const FIELD_REGISTRY = {
   "home.with_lender_since": { label: "how long you've been with them", retrieval: "none", confidence_floor: "stated", softeners: "permitted" },
   "home.repayment_monthly": { label: "the loan repayment each month", retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
   "home.term_remaining_years": { label: "how many years are left on the loan", retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
-  "home.has_offset":      { label: "whether the loan has an offset attached", retrieval: "offered", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"], confidence_floor: "stated", softeners: "forbidden" },
+  "home.has_offset":      { label: "whether the loan has an offset attached", retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
   "home.offset_balance":  { label: "what's sitting in the offset", retrieval: "required", evidence: ["banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", requires: ["home.has_offset"] },
   "home.package_fee_annual": { label: "what the loan package charges a year", retrieval: "offered", evidence: ["loan_statement"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "stated", softeners: "forbidden" },
 
   /* ── buffer ── */
   "buffer.accessible_savings": { label: "the money you could reach quickly", retrieval: "required", evidence: ["banking_app", "bank_statement"], paths: ["bank_statement"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", feeds: ["buffer_months"] },
   "buffer.where_held":    { label: "where that money sits", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
-  "buffer.linked_to_loan": { label: "whether it sits against the loan", retrieval: "offered", evidence: ["banking_app"], paths: ["loan_details"], confidence_floor: "stated", softeners: "forbidden" },
+  "buffer.linked_to_loan": { label: "whether it sits against the loan", retrieval: "required", evidence: ["banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
   "buffer.counts_credit_as_buffer": { label: "whether credit is being counted as the safety net", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "buffer.other_cash":    { label: "cash beyond the emergency buffer", retrieval: "required", evidence: ["banking_app", "bank_statement"], paths: ["bank_statement"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
   "buffer.other_cash_where_held": { label: "where that cash sits", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
 
   /* ── super ── */
-  "super.funds[].fund":   { label: "which fund it's with", retrieval: "offered", evidence: ["super_statement", "mygov"], paths: ["super_statement"], confidence_floor: "stated", softeners: "forbidden" },
+  "super.funds[].fund":   { label: "which fund it's with", retrieval: "required", evidence: ["super_statement", "mygov"], paths: ["super_statement"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
   "super.funds[].owner":  { label: "whose account it is", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "super.funds[].balance": { label: "the balance in that fund", retrieval: "required", evidence: ["super_statement", "mygov", "fund_app"], paths: ["super_statement"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", feeds: ["super_total"] },
   "super.funds[].has_insurance": { label: "whether insurance sits inside it", retrieval: "required", evidence: ["super_statement", "fund_app"], paths: ["super_statement"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
   "super.multiple_accounts": { label: "whether one of you holds more than one account", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
-  "super.extra_contributions": { label: "whether extra is going in", retrieval: "offered", evidence: ["payslip", "super_statement"], paths: ["payslip"], confidence_floor: "stated", softeners: "forbidden" },
+  "super.extra_contributions": { label: "whether extra is going in", retrieval: "required", evidence: ["payslip", "super_statement"], paths: ["payslip"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
 
   /* ── protection ── */
   "protection.life.held": { label: "whether life cover is held", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "protection.life.amount": { label: "what the life cover would pay", retrieval: "required", evidence: ["policy_schedule", "super_statement"], paths: ["policy_schedule"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
-  "protection.life.inside_super": { label: "whether it sits inside super", retrieval: "offered", evidence: ["policy_schedule", "super_statement"], paths: ["policy_schedule"], confidence_floor: "stated", softeners: "forbidden" },
+  "protection.life.inside_super": { label: "whether it sits inside super", retrieval: "required", evidence: ["policy_schedule", "super_statement"], paths: ["policy_schedule"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
   "protection.tpd.held":  { label: "whether TPD cover is held", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "protection.tpd.amount": { label: "what the TPD cover would pay", retrieval: "required", evidence: ["policy_schedule", "super_statement"], paths: ["policy_schedule"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
-  "protection.tpd.inside_super": { label: "whether it sits inside super", retrieval: "offered", evidence: ["policy_schedule", "super_statement"], paths: ["policy_schedule"], confidence_floor: "stated", softeners: "forbidden" },
+  "protection.tpd.inside_super": { label: "whether it sits inside super", retrieval: "required", evidence: ["policy_schedule", "super_statement"], paths: ["policy_schedule"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
   "protection.income_protection.held": { label: "whether income protection is held", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "protection.income_protection.amount": { label: "what it would pay a month", retrieval: "required", evidence: ["policy_schedule", "super_statement"], paths: ["policy_schedule"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
-  "protection.income_protection.inside_super": { label: "whether it sits inside super", retrieval: "offered", evidence: ["policy_schedule", "super_statement"], paths: ["policy_schedule"], confidence_floor: "stated", softeners: "forbidden" },
+  "protection.income_protection.inside_super": { label: "whether it sits inside super", retrieval: "required", evidence: ["policy_schedule", "super_statement"], paths: ["policy_schedule"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
   "protection.trauma.held": { label: "whether trauma cover is held", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "protection.trauma.amount": { label: "what the trauma cover would pay", retrieval: "required", evidence: ["policy_schedule"], paths: ["policy_schedule"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
-  "protection.trauma.inside_super": { label: "whether it sits inside super", retrieval: "offered", evidence: ["policy_schedule", "super_statement"], paths: ["policy_schedule"], confidence_floor: "stated", softeners: "forbidden" },
+  "protection.trauma.inside_super": { label: "whether it sits inside super", retrieval: "required", evidence: ["policy_schedule", "super_statement"], paths: ["policy_schedule"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
 
   /* ── estate ── */
   "estate.will.in_place": { label: "whether a will is in place", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
@@ -121,9 +122,9 @@ export const FIELD_REGISTRY = {
   "estate.poa.last_updated": { label: "when it was last looked at", retrieval: "offered", evidence: ["poa_document"], paths: [], confidence_floor: "stated", softeners: "permitted" },
   "estate.guardianship.in_place": { label: "whether guardianship for the children is in place", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "estate.guardianship.last_updated": { label: "when it was last looked at", retrieval: "offered", evidence: ["guardianship_document"], paths: [], confidence_floor: "stated", softeners: "permitted" },
-  "estate.super_nomination.in_place": { label: "whether a super nomination is in place", retrieval: "offered", evidence: ["fund_portal", "super_statement"], paths: ["super_statement"], confidence_floor: "stated", softeners: "forbidden" },
-  "estate.super_nomination.last_updated": { label: "when the nomination was made", retrieval: "offered", evidence: ["fund_portal", "super_statement"], paths: ["super_statement"], confidence_floor: "stated", softeners: "permitted" },
-  "estate.super_nomination.binding": { label: "whether the nomination is binding", retrieval: "offered", evidence: ["fund_portal", "super_statement"], paths: ["super_statement"], confidence_floor: "stated", softeners: "forbidden" },
+  "estate.super_nomination.in_place": { label: "whether a super nomination is in place", retrieval: "required", evidence: ["fund_portal", "super_statement"], paths: ["super_statement"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
+  "estate.super_nomination.last_updated": { label: "when the nomination was made", retrieval: "required", evidence: ["fund_portal", "super_statement"], paths: ["super_statement"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
+  "estate.super_nomination.binding": { label: "whether the nomination is binding", retrieval: "required", evidence: ["fund_portal", "super_statement"], paths: ["super_statement"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
 
   /* ── investments ── */
   "investments.shares_value": { label: "what the shares and ETFs are worth", retrieval: "required", evidence: ["platform_app", "platform_statement"], paths: ["investment_platform"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
@@ -132,13 +133,21 @@ export const FIELD_REGISTRY = {
   "investments.properties[].value_estimate": { label: "what the property is worth", retrieval: "required", evidence: ["lender_valuation", "rates_notice", "portal_estimate", "appraisal"], paths: ["home_value"], accepts_upload: true, confidence_floor: "estimated", range_permitted: true, softeners: "forbidden", feeds: ["property_equity"] },
   "investments.properties[].loan_balance": { label: "what's owing against it", retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", feeds: ["property_equity"] },
   "investments.properties[].rate_percent": { label: "the rate that loan is on", retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
-  "investments.properties[].repayment_type": { label: "whether it's interest-only or principal and interest", retrieval: "offered", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"], confidence_floor: "stated", softeners: "forbidden" },
+  "investments.properties[].repayment_type": { label: "whether it's interest-only or principal and interest", retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
   "investments.properties[].rent_monthly": { label: "the rent it brings in", retrieval: "required", evidence: ["lease", "agent_statement"], paths: ["rental_income"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
   "investments.properties[].held_in": { label: "whose name it's in", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "investments.properties[].use": { label: "what the property is for", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true },
 
-  /* ── debts ── */
-  "debts.items[].type":   { label: "what kind of debt it is", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true, requires_pending_schema: ["purpose", "borrower"] },
+  /* ── debts ──
+     type carries item-sibling requires (no dot in the id): purpose and
+     borrower must be present ON THE SAME ITEM before type commits.
+     Enforced as of the field-spec Part 2 schema fold. */
+  "debts.items[].type":   { label: "what kind of debt it is", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true, requires: ["purpose", "borrower"] },
+  "debts.items[].purpose": { label: "what the money was used for", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true },
+  "debts.items[].borrower": { label: "whose name the borrowing is in", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true },
+  "debts.items[].security": { label: "what it's secured against", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true },
+  "debts.items[].is_split": { label: "whether it's a split of a larger loan", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
+  "debts.items[].parent_loan_id": { label: "which loan it's a split of", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "debts.items[].balance": { label: "what's owing on it", retrieval: "required", evidence: ["statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", feeds: ["debts_total"] },
   "debts.items[].rate_percent": { label: "the rate it charges", retrieval: "required", evidence: ["statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
   "debts.items[].minimum_monthly": { label: "the minimum repayment", retrieval: "required", evidence: ["statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", feeds: ["surplus_monthly"] },
@@ -164,7 +173,7 @@ export const FIELD_REGISTRY = {
 
 function resolveEntry(entry, item) {
   if (!entry || !entry.retrieval_by_type) return entry;
-  const t = item && item.type;
+  const t = item && item[entry.type_key || "type"];
   const byType = t && entry.retrieval_by_type[t];
   return byType ? { ...entry, ...byType } : { ...entry, retrieval: "required" }; // unknown type: strictest
 }
@@ -228,7 +237,13 @@ export function persistenceGate(patchDomains, mergedDomains, validRefusals) {
       }
     }
     for (const req of entry.requires || []) {
-      if (!presentInMerged(mergedDomains, req)) {
+      if (!req.includes(".")) {
+        // Item-sibling require: must be present on the same array item.
+        const sib = w.item ? w.item[req] : undefined;
+        if (sib === null || sib === undefined) {
+          errors.push(`gate: ${w.id} written before required field ${req} is present on the item`);
+        }
+      } else if (!presentInMerged(mergedDomains, req)) {
         errors.push(`gate: ${w.id} written before required field ${req} is present`);
       }
     }

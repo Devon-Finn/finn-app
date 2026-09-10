@@ -10,8 +10,12 @@
 
    Exposed as window.finnDerived.derive(domains) -> {
      home_equity, lvr_percent, surplus_monthly, buffer_months, super_total,
-     income_total_annual, property_equity[], debts_total
-   } */
+     income_total_annual, income_unreconciled[], property_equity[],
+     debts_total, debts_total_by_entity{}
+   }
+   income_unreconciled non-empty means the income total is NOT complete:
+   the panel names the open producer rather than showing a total that
+   omits it. */
 (function () {
   const num = v => (typeof v === 'number' && isFinite(v)) ? v : null;
 
@@ -52,8 +56,13 @@
       else if (num(exp.housing_repayment_monthly) !== null) housing = exp.housing_repayment_monthly;
       else if (home.owns_home === false || (num(home.mortgage_balance) !== null && home.mortgage_balance === 0)) housing = 0;
       if (housing !== null) {
+        // Minimums on debt the household pays personally: entity-borrowed
+        // debt is serviced inside the entity, and HECS comes out of pay
+        // before it lands, so neither belongs in the personal surplus.
         const minimums = Array.isArray(debts.items)
-          ? debts.items.reduce((a, it) => a + (num(it && it.minimum_monthly) ?? 0), 0)
+          ? debts.items
+              .filter(it => it && it.type !== 'hecs_help' && !['company', 'trust', 'smsf', 'partnership'].includes(it.borrower))
+              .reduce((a, it) => a + (num(it.minimum_monthly) ?? 0), 0)
           : 0;
         surplus_monthly = Math.round(netMonthly - exp.living_monthly - housing - minimums);
       }
@@ -75,13 +84,68 @@
     const super_total = Array.isArray(sup.funds)
       ? sumKnown(sup.funds.map(f => f && f.balance)) : null;
 
-    // income_total_annual = sum of all annual income fields, including the
-    // typed income.other[] array (capture-conduct correction 4).
-    const otherAnnual = Array.isArray(inc.other)
-      ? sumKnown(inc.other.map(o => o && o.amount_annual)) : null;
+    // ── THE RECONCILIATION PASS (field-spec Part 2, Sept 2026 fold) ──
+    // Before income_total_annual derives, walk every declared producer and
+    // assert an income entry or an explicit zero with a reason. Unmatched
+    // producers land in income_unreconciled and the total is not presented
+    // as complete — the panel names the open asset rather than showing a
+    // total that omits it.
+    // Normalise: an un-migrated item still keyed by the old `type` reads as
+    // its 1:1 source (family_support is "other" by definition of the new enum).
+    const other = (Array.isArray(inc.other) ? inc.other.filter(o => o && typeof o === 'object') : [])
+      .map(o => o.source ? o : Object.assign({}, o, { source: o.type === 'family_support' ? 'other' : o.type }));
+    const income_unreconciled = [];
+    // Anything the migration parked (legacy scalars, un-typeable items)
+    // stays open until re-captured — never silently excluded.
+    const storedOpen = (d.flags && Array.isArray(d.flags.income_unreconciled)) ? d.flags.income_unreconciled : [];
+    for (const id of storedOpen) income_unreconciled.push(id);
+    // A stored row the server hasn't migrated yet may still carry the old
+    // scalars. They no longer sum (they can't be typed without guessing),
+    // so they surface as open items here too — excluded loudly, never
+    // silently.
+    if (num(inc.business_income_annual) !== null && !income_unreconciled.includes('legacy:business_income_annual')) {
+      income_unreconciled.push('legacy:business_income_annual');
+    }
+    if (num(inc.rental_income_annual) !== null && !income_unreconciled.includes('legacy:rental_income_annual')) {
+      income_unreconciled.push('legacy:rental_income_annual');
+    }
+    // Producer: every investment property. Satisfied by a linked income
+    // entry ("prop-N", capture order), a rental-source entry where only one
+    // property exists, or the property's own rent_monthly as a known number
+    // (0 is an explicit zero, null is not-yet-asked).
+    const props = Array.isArray(inv.properties) ? inv.properties : [];
+    const rentalEntries = other.filter(o => o.source === 'rental_residential' || o.source === 'rental_commercial');
+    props.forEach((p, i) => {
+      if (!p) return;
+      const id = 'prop-' + (i + 1);
+      const linked = other.some(o => o.linked_asset_id === id);
+      const soleRental = props.length === 1 && rentalEntries.length > 0;
+      const ownRent = num(p.rent_monthly) !== null;
+      if (!linked && !soleRental && !ownRent) income_unreconciled.push(id);
+    });
+    // Producer: the company or trust. Satisfied by any entity-flavoured
+    // income entry or an explicit link.
+    if (inc.entity && typeof inc.entity === 'object' && inc.entity.type) {
+      const entitySat = other.some(o => o.linked_asset_id === 'entity' ||
+        ['trust_distribution', 'business_profit', 'director_fee'].includes(o.source));
+      if (!entitySat) income_unreconciled.push('entity');
+    }
+    // Producer: the share/ETF/fund holdings. Satisfied by a dividends or
+    // distributions entry or an explicit link (amount 0 is an explicit zero).
+    if ((num(inv.shares_value) !== null && inv.shares_value > 0) ||
+        (num(inv.managed_funds_value) !== null && inv.managed_funds_value > 0)) {
+      const holdSat = other.some(o => o.linked_asset_id === 'holdings' ||
+        ['dividends', 'distributions'].includes(o.source));
+      if (!holdSat) income_unreconciled.push('holdings');
+    }
+    // Producer: a business run as a sole trader. (Company/trust businesses
+    // are the entity producer above.)
+    if (inc.structure === 'sole_trader') {
+      if (!other.some(o => o.source === 'business_profit')) income_unreconciled.push('business');
+    }
+    const otherAnnual = other.length ? sumKnown(other.map(o => o.amount_annual)) : null;
     const income_total_annual = sumKnown([
-      inc.salary_gross_annual, inc.partner_salary_gross_annual,
-      inc.business_income_annual, inc.rental_income_annual, otherAnnual
+      inc.salary_gross_annual, inc.partner_salary_gross_annual, otherAnnual
     ]);
 
     // property_equity — per investment property: value_estimate − loan_balance
@@ -90,11 +154,23 @@
           ? p.value_estimate - p.loan_balance : null)
       : [];
 
-    // debts_total = sum(debts.items[].balance) — HECS excluded by design.
-    const debts_total = Array.isArray(debts.items)
-      ? sumKnown(debts.items.map(it => it && it.balance)) : null;
+    // debts totals derive PER ENTITY (field-spec Part 2): borrowing known
+    // to sit inside a company, trust, smsf or partnership is never summed
+    // into the personal total. The personal total takes personal, joint and
+    // not-yet-classified items (excluding known-entity debt is the rule;
+    // vanishing a debt whose borrower hasn't been asked yet would hide it).
+    // HECS excluded by design — both the separate balance and hecs_help items.
+    const items = Array.isArray(debts.items) ? debts.items.filter(it => it && it.type !== 'hecs_help') : [];
+    const ENTITY_BORROWERS = ['company', 'trust', 'smsf', 'partnership'];
+    const personalItems = items.filter(it => !ENTITY_BORROWERS.includes(it.borrower));
+    const debts_total = items.length ? sumKnown(personalItems.map(it => it.balance)) : null;
+    const debts_total_by_entity = {};
+    for (const it of items) {
+      const b = ENTITY_BORROWERS.includes(it.borrower) ? it.borrower : 'personal';
+      if (num(it.balance) !== null) debts_total_by_entity[b] = (debts_total_by_entity[b] || 0) + it.balance;
+    }
 
-    return { home_equity, lvr_percent, surplus_monthly, buffer_months, super_total, income_total_annual, property_equity, debts_total };
+    return { home_equity, lvr_percent, surplus_monthly, buffer_months, super_total, income_total_annual, income_unreconciled, property_equity, debts_total, debts_total_by_entity };
   }
 
   window.finnDerived = { derive };

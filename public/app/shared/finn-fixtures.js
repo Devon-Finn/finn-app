@@ -58,7 +58,10 @@
     {
       name: 'D — sole trader plus rental property plus shares',
       domains: {
-        income: { structure: 'sole_trader', business_income_annual: 54000, rental_income_annual: 28080, _confidence: 'stated' },
+        income: { structure: 'sole_trader', other: [
+          { source: 'business_profit', linked_asset_id: null, entity: 'personal', amount_annual: 54000, basis: 'net_of_costs' },
+          { source: 'rental_residential', linked_asset_id: 'prop-1', entity: 'joint', amount_annual: 28080, basis: 'gross' },
+        ], _confidence: 'stated' },
         home: { owns_home: false, _confidence: 'stated' },
         investments: { properties: [ { value_estimate: 640000, loan_balance: 410000, rate_percent: 5.89, repayment_type: 'interest_only', rent_monthly: 2340, held_in: 'joint' } ], shares_value: 84200, held_in: 'one name', _confidence: 'stated' },
         estate: { ...estateQuiet, _confidence: 'stated' },
@@ -69,7 +72,9 @@
     {
       name: 'D-rent-only — rental property alone must NOT fire 9.1',
       domains: {
-        income: { structure: 'paye', rental_income_annual: 28080, _confidence: 'stated' },
+        income: { structure: 'paye', other: [
+          { source: 'rental_residential', linked_asset_id: 'prop-1', entity: 'joint', amount_annual: 28080, basis: 'gross' },
+        ], _confidence: 'stated' },
         home: { owns_home: false, _confidence: 'stated' },
         investments: { properties: [ { value_estimate: 640000, loan_balance: 410000, rate_percent: 5.89, repayment_type: 'interest_only', rent_monthly: 2340, held_in: 'joint' } ], _confidence: 'stated' },
         estate: { ...estateQuiet, _confidence: 'stated' },

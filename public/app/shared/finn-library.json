@@ -348,7 +348,7 @@
       "route_also": ["financial_planner", "accountant"],
       "position_line": {
         "template": "Investment property valued around {property_value}, with {property_loan} owing and rent of {rental_income_annual} a year.",
-        "fields": ["investments.properties", "income.rental_income_annual"]
+        "fields": ["investments.properties", "income.other"]
       },
       "blocks": {
         "why": "An investment property comes with its own loan, its own equity, and its own tax picture, and each of those is worth keeping current in the same way your home loan is. The rate and structure on an investment loan can drift out of date just like any other, and the tax side has its own moving parts.",
@@ -432,7 +432,7 @@
       "route_also": [],
       "position_line": {
         "template": "Your income is made up as {structure_display}.",
-        "fields": ["income.structure", "income.entity", "income.employer_super_on", "income.business_income_annual"]
+        "fields": ["income.structure", "income.entity", "income.employer_super_on", "income.other"]
       },
       "blocks": {
         "why": "When some of your income comes from something other than a regular salary, a business, side work, an investment, or a trust, how it's all structured starts to matter for tax in a way it simply doesn't for a straightforward wage. It's an area where the right setup can make a genuine difference, and where a lot of people are running on an arrangement they set up years ago, or never deliberately set up at all.",

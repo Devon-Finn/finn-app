@@ -135,9 +135,14 @@
 
     // 9.1 — structural complexity only. A null structure is "not yet asked"
     // and never fires; rental/dividend income alone never fires (Tile 7 owns
-    // those — explicit non-trigger in 3.3).
+    // those — explicit non-trigger in 3.3). Business income lives in typed
+    // income.other[] entries since the Part 2 fold; the legacy scalar is
+    // read only from not-yet-migrated rows.
+    const businessAnnual = (Array.isArray(inc.other) ? inc.other : [])
+      .some(o => o && (o.source || o.type) === 'business_profit' && pos(o.amount_annual))
+      || pos(inc.business_income_annual);
     fires['9.1'] = (inc.structure != null && inc.structure !== 'paye')
-      || pos(inc.business_income_annual)
+      || businessAnnual
       || inc.entity != null;
 
     // 3.4 — precedence.

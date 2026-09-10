@@ -113,9 +113,15 @@ Drives: guardianship relevance on Tile 6, dependants framing on Tile 3, and the 
   "salary_net_monthly": 6100,
   "partner_salary_gross_annual": 58000,
   "partner_salary_net_monthly": 3820,
-  "business_income_annual": null,
-  "rental_income_annual": null,
-  "other_income_annual": null,
+  "other": [
+    {
+      "source": "rental_residential",
+      "linked_asset_id": "prop-1",
+      "entity": "joint",
+      "amount_annual": 28080,
+      "basis": "gross"
+    }
+  ],
   "structure": "paye",
   "entity": null,
   "employer_super_on": ["salary", "partner_salary"],
@@ -123,11 +129,26 @@ Drives: guardianship relevance on Tile 6, dependants framing on Tile 3, and the 
 }
 ```
 
+```
+income.other[]:
+  source: rental_residential | rental_commercial | dividends | distributions |
+          trust_distribution | business_profit | director_fee | government | other
+  linked_asset_id: <id>
+  entity: personal | joint | company | trust | smsf | unknown
+  amount_annual: <number>
+  basis: gross | net_of_costs
+
+flags.income_unreconciled: [<asset_id>, ...]
+```
+
+Gross rent and costs are captured separately. Finn states both. It never nets them silently and never characterises the gearing.
+
+**The reconciliation pass.** Before `income_total_annual` derives, walk every declared producer and assert an income entry or an explicit zero with a reason: every property where `use != owner_occupied`, every company, trust or partnership, every share, ETF or fund holding, and any business in the context domain. Unmatched producers land in `flags.income_unreconciled` and the total is not presented as complete. The panel names the open asset rather than showing a total that omits it.
+
 | Field | Type | Notes |
 |---|---|---|
 | `*_net_monthly` | int / null | **Required for the surplus calculation.** Ask for take-home pay, do not model tax. |
-| `business_income_annual` | int / null | Sole trader, contracting, ABN work |
-| `rental_income_annual` | int / null | Displayed on Tile 9, but **owned by Tile 7 for routing** |
+| `other[]` | array | One entry per non-salary income source, typed by `source` and linked to its producing asset by `linked_asset_id`. Rental and dividend income displayed on Tile 9, **owned by Tile 7 for routing**. |
 | `structure` | enum | `paye`, `sole_trader`, `company`, `trust`, `mixed` |
 | `entity` | object / null | `{ type, name }` where a company or trust exists |
 | `employer_super_on` | array | Which income streams attract employer contributions. Drives the 9.1 super point. |
@@ -253,10 +274,9 @@ Uniform shape across all four. `held: true, amount: null` is a real and common s
 
   "debts": {
     "items": [
-      { "type": "credit_card",   "balance": 6200,  "rate_percent": 19.99, "minimum_monthly": 124 },
-      { "type": "personal_loan", "balance": 9800,  "rate_percent": 13.5,  "minimum_monthly": 410 },
-      { "type": "car_loan",      "balance": 18400, "rate_percent": 8.9,   "minimum_monthly": 640 },
-      { "type": "bnpl",          "balance": 1340,  "rate_percent": null,  "minimum_monthly": 310 }
+      { "type": "credit_card",   "purpose": "personal",          "borrower": "personal", "security": "unsecured",     "is_split": false, "parent_loan_id": null, "balance": 6200,   "rate_percent": 19.99, "minimum_monthly": 124 },
+      { "type": "loan_split",    "purpose": "investment_shares", "borrower": "joint",    "security": "property_home", "is_split": true,  "parent_loan_id": "loan-1", "balance": 80000, "rate_percent": 5.99, "minimum_monthly": 399 },
+      { "type": "car_loan",      "purpose": "vehicle",           "borrower": "personal", "security": "vehicle",       "is_split": false, "parent_loan_id": null, "balance": 18400,  "rate_percent": 8.9,   "minimum_monthly": 640 }
     ],
     "hecs_balance": 0,
     "_confidence": "stated"
@@ -264,7 +284,27 @@ Uniform shape across all four. `held: true, amount: null` is a real and common s
 }
 ```
 
-`debts.items[]` replaces the untyped `expensive_debts[]`. `type` is an enum: `credit_card`, `personal_loan`, `car_loan`, `bnpl`, `tax_debt`, `other`. HECS is held separately and **never** included in the Tile 8 total — it behaves nothing like consumer debt and grouping it would misrepresent the position.
+Debts carry product and purpose separately. A home loan split used to buy ETFs is, as a product, a home loan. As a purpose, it is share investment. Interest on it is generally deductible and interest on the rest of the same loan generally is not. That distinction is the whole knowledge block on Tile 7, and a schema that cannot express it cannot support the tile that depends on it.
+
+```
+debts.items[]:
+  type:      home_loan | investment_property_loan | loan_split | line_of_credit |
+             commercial_loan | business_loan | equipment_finance | car_loan |
+             personal_loan | credit_card | bnpl | hecs_help | tax_debt |
+             family_loan | other
+  purpose:   owner_occupied | investment_property | commercial_property |
+             investment_shares | business_operating | vehicle | personal |
+             education | tax | mixed | unknown
+  borrower:  personal | joint | company | trust | smsf | partnership | unknown
+  security:  property_home | property_investment | property_commercial |
+             vehicle | business_assets | unsecured | other
+  is_split:  true | false
+  parent_loan_id: <id>
+```
+
+Purpose is never inferred from product. Where a debt is not plainly the loan on the home they live in, Finn asks two things: what it is, and what the money was used for. `personal_loan` now means a personal loan and nothing else. Borrowing inside a company or trust is not personal household debt and is not summed into a personal total unmarked; totals derive per entity.
+
+Each item still carries `balance`, `rate_percent` and `minimum_monthly`. HECS remains held separately in `hecs_balance` and **never** included in the Tile 8 total — it behaves nothing like consumer debt and grouping it would misrepresent the position.
 
 ## 2.10 `flags` — NEW
 
@@ -289,9 +329,9 @@ The one field on this page written from the model's read rather than a stated an
 | `surplus_monthly` | `(all net monthly income) − expenses.living_monthly − expenses.housing_repayment_monthly − sum(debts.minimum_monthly)` |
 | `buffer_months` | `buffer.accessible_savings ÷ (expenses.living_monthly + expenses.housing_repayment_monthly)` |
 | `super_total` | `sum(super.funds[].balance)` |
-| `income_total_annual` | `sum of all annual income fields` |
+| `income_total_annual` | `sum of salary fields + sum(income.other[].amount_annual)` — derives only after the reconciliation pass (§2.2); where `flags.income_unreconciled` is non-empty the total is not presented as complete |
 | `property_equity` | per property: `value_estimate − loan_balance` |
-| `debts_total` | `sum(debts.items[].balance)`, excluding HECS |
+| `debts_total` | per entity: `sum(debts.items[].balance)` grouped by `borrower` — the personal total sums `personal` and `joint` only; excluding HECS |
 
 Storing any of these guarantees they drift out of sync with their inputs.
 
