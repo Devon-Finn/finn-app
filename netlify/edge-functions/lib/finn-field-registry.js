@@ -189,9 +189,16 @@ export const FIELD_REGISTRY = {
     } },
   "debts.items[].is_split": { label: "whether it's a split of a larger loan", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "debts.items[].parent_loan_id": { label: "which loan it's a split of", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
-  "debts.items[].balance": { label: "what's owing on it", retrieval: "required", evidence: ["statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", feeds: ["debts_total"] },
-  "debts.items[].rate_percent": { label: "the rate it charges", retrieval: "required", evidence: ["statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
-  "debts.items[].minimum_monthly": { label: "the minimum repayment", retrieval: "required", evidence: ["statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", feeds: ["surplus_monthly"] },
+  /* The money fields are required off the loan screen for every product
+     with an institution behind it. family_loan has no institution screen,
+     so under the required-implies-servable-path invariant its figures are
+     retrieval none, floor stated — the same data fix as its security. */
+  "debts.items[].balance": { label: "what's owing on it", retrieval: "required", evidence: ["statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", feeds: ["debts_total"], type_key: "type",
+    retrieval_by_type: { family_loan: { retrieval: "none", confidence_floor: "stated" } } },
+  "debts.items[].rate_percent": { label: "the rate it charges", retrieval: "required", evidence: ["statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", type_key: "type",
+    retrieval_by_type: { family_loan: { retrieval: "none", confidence_floor: "stated" } } },
+  "debts.items[].minimum_monthly": { label: "the minimum repayment", retrieval: "required", evidence: ["statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", feeds: ["surplus_monthly"], type_key: "type",
+    retrieval_by_type: { family_loan: { retrieval: "none", confidence_floor: "stated" } } },
   "debts.hecs_balance":   { label: "the HECS balance", retrieval: "offered", evidence: ["mygov", "ato_statement"], paths: ["hecs"], accepts_upload: true, confidence_floor: "stated", softeners: "forbidden" },
 
   /* ── flags (never asked; written from the model's read) ── */

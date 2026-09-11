@@ -93,7 +93,9 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
   const refusalFields = new Set(((picture && picture.refusals) || []).map(r => r && r.field).filter(Boolean));
 
   /* 1 · Confidence floor: a required field resting below its floor in the
-     final picture with no refusal record; caught attempts reported too. */
+     final picture with no refusal record. Attempts the gate caught are
+     listed for the record but do NOT fail — the write was refused and
+     nothing rests below floor; the linter flags leaks, not blocks. */
   {
     const details = [];
     for (const w of leafWrites(domains)) {
@@ -106,16 +108,19 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
         details.push(`${w.id} rests at "${conf ?? "no confidence"}" below floor "${e.confidence_floor}" with no refusal record`);
       }
     }
+    const failing = details.length > 0;
     const caught = allRows.filter(r => r.status === "refused" && Array.isArray(r.errors) && r.errors.some(e => String(e).includes("below floor")));
-    for (const r of caught) details.push(`(caught by gate) ${r.errors.filter(e => String(e).includes("below floor")).join("; ")}`);
-    add("confidence_floor", "Confidence floor", details.length ? "fail" : "pass", details);
+    for (const r of caught) details.push(`(caught by gate, write refused) ${r.errors.filter(e => String(e).includes("below floor")).join("; ")}`);
+    add("confidence_floor", "Confidence floor", failing ? "fail" : "pass", details);
   }
 
-  /* 2 · Refusal validity: a refusal claimed in a capture with no
-     path_served row for that field at or before the claim. */
+  /* 2 · Refusal validity: a refusal claimed in an APPLIED capture with no
+     path_served row for that field at or before the claim. Claims in
+     refused rows never took effect — the gate rejected them, which is the
+     machinery working, not a leak. */
   {
     const details = [];
-    for (const r of captureRows) {
+    for (const r of captureRows.filter(r => r.status === "applied")) {
       const claims = r.capture && Array.isArray(r.capture.refusals) ? r.capture.refusals : [];
       const t = new Date(r.created_at).getTime();
       for (const f of claims) {
@@ -151,9 +156,10 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
         if (it[req] === null || it[req] === undefined) details.push(`debts.items[${i}] has type "${it.type}" without ${req}`);
       }
     });
+    const failing = details.length > 0;
     const caught = allRows.filter(r => r.status === "refused" && Array.isArray(r.errors) && r.errors.some(e => /before required field (purpose|borrower)/.test(String(e))));
-    for (const r of caught) details.push(`(caught by gate) ${r.errors.join("; ").slice(0, 160)}`);
-    add("enum_default", "Enum default", details.length ? "fail" : "pass", details);
+    for (const r of caught) details.push(`(caught by gate, write refused) ${r.errors.join("; ").slice(0, 160)}`);
+    add("enum_default", "Enum default", failing ? "fail" : "pass", details);
   }
 
   /* 5 · Reconciliation: declared producers with no income entry and no
@@ -191,14 +197,14 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
     add("reconciliation", "Reconciliation", details.length ? "fail" : "pass", details);
   }
 
-  /* 6 · Path served: a required field written below document confidence
+  /* 6 · Path served: a required field APPLIED below document confidence
      with no path_served row — the ask happened without its path text.
      Document-confidence writes are exempt (a volunteered attachment
-     needs no ask). */
+     needs no ask), and refused writes never landed. */
   {
     const details = [];
     const seen = new Set();
-    for (const r of captureRows) {
+    for (const r of captureRows.filter(r => r.status === "applied")) {
       const capDomains = r.capture && r.capture.domains ? r.capture.domains : {};
       for (const w of leafWrites(capDomains)) {
         const e = resolveEntry(registry, w.id, w.item);

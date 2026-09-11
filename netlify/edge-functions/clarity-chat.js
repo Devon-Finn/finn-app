@@ -1,7 +1,7 @@
 import { bankExportsPromptSection } from "./lib/finn-bank-exports.js";
 import { RETRIEVAL_PATHS, retrievalPromptSection, substituteAskTokens, assertRequiredServable } from "./lib/finn-retrieval-paths.js";
-import { assignAssetIds, mergeDomainsById, migratePositionalLinks, resolveSecurity } from "./lib/finn-merge.js";
-import { FIELD_REGISTRY, persistenceGate, CONFIDENCE_RANK, PRODUCERS } from "./lib/finn-field-registry.js";
+import { FIELD_REGISTRY, CONFIDENCE_RANK, PRODUCERS } from "./lib/finn-field-registry.js";
+import { applyCaptureCore } from "./lib/finn-capture-pipeline.js";
 import { runConductLinter } from "./lib/finn-conduct-linter.js";
 
 // Startup invariant (Devon, Sept 2026): required implies a servable path.
@@ -261,7 +261,7 @@ Rules for the block:
   debts: items (array of {type, purpose, borrower, security, is_split, parent_loan_id, balance, rate_percent, minimum_monthly}). PLACEMENT: the loan on the home they live in lives in the home domain (mortgage_balance etc.) and is NEVER duplicated as a debts item; the loan on an investment property lives on that property in investments.properties[]. debts.items carries every OTHER borrowing, including a split carved off the home loan for another purpose (type "loan_split", is_split true, parent_loan_id pointing at the home loan). type is the PRODUCT: "home_loan"/"investment_property_loan"/"loan_split"/"line_of_credit"/"commercial_loan"/"business_loan"/"equipment_finance"/"car_loan"/"personal_loan"/"credit_card"/"bnpl"/"hecs_help"/"tax_debt"/"family_loan"/"other". purpose is what the money was used for: "owner_occupied"/"investment_property"/"commercial_property"/"investment_shares"/"business_operating"/"vehicle"/"personal"/"education"/"tax"/"mixed"/"unknown". Purpose is NEVER inferred from product: where a debt is not plainly the loan on the home they live in, ask two things — what it is, and what the money was used for — and do not write type until purpose and borrower are answered (the write is refused otherwise; "unknown" is a legitimate answer when they genuinely don't know, a specific guess never is). "personal_loan" means a personal loan and nothing else. borrower is whose name the borrowing is in: "personal"/"joint"/"company"/"trust"/"smsf"/"partnership"/"unknown" — borrowing inside a company or trust is not personal household debt. security is "property_home"/"property_investment"/"property_commercial"/"vehicle"/"business_assets"/"unsecured"/"other". is_split true with parent_loan_id naming the loan it splits from where the debt is a split of a larger facility. hecs_balance (always separate — never one of the items)
   flags: hardship, hardship_signal — see the hardship rule below.
   Every domain you update this turn also carries _confidence, ranked document > sighted > stated > estimated: "document" ONLY when YOU read the figures from an artefact the person attached (a payslip, statement, screenshot or policy schedule you actually saw); "sighted" when the person was on the source screen or document and read the figures off it to you, but you did not see it yourself; "stated" when the person knew it and said it from memory, no source in front of them; "estimated" when no document exists or it couldn't be reached. The professional receiving the picture needs to know which figures are hard, so never write "document" for a figure the person read out (that is sighted), never write "sighted" for a remembered number (that is stated), and never write "stated" for a figure you read off an attachment. ("inferred" exists solely for flags.hardship, which is written from your read, never from asking.) Freeform nuance goes in _notes per domain (for human reading only — it never drives what the person is shown). Numbers as plain whole-dollar numbers, rates as percent numbers, no strings for money, no dollar signs. Nothing invented: if they did not say it, it is not in the block.
-  Array items (children, super funds, properties, debts items, other income) carry an "id" assigned by the system, visible in the picture context. When you update or correct an EXISTING item, include its id exactly as shown there, so the update lands on that item. For a NEW item, never invent an id, leave id out and the system assigns one. Items you do not mention are retained, so send only the items this turn added or corrected, never the whole array.
+  Array items (children, super funds, properties, debts items, other income) carry an "id" assigned by the system, visible in the picture context. When you update or correct an EXISTING item, include its id exactly as shown there, so the update lands on that item. For a NEW item, never invent an id, leave id out and the system assigns one. Items you do not mention are retained, so send only the items this turn added or corrected, never the whole array. When the person says an item no longer exists (an account closed, a debt paid out, a fund consolidated away), remove it by sending {"id":"<its id>","_remove":true} as that item — never by re-sending the array without it.
   Every field lives in EXACTLY the domain listed above — never place a field under a different domain, even when the conversation surfaced them together. In particular: structure, entity and employer_super_on belong to income, NEVER to context, even though the work setup comes up during the household opening. A field under the wrong domain causes the whole write to be refused and that turn's facts to be lost, so check placement before you emit the block.
 - Hardship (flags): set from your read of the conversation, NEVER from asking — "are you in financial hardship" is never a question you put to someone. If genuine hardship shows (missed essential payments, collectors calling, choosing between essentials), set hardship true and record what prompted it in hardship_signal, in their words where possible, so the decision is auditable. Its _confidence is "inferred". This is the one field written from judgment, and it exists so the person is routed to free help — hard line 5 stands unchanged.
 - Absent versus not-yet-discussed (keep this distinction exact everywhere): when the person CONFIRMS something is not held or not in place, record it as explicitly false (e.g. protection tpd {held: false}, estate will {in_place: false}, has_offset: false). Never record a confirmed absence as null, and never omit it — a missing field or null means "not yet discussed"; false means "confirmed no". A confirmed absence is a captured fact and must be written to the block.
@@ -324,439 +324,9 @@ async function authenticate(request) {
   return { userId: user.id, householdId, depth };
 }
 
-/* ════════════ SCHEMA v2 — field-spec.md Part 2 (Step 1) ════════════
-   The domains JSONB target shape. Conventions, enforced here:
-     * null = not yet asked; false/0 = asked and answered no. Strictly
-       distinct — the translator never turns absence into a negative.
-     * Money is a whole-dollar integer, never a string (floats are
-       rounded; strings are rejected).
-     * Derived values (Part 2.11) are computed at read time in
-       public/app/shared/finn-derived.js and are NEVER stored here.
-   The 3a system prompt is untouched in this step (it still emits the
-   legacy capture shape), so every incoming capture is TRANSLATED v1→v2
-   before merge, and a legacy stored row is lazily upgraded on its first
-   new write. schema_version identifies which shape a row holds.
-   Deliberate deviation from the spec, flagged for Devon: every domain
-   also accepts optional `_notes` (string) — the legacy protocol captures
-   per-domain notes and dropping them silently would lose data. Step 2
-   decides their fate. */
-
-const MONEY = "money", RATE = "rate", BOOL = "bool", INT = "int", STR = "str";
-const V2_ENUMS = {
-  work_intent: ["both continuing", "one reducing", "one stopping", "unsure"],
-  structure: ["paye", "sole_trader", "company", "trust", "mixed"],
-  // field-spec Part 2 (Sept 2026 fold): debts carry product and purpose
-  // separately. Purpose is NEVER inferred from product; type carries
-  // requires [purpose, borrower] in the field registry, enforced.
-  debt_type: ["home_loan", "investment_property_loan", "loan_split", "line_of_credit", "commercial_loan", "business_loan", "equipment_finance", "car_loan", "personal_loan", "credit_card", "bnpl", "hecs_help", "tax_debt", "family_loan", "other"],
-  debt_purpose: ["owner_occupied", "investment_property", "commercial_property", "investment_shares", "business_operating", "vehicle", "personal", "education", "tax", "mixed", "unknown"],
-  debt_borrower: ["personal", "joint", "company", "trust", "smsf", "partnership", "unknown"],
-  debt_security: ["property_home", "property_investment", "property_commercial", "vehicle", "business_assets", "unsecured", "other"],
-  // Five-state ladder (Devon, Sept 2026), ranked document > sighted >
-  // stated > estimated > inferred. document means Finn read the artefact;
-  // sighted means the person was on the source and read it off; stated
-  // means they knew it and said it from memory; estimated means no
-  // document exists or it couldn't be reached. "inferred" remains solely
-  // for flags.hardship, which is written from Finn's read.
-  confidence: ["document", "sighted", "stated", "estimated", "inferred"],
-  // component-spec 5.1: a holiday house is neither the home they live in
-  // nor an investment, and needs somewhere to go.
-  property_use: ["investment", "holiday", "other"],
-  // field-spec Part 2 (Sept 2026 fold): income beyond salary is one typed
-  // array, each entry linked to its producing asset and carrying whose
-  // hands it arrives in and whether the figure is gross or net of costs.
-  // Gross rent and costs are never netted silently.
-  other_income_source: ["rental_residential", "rental_commercial", "dividends", "distributions", "trust_distribution", "business_profit", "director_fee", "government", "other"],
-  income_entity: ["personal", "joint", "company", "trust", "smsf", "unknown"],
-  income_basis: ["gross", "net_of_costs"],
-};
-const COVER = { held: BOOL, amount: MONEY, inside_super: BOOL };
-const ESTATE_DOC = { in_place: "docstate", last_updated: STR };
-
-const V2_SCHEMA = {
-  // Every array item carries `id`: generated by CODE at first write
-  // (lib/finn-merge.js), echoed by the model when correcting an existing
-  // item. Never positional, never derived from capture order, never
-  // reused after deletion.
-  context: { adults: INT, children: { array: { id: STR, age: INT } }, owner_age: INT, partner_age: INT, work_intent: { enum: "work_intent" }, horizon_years: INT },
-  // Legacy business_income_annual / rental_income_annual scalars are gone
-  // from the schema (field-spec Part 2 fold): every non-salary source is a
-  // typed income.other[] entry. Stored scalars migrate via
-  // migrateIncomeShape — to income._unmapped and flags.income_unreconciled,
-  // never silently dropped from a total.
-  income: { salary_gross_annual: MONEY, salary_net_monthly: MONEY, partner_salary_gross_annual: MONEY, partner_salary_net_monthly: MONEY, other: { array: { id: STR, source: { enum: "other_income_source" }, linked_asset_id: STR, entity: { enum: "income_entity" }, amount_annual: MONEY, basis: { enum: "income_basis" } } }, structure: { enum: "structure" }, entity: { object: { type: STR, name: STR } }, employer_super_on: { array: STR } },
-  expenses: { living_monthly: MONEY, includes_housing: BOOL, housing_repayment_monthly: MONEY },
-  home: { owns_home: BOOL, value_estimate: MONEY, value_source: STR, mortgage_balance: MONEY, rate_percent: RATE, rate_type: STR, lender: STR, with_lender_since: STR, repayment_monthly: MONEY, term_remaining_years: INT, has_offset: BOOL, offset_balance: MONEY, package_fee_annual: MONEY },
-  buffer: { accessible_savings: MONEY, where_held: STR, linked_to_loan: BOOL, counts_credit_as_buffer: BOOL, other_cash: MONEY, other_cash_where_held: STR },
-  super: { funds: { array: { id: STR, fund: STR, owner: STR, balance: MONEY, has_insurance: BOOL } }, multiple_accounts: BOOL, extra_contributions: BOOL },
-  protection: { life: { object: COVER }, tpd: { object: COVER }, income_protection: { object: COVER }, trauma: { object: COVER } },
-  estate: { will: { object: ESTATE_DOC }, poa: { object: ESTATE_DOC }, guardianship: { object: ESTATE_DOC }, super_nomination: { object: { ...ESTATE_DOC, binding: BOOL } } },
-  investments: { shares_value: MONEY, held_in: STR, managed_funds_value: MONEY, properties: { array: { id: STR, value_estimate: MONEY, loan_balance: MONEY, rate_percent: RATE, repayment_type: STR, rent_monthly: MONEY, held_in: STR, use: { enum: "property_use" } } } },
-  debts: { items: { array: { id: STR, type: { enum: "debt_type" }, purpose: { enum: "debt_purpose" }, borrower: { enum: "debt_borrower" }, security: { enum: "debt_security" }, is_split: BOOL, parent_loan_id: STR, balance: MONEY, rate_percent: RATE, minimum_monthly: MONEY } }, hecs_balance: MONEY },
-  flags: { hardship: BOOL, hardship_signal: STR, income_unreconciled: { array: STR } },
-};
-
-// Validate + normalise one value against a field spec. Returns the
-// normalised value; pushes human-readable problems into errors.
-function v2CheckValue(spec, v, path, errors) {
-  if (v === null || v === undefined) return v === undefined ? undefined : null;
-  if (spec === MONEY) {
-    if (typeof v !== "number" || !isFinite(v)) { errors.push(path + ": money must be a number, got " + typeof v); return undefined; }
-    return Math.round(v); // whole-dollar integer
-  }
-  if (spec === RATE) {
-    if (typeof v !== "number" || !isFinite(v)) { errors.push(path + ": rate must be a number"); return undefined; }
-    return v;
-  }
-  if (spec === INT) {
-    if (typeof v !== "number" || !isFinite(v)) { errors.push(path + ": must be an integer"); return undefined; }
-    return Math.round(v);
-  }
-  if (spec === BOOL) {
-    if (typeof v !== "boolean") { errors.push(path + ": must be true/false/null"); return undefined; }
-    return v;
-  }
-  if (spec === STR) {
-    if (typeof v !== "string") { errors.push(path + ": must be a string"); return undefined; }
-    return v.slice(0, 500);
-  }
-  if (spec === "docstate") {
-    // Three-state estate value, approved by Devon with the trigger rule
-    // DECIDED (for the Step-4 trigger engine): false fires 6.1, "unsure"
-    // ALSO fires 6.1, "na" does not fire and renders as not applicable.
-    if (typeof v === "boolean" || v === "unsure" || v === "na") return v;
-    errors.push(path + ': must be true/false/"unsure"/"na"/null'); return undefined;
-  }
-  if (spec.enum) {
-    if (typeof v === "string" && V2_ENUMS[spec.enum].includes(v)) return v;
-    errors.push(path + ": must be one of " + V2_ENUMS[spec.enum].join("/")); return undefined;
-  }
-  if (spec.array) {
-    if (!Array.isArray(v)) { errors.push(path + ": must be an array"); return undefined; }
-    return v.map((item, i) => {
-      if (typeof spec.array === "string" || spec.array === STR) return v2CheckValue(spec.array, item, path + "[" + i + "]", errors);
-      if (item === null || typeof item !== "object" || Array.isArray(item)) { errors.push(path + "[" + i + "]: must be an object"); return undefined; }
-      return v2CheckObject(spec.array, item, path + "[" + i + "]", errors);
-    }).filter(x => x !== undefined);
-  }
-  if (spec.object) {
-    if (typeof v !== "object" || Array.isArray(v)) { errors.push(path + ": must be an object"); return undefined; }
-    return v2CheckObject(spec.object, v, path, errors);
-  }
-  errors.push(path + ": unhandled spec"); return undefined;
-}
-
-function v2CheckObject(shape, obj, path, errors) {
-  const out = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (!(k in shape)) { errors.push(path + "." + k + ": unknown field"); continue; }
-    const checked = v2CheckValue(shape[k], v, path + "." + k, errors);
-    if (checked !== undefined) out[k] = checked;
-  }
-  return out;
-}
-
-// Validate a full v2 domains object. Unknown domains and unknown fields are
-// ERRORS, not tolerated noise — a silently malformed picture is worse than
-// a failed write.
-function validateDomainsV2(domains) {
-  const errors = [];
-  const out = {};
-  if (!domains || typeof domains !== "object" || Array.isArray(domains)) {
-    return { ok: false, errors: ["domains: must be an object"], value: null };
-  }
-  for (const [name, body] of Object.entries(domains)) {
-    if (!(name in V2_SCHEMA)) { errors.push(name + ": unknown domain"); continue; }
-    if (body === null) { out[name] = null; continue; }
-    if (typeof body !== "object" || Array.isArray(body)) { errors.push(name + ": must be an object"); continue; }
-    const clean = {};
-    for (const [k, v] of Object.entries(body)) {
-      if (k === "_confidence") {
-        if (v === null || (typeof v === "string" && V2_ENUMS.confidence.includes(v))) clean._confidence = v;
-        else errors.push(name + "._confidence: must be document/stated/estimated/inferred/null");
-        continue;
-      }
-      if (k === "_notes") {
-        // Approved deviation. HARD CONSTRAINT (Devon): _notes must NEVER
-        // feed a trigger or a position line — human reading and the
-        // Advice-Ready Pack only.
-        if (typeof v === "string") clean._notes = v.slice(0, 2000);
-        else errors.push(name + "._notes: must be a string");
-        continue;
-      }
-      if (k === "_unmapped") {
-        // Lossless-translation holding pen for v1 fields with no v2 home.
-        // Same hard constraint as _notes: never feeds a trigger or a
-        // position line. Step 2 re-asks or re-homes these.
-        if (v && typeof v === "object" && !Array.isArray(v) && JSON.stringify(v).length <= 4000) clean._unmapped = v;
-        else errors.push(name + "._unmapped: must be a small object");
-        continue;
-      }
-      if (!(k in V2_SCHEMA[name])) { errors.push(name + "." + k + ": unknown field"); continue; }
-      const checked = v2CheckValue(V2_SCHEMA[name][k], v, name + "." + k, errors);
-      if (checked !== undefined) clean[k] = checked;
-    }
-    out[name] = clean;
-  }
-  return { ok: errors.length === 0, errors, value: out };
-}
-
-/* ── v1 → v2 translation ──
-   Sparse: only domains present in the input produce output. Absence stays
-   absence; null stays null; has_offset is NEVER inferred. */
-function isV2Domains(d) {
-  if (!d || typeof d !== "object") return false;
-  // v2-only domain names are decisive.
-  if (["context", "expenses", "home", "investments", "debts", "flags"].some(k => k in d)) return true;
-  // Domains that exist in both shapes need field-level detection — a
-  // capture touching only one shared-name domain must still be recognised
-  // (an income-only v2 patch has no marker key at the top level).
-  const p = d.protection;
-  if (p && ["life", "tpd", "income_protection", "trauma"].some(k => p[k] && typeof p[k] === "object")) return true;
-  const e = d.estate;
-  if (e && ["will", "poa", "guardianship", "super_nomination"].some(k => e[k] && typeof e[k] === "object")) return true;
-  const inc = d.income;
-  if (inc && ["salary_gross_annual", "salary_net_monthly", "partner_salary_gross_annual", "partner_salary_net_monthly", "business_income_annual", "rental_income_annual", "other", "structure", "entity", "employer_super_on"].some(k => k in inc)) return true;
-  const b = d.buffer;
-  if (b && ["where_held", "linked_to_loan", "counts_credit_as_buffer", "other_cash", "other_cash_where_held"].some(k => k in b)) return true;
-  const s = d.super;
-  if (s && Array.isArray(s.funds) && s.funds.some(f => f && typeof f === "object" && "has_insurance" in f)) return true;
-  return false;
-}
-
-function v2DebtType(s) {
-  const t = String(s || "").toLowerCase();
-  if (t.includes("credit")) return "credit_card";
-  if (t.includes("car")) return "car_loan";
-  if (t.includes("personal")) return "personal_loan";
-  if (t.includes("bnpl") || t.includes("afterpay") || t.includes("zip") || t.includes("buy now")) return "bnpl";
-  if (t.includes("tax")) return "tax_debt";
-  return "other";
-}
-
-/* ── income shape migration (field-spec Part 2 fold, Sept 2026) ──
-   The income domain lost its business_income_annual / rental_income_annual
-   scalars and income.other[] changed shape ({type,label,amount_annual} →
-   {source,linked_asset_id,entity,amount_annual,basis}). Rows and patches
-   carrying the old shape are migrated here.
-
-   The migration must not reintroduce the omission bug the reconciliation
-   exists to catch: NOTHING is dropped. Old array items re-type 1:1 (the
-   source enum is a superset except family_support, which is "other" by
-   definition of the new enum); entity becomes "unknown" and basis null —
-   honest not-yet-asked states, never guesses. The scalars cannot be
-   re-typed without guessing (rental: residential or commercial is exactly
-   the guess that caused the walk finding), so their figures land pathed in
-   income._unmapped AND are named in flags.income_unreconciled — they
-   render as open items and no income total presents as complete while
-   they stand. */
-function migrateIncomeShape(domains) {
-  const inc = domains && domains.income;
-  if (!inc || typeof inc !== "object") return domains;
-  const oldShape = "business_income_annual" in inc || "rental_income_annual" in inc ||
-    (Array.isArray(inc.other) && inc.other.some(it => it && typeof it === "object" && "type" in it && !("source" in it)));
-  if (!oldShape) return domains;
-  const out = { ...domains, income: { ...inc } };
-  const o = out.income;
-  const un = () => (o._unmapped = { ...(o._unmapped || {}) });
-  const open = new Set(Array.isArray(domains.flags?.income_unreconciled) ? domains.flags.income_unreconciled : []);
-  if ("business_income_annual" in o) {
-    if (o.business_income_annual !== null && o.business_income_annual !== undefined) {
-      un()["income.business_income_annual"] = o.business_income_annual;
-      open.add("legacy:business_income_annual");
-    }
-    delete o.business_income_annual;
-  }
-  if ("rental_income_annual" in o) {
-    if (o.rental_income_annual !== null && o.rental_income_annual !== undefined) {
-      un()["income.rental_income_annual"] = o.rental_income_annual;
-      open.add("legacy:rental_income_annual");
-    }
-    delete o.rental_income_annual;
-  }
-  if (Array.isArray(o.other)) {
-    o.other = o.other.map((item, i) => {
-      if (!item || typeof item !== "object" || !("type" in item) || "source" in item) return item;
-      const source = item.type === "family_support" ? "other" : item.type;
-      if (typeof source === "string" && V2_ENUMS.other_income_source.includes(source)) {
-        if (typeof item.label === "string" && item.label) un()["income.other[" + i + "].label"] = item.label;
-        return { source, linked_asset_id: null, entity: "unknown", amount_annual: item.amount_annual ?? null, basis: null };
-      }
-      un()["income.other[" + i + "]"] = item;
-      open.add("legacy:income.other[" + i + "]");
-      return undefined;
-    }).filter(x => x !== undefined);
-  }
-  if (open.size) out.flags = { ...(domains.flags || {}), income_unreconciled: [...open] };
-  return out;
-}
-
-function v2Cover(vAmount, globalInsideSuper) {
-  if (vAmount === undefined) return undefined;               // not mentioned
-  if (vAmount === null) return { held: null, amount: null, inside_super: null };   // not yet asked
-  if (vAmount === false) return { held: false, amount: null, inside_super: null }; // confirmed not held
-  if (vAmount === true) return { held: true, amount: null, inside_super: globalInsideSuper === true ? true : null };
-  if (typeof vAmount === "number") return { held: true, amount: Math.round(vAmount), inside_super: globalInsideSuper === true ? true : null };
-  return undefined;
-}
-
-// Translation is NEVER lossy (Devon rule): every v1 field either maps to a
-// v2 field or lands, raw and pathed, in the successor domain's _unmapped
-// object. _unmapped and _notes are for human reading and the Advice-Ready
-// Pack ONLY — they must NEVER feed a trigger or a position line.
-function stashUnmapped(out, targetDomain, srcDomain, srcObj, consumed) {
-  const leftovers = Object.entries(srcObj).filter(([k]) => !consumed.has(k) && k !== "notes");
-  if (!leftovers.length) return;
-  out[targetDomain] = out[targetDomain] || {};
-  const u = out[targetDomain]._unmapped = out[targetDomain]._unmapped || {};
-  for (const [k, v] of leftovers) u[srcDomain + "." + k] = v;
-}
-
-function translateLegacyDomains(v1) {
-  const out = {};
-  const inc = v1.income, a = v1.assets, l = v1.liabilities, b = v1.buffer, p = v1.protection, e = v1.estate, s = v1.super;
-
-  if (inc) {
-    const consumed = new Set(["salary_annual", "partner_salary_annual", "side_income_annual", "monthly_expenses"]);
-    const o = {};
-    if ("salary_annual" in inc) o.salary_gross_annual = inc.salary_annual;
-    if ("partner_salary_annual" in inc) o.partner_salary_gross_annual = inc.partner_salary_annual;
-    if ("side_income_annual" in inc) o.business_income_annual = inc.side_income_annual;
-    // Legacy other_income_annual has no type and income.other[] items may
-    // never take a nearest-fit type (no_default) — it goes to _unmapped via
-    // stashUnmapped rather than being guessed into the typed array.
-    if (typeof inc.notes === "string") o._notes = inc.notes;
-    if (Object.keys(o).length) out.income = o;
-    if ("monthly_expenses" in inc) {
-      // Legacy figure never declared whether it includes housing — mark
-      // explicitly unknown so it can be identified and re-asked (spec 2.3).
-      out.expenses = { living_monthly: inc.monthly_expenses, includes_housing: null };
-    }
-    stashUnmapped(out, "income", "income", inc, consumed);
-  }
-
-  const home = {};
-  if (a && "home_value" in a) {
-    home.value_estimate = a.home_value;
-    if (a.home_value !== null) { home.owns_home = true; home.value_source = "owner estimate"; }
-  }
-  if (l) {
-    if ("mortgage_balance" in l) { home.mortgage_balance = l.mortgage_balance; if (l.mortgage_balance !== null) home.owns_home = true; }
-    if ("mortgage_rate_percent" in l) home.rate_percent = l.mortgage_rate_percent;
-    if ("offset_balance" in l) home.offset_balance = l.offset_balance;
-    // has_offset deliberately NOT set — explicit capture only, never inferred.
-  }
-  if (Object.keys(home).length) out.home = home;
-
-  if (b) {
-    // assets.savings is NOT folded in here (Devon rule): it answers a
-    // different question than accessible_savings and buffer_months is a
-    // headline figure. Step 2 asks properly; until then it sits in
-    // investments._unmapped["assets.savings"].
-    const consumed = new Set(["accessible_savings"]);
-    const buf = {};
-    if ("accessible_savings" in b) buf.accessible_savings = b.accessible_savings;
-    if (typeof b.notes === "string") buf._notes = b.notes;
-    if (Object.keys(buf).length) out.buffer = buf;
-    stashUnmapped(out, "buffer", "buffer", b, consumed);
-  }
-
-  if (a) {
-    const consumed = new Set(["home_value", "shares_value", "investment_property_value"]);
-    const inv = {};
-    if ("shares_value" in a) inv.shares_value = a.shares_value;
-    if ("investment_property_value" in a && a.investment_property_value !== null) {
-      inv.properties = [{ value_estimate: a.investment_property_value, loan_balance: null, rate_percent: null, repayment_type: null, rent_monthly: null, held_in: null }];
-    }
-    if (typeof a.notes === "string") inv._notes = a.notes;
-    if (Object.keys(inv).length) out.investments = inv;
-    // Everything else (savings, business_value, other, model drift) is
-    // preserved, pathed, in investments._unmapped — never dropped.
-    stashUnmapped(out, "investments", "assets", a, consumed);
-  }
-
-  if (l) {
-    const consumed = new Set(["mortgage_balance", "mortgage_rate_percent", "offset_balance", "expensive_debts", "hecs_balance"]);
-    const debts = {};
-    if (Array.isArray(l.expensive_debts)) {
-      // purpose and borrower were never captured in v1 — "unknown" is the
-      // legitimate, reachable value for exactly this (never a nearest fit),
-      // and it satisfies the enforced requires on type so translation
-      // itself cannot trip the gate.
-      debts.items = l.expensive_debts
-        .filter(x => x && typeof x === "object")
-        .map(x => ({ type: v2DebtType(x.type), purpose: "unknown", borrower: "unknown", balance: typeof x.balance === "number" ? Math.round(x.balance) : null, rate_percent: null, minimum_monthly: null }));
-    }
-    if ("hecs_balance" in l) debts.hecs_balance = l.hecs_balance; // separate, never in debt totals
-    if (typeof l.notes === "string") debts._notes = l.notes;
-    if (Object.keys(debts).length) out.debts = debts;
-    stashUnmapped(out, "debts", "liabilities", l, consumed);
-  }
-
-  if (s) {
-    const consumed = new Set(["funds", "multiple_accounts", "extra_contributions"]);
-    const o = {};
-    if (Array.isArray(s.funds)) {
-      o.funds = s.funds.filter(f => f && typeof f === "object").map(f => ({
-        fund: typeof f.fund === "string" ? f.fund : null,
-        owner: typeof f.owner === "string" ? f.owner : null,
-        balance: typeof f.balance === "number" ? Math.round(f.balance) : null,
-        has_insurance: (typeof f.has_insurance === "boolean") ? f.has_insurance : null, // not asked per-fund in v1
-      }));
-    }
-    if ("multiple_accounts" in s) o.multiple_accounts = s.multiple_accounts;
-    if ("extra_contributions" in s) o.extra_contributions = s.extra_contributions;
-    if (typeof s.notes === "string") o._notes = s.notes;
-    if (Object.keys(o).length) out.super = o;
-    stashUnmapped(out, "super", "super", s, consumed);
-  }
-
-  if (p) {
-    const consumed = new Set(["life_cover_amount", "tpd_amount", "income_protection", "trauma_amount", "inside_super"]);
-    const gis = p.inside_super;
-    const o = {};
-    const life = v2Cover(p.life_cover_amount, gis); if (life) o.life = life;
-    const tpd = v2Cover(p.tpd_amount, gis); if (tpd) o.tpd = tpd;
-    const ip = v2Cover(p.income_protection, gis); if (ip) o.income_protection = ip;
-    const trauma = v2Cover(p.trauma_amount, gis); if (trauma) o.trauma = trauma;
-    if (typeof p.notes === "string") o._notes = p.notes;
-    if (Object.keys(o).length) out.protection = o;
-    stashUnmapped(out, "protection", "protection", p, consumed);
-  }
-
-  if (e) {
-    const consumed = new Set(["will", "poa", "guardianship", "super_nomination"]);
-    const doc = v => v === undefined ? undefined : { in_place: v, last_updated: null };
-    const o = {};
-    const w = doc(e.will); if (w) o.will = w;
-    const poa = doc(e.poa); if (poa) o.poa = poa;
-    const g = doc(e.guardianship); if (g) o.guardianship = g;
-    if (e.super_nomination !== undefined) o.super_nomination = { in_place: e.super_nomination, last_updated: null, binding: null };
-    if (typeof e.notes === "string") o._notes = e.notes;
-    if (Object.keys(o).length) out.estate = o;
-    stashUnmapped(out, "estate", "estate", e, consumed);
-  }
-
-  // Unknown v1 domains (model drift) are passed through untouched; the
-  // validator rejects them and the whole write lands in quarantine — held,
-  // not lost, and loudly flagged.
-  for (const [k, v] of Object.entries(v1)) {
-    if (!["income", "assets", "liabilities", "buffer", "protection", "estate", "super"].includes(k)) out[k] = v;
-  }
-
-  return out;
-}
-
-// Deep-merge captured domain data into the existing picture. Objects merge
-// recursively; arrays and scalars replace (a corrected figure overwrites).
-function deepMerge(base, patch) {
-  if (patch === null || typeof patch !== "object" || Array.isArray(patch)) return patch;
-  const out = { ...(base && typeof base === "object" && !Array.isArray(base) ? base : {}) };
-  for (const [k, v] of Object.entries(patch)) {
-    out[k] = deepMerge(out[k], v);
-  }
-  return out;
-}
+/* SCHEMA v2, translation, migration and merge live in
+   lib/finn-capture-pipeline.js since the step-7 fixture household needs
+   to drive the real chain. applyCaptureCore below is that chain. */
 
 // Parse the [CAPTURE] block out of the full reply text.
 function parseCapture(fullText) {
@@ -1109,130 +679,41 @@ async function setWriteStatusFalse(householdId) {
 // against Part 2 before anything is written. A write that fails validation
 // is REFUSED and logged loudly — never stored malformed.
 async function applyCapture(householdId, picture, capture, logId, sessionId) {
-  // Defensive re-homing: the model occasionally emits a domain as a SIBLING
-  // of "domains" instead of inside it. Ignoring unexpected top-level keys
-  // would be silent data loss, so unambiguous domain names are folded back
-  // into domains (loudly) before processing.
-  const KNOWN_TOP = new Set(["domains", "goals", "completed_domains", "session_complete"]);
-  for (const [k, v] of Object.entries(capture ?? {})) {
-    if (KNOWN_TOP.has(k)) continue;
-    if (k in V2_SCHEMA && v && typeof v === "object" && !Array.isArray(v)) {
-      console.error(`[Finn clarity] capture anomaly: domain "${k}" emitted outside "domains" — re-homed rather than dropped.`);
-      capture.domains = capture.domains || {};
-      capture.domains[k] = capture.domains[k] ? deepMerge(capture.domains[k], v) : v;
-    } else if (["assets", "liabilities"].includes(k) && v && typeof v === "object") {
-      console.error(`[Finn clarity] capture anomaly: legacy domain "${k}" emitted outside "domains" — re-homed rather than dropped.`);
-      capture.domains = capture.domains || {};
-      capture.domains[k] = capture.domains[k] ? deepMerge(capture.domains[k], v) : v;
-    } else {
-      console.error(`[Finn clarity] capture anomaly: unknown top-level key "${k}" ignored (value type: ${typeof v}).`);
-    }
-  }
-  let baseDomains = picture.domains ?? {};
-  if ((picture.schema_version ?? 1) < 2 && !isV2Domains(baseDomains)) {
-    baseDomains = translateLegacyDomains(baseDomains);
-  }
-  baseDomains = migrateIncomeShape(baseDomains);
-  // Stable ids: existing rows get ids at migration (first write after this
-  // lands), then positional prop-N links carry across only where the
-  // mapping is unambiguous — anywhere else they clear, never a guessed
-  // remap, and the reconciliation pass surfaces the open producer.
-  baseDomains = migratePositionalLinks(assignAssetIds(baseDomains));
-  let patch = capture.domains ?? {};
-  if (Object.keys(patch).length && !isV2Domains(patch)) {
-    patch = translateLegacyDomains(patch);
-  }
-  patch = migrateIncomeShape(patch);
-  // Arrays merge BY ID: a patch item echoing an existing id updates that
-  // item; an id-less item appends and is assigned its id below; items the
-  // patch does not mention are retained.
-  let merged = mergeDomainsById(baseDomains, patch);
-  // Code resolutions after the gate sees the model's own writes: new items
-  // get their ids, and security resolves to unsecured for the four
-  // products that cannot carry security (deterministic, no trip).
-  merged = resolveSecurity(assignAssetIds(merged));
-
-  /* ── THE PERSISTENCE GATE (capture-conduct step 2, corrections 1-2) ──
-     Runs in the request path, after the write-ahead raw insert and before
-     the validated merge commits, so a gate failure quarantines the item
-     rather than losing it.
-
-     Refusals are CODE-WITNESSED and SESSION-SCOPED: a refusal is valid
-     only where a path_served event (written by code when path text was
-     served, from build step 4) exists for that field id in THIS session.
-     Refusals from earlier sessions have expired — the field is offered
-     once more. Until step 4 exists no path_served rows do, so no refusal
-     is valid: correct and intended. */
-  const claimedRefusals = new Set([
-    ...(Array.isArray(picture.refusals) ? picture.refusals : [])
-      .filter(r => r && r.field && sessionId && r.session_id === sessionId).map(r => r.field),
-    ...(Array.isArray(capture.refusals) ? capture.refusals : [])
-      .filter(f => typeof f === "string" && FIELD_REGISTRY[f]),
-  ]);
-  let validRefusals = new Set();
-  if (claimedRefusals.size && sessionId) {
+  // Code-witnessed path_served rows for THIS session — the only thing the
+  // pure core cannot know. Queried once; the core decides refusal validity.
+  let servedFields = new Set();
+  if (sessionId) {
     const servedRes = await sbFetch(
       `/rest/v1/capture_log?household_id=eq.${householdId}&session_id=eq.${sessionId}&status=eq.path_served&select=field_id`);
-    const served = servedRes.ok ? new Set((await servedRes.json()).map(r => r.field_id)) : new Set();
-    validRefusals = new Set([...claimedRefusals].filter(f => served.has(f)));
+    if (servedRes.ok) servedFields = new Set((await servedRes.json()).map(r => r.field_id));
   }
-  const gate = persistenceGate(patch, merged, validRefusals);
-  if (!gate.ok) {
-    console.error(
-      "[Finn clarity] GATE — capture-conduct violation, picture write refused for household " + householdId +
-      ". Nothing is lost: the raw capture is in capture_log. " + JSON.stringify(gate.errors)
-    );
-    if (logId) {
-      await markCaptureLog(logId, "refused", { errors: gate.errors, merged_domains: merged });
-    } else {
-      await insertCaptureLog(householdId, null, capture, "refused", sessionId);
-    }
-    await setWriteStatusFalse(householdId);
-    return;
-  }
-  // Persist this session's newly recorded refusals (session-tagged) and
-  // prune expired ones: a refusal from another session whose field is
-  // still below its floor is cleared, so the path is offered once more.
-  const capRefusals = (Array.isArray(capture.refusals) ? capture.refusals : [])
-    .filter(f => typeof f === "string" && FIELD_REGISTRY[f]);
-  const existing = Array.isArray(picture.refusals) ? picture.refusals : [];
-  const kept = existing.filter(r => r && r.field && (!sessionId || r.session_id === sessionId));
-  const keptFields = new Set(kept.map(r => r.field));
-  const added = capRefusals.filter(f => !keptFields.has(f))
-    .map(f => ({ field: f, at: new Date().toISOString(), session_id: sessionId }));
-  const refusalsOut = (added.length || kept.length !== existing.length) ? [...kept, ...added] : undefined;
 
-  const check = validateDomainsV2(merged);
-  if (!check.ok) {
-    // 1. Loud, greppable log line — the alert signal.
-    console.error(
-      "[Finn clarity] REFUSED — schema v2 validation failed, picture write refused for household " + householdId +
-      ". Nothing is lost: the raw capture is in capture_log and the session UI is told. Problems: " + JSON.stringify(check.errors)
-    );
-    // 2. Mark the write-ahead row refused (or insert one directly if the
-    //    write-ahead itself failed — a refusal must never mean silent loss).
+  // The pure chain: translate, migrate, ids, merge-by-id, gate, code
+  // resolutions, validate — lib/finn-capture-pipeline.js, shared with the
+  // step-7 fixture household so the tests drive the REAL machinery.
+  const result = applyCaptureCore({ picture, capture, sessionId, servedFields });
+  for (const a of result.anomalies) console.error(`[Finn clarity] capture anomaly: ${a}.`);
+
+  if (result.status === "refused") {
+    const label = result.kind === "gate"
+      ? "GATE — capture-conduct violation, picture write refused for household " + householdId + ". Nothing is lost: the raw capture is in capture_log. "
+      : "REFUSED — schema v2 validation failed, picture write refused for household " + householdId + ". Nothing is lost: the raw capture is in capture_log and the session UI is told. Problems: ";
+    console.error("[Finn clarity] " + label + JSON.stringify(result.errors));
     if (logId) {
-      await markCaptureLog(logId, "refused", { errors: check.errors, merged_domains: merged });
+      await markCaptureLog(logId, "refused", { errors: result.errors, merged_domains: result.merged });
     } else {
       await insertCaptureLog(householdId, null, capture, "refused", sessionId);
     }
-    // 3. Tell the session — domains/schema_version are NOT touched here.
     await setWriteStatusFalse(householdId);
     return;
   }
-  const domains = check.value;
-  const goals = deepMerge(picture.goals ?? {}, capture.goals ?? {});
-  const prevDone = Array.isArray(picture.completed_domains) ? picture.completed_domains : [];
-  const newDone = Array.isArray(capture.completed_domains) ? capture.completed_domains : [];
-  const VALID = ["income", "assets", "liabilities", "buffer", "protection", "estate", "super", "goals"];
-  const completed = [...new Set([...prevDone, ...newDone])].filter(d => VALID.includes(d));
 
   const pictureBody = JSON.stringify({
-    domains,
-    goals,
-    completed_domains: completed,
+    domains: result.domains,
+    goals: result.goals,
+    completed_domains: result.completedDomains,
     schema_version: 2,
-    ...(refusalsOut ? { refusals: refusalsOut } : {}),
+    ...(result.refusalsOut ? { refusals: result.refusalsOut } : {}),
     last_write_status: { ok: true, at: new Date().toISOString() },
     updated_at: new Date().toISOString(),
   });

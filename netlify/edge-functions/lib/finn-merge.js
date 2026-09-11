@@ -72,6 +72,13 @@ export function mergeDomainsById(base, patch) {
         if (!isObj(item)) { out.push(item); continue; }
         const ix = typeof item.id === "string" && item.id
           ? out.findIndex(x => isObj(x) && x.id === item.id) : -1;
+        // { id, _remove: true } deletes the item; surviving items keep
+        // their ids (never positional, never reused), and a _remove for
+        // an unknown id is ignored rather than appended.
+        if (item._remove === true) {
+          if (ix !== -1) out.splice(ix, 1);
+          continue;
+        }
         if (ix === -1) out.push(item);
         else out[ix] = mergeVal(out[ix], item, false);
       }
