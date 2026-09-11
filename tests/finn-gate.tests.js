@@ -150,7 +150,42 @@ export function runGateTests(mod) {
       return !e.requires_pending_schema && Array.isArray(e.requires) &&
         e.requires.includes('purpose') && e.requires.includes('borrower'); })());
 
-  return { pass: failures.length === 0, total: 34, failures };
+  /* ── sighted (Devon, Sept 2026): document > sighted > stated > estimated.
+     Upload works today (UPLOAD_PATH_WORKS true), so sighted does NOT
+     satisfy a document floor anywhere — it ranks below document and the
+     gate fires. The satisfies-when-no-upload branch flips in code, not in
+     the registry. ── */
+  t('sighted-ranks-between-stated-and-document',
+    mod.CONFIDENCE_RANK.sighted === 3 && mod.CONFIDENCE_RANK.document === 4 &&
+    mod.CONFIDENCE_RANK.stated === 2 && mod.CONFIDENCE_RANK.estimated === 1);
+  t('sighted-blocked-while-upload-works',
+    persistenceGate({ home: { mortgage_balance: 512000, _confidence: 'sighted' } }, { home: { mortgage_balance: 512000 } }, new Set()).errors.length === 1);
+  t('upload-capability-flag-lives-in-code',
+    mod.UPLOAD_PATH_WORKS === true && typeof mod.uploadWorks === 'function');
+
+  /* ── security required by type (Devon item 4): unsecurable products
+     resolve without a trip; every real loan product needs the loan path. ── */
+  t('security-credit-card-stated-passes',
+    persistenceGate({ debts: { items: [{ type: 'credit_card', purpose: 'personal', borrower: 'personal', security: 'unsecured' }], _confidence: 'stated' } },
+      { debts: {} }, new Set()).ok);
+  t('security-car-loan-stated-blocked',
+    persistenceGate({ debts: { items: [{ type: 'car_loan', purpose: 'vehicle', borrower: 'personal', security: 'vehicle', balance: 18400 }], _confidence: 'document' } },
+      { debts: {} }, new Set()).ok
+    && persistenceGate({ debts: { items: [{ type: 'car_loan', purpose: 'vehicle', borrower: 'personal', security: 'vehicle' }], _confidence: 'stated' } },
+      { debts: {} }, new Set()).errors.join().includes('debts.items[].security'));
+  t('security-unknown-type-strictest',
+    persistenceGate({ debts: { items: [{ purpose: 'unknown', borrower: 'unknown', security: 'other' }], _confidence: 'stated' } },
+      { debts: {} }, new Set()).errors.join().includes('debts.items[].security'));
+
+  /* ── step 5: producers are declared in the registry, not remembered. ── */
+  t('producers-declared',
+    Array.isArray(mod.PRODUCERS) && mod.PRODUCERS.length === 4 &&
+    mod.PRODUCERS.some(p => p.key === 'investments.properties[]') &&
+    mod.PRODUCERS.some(p => p.key === 'income.entity') &&
+    mod.PRODUCERS.some(p => p.key === 'investments.holdings') &&
+    mod.PRODUCERS.some(p => p.key === 'income.structure:sole_trader'));
+
+  return { pass: failures.length === 0, total: 41, failures };
 }
 
 /* ── capture-conduct steps 3-4: the retrieval path file and the
@@ -209,4 +244,65 @@ export function runPathTests(regMod, pathsMod) {
         .every(f => s.includes(f)); })());
 
   return { pass: failures.length === 0, total: 10, failures };
+}
+
+/* ── stable asset ids and id-aware merge (lib/finn-merge.js) ──
+   Run by blob-importing lib/finn-merge.js and calling
+   runMergeTests(mergeMod). */
+export function runMergeTests(mod) {
+  const { assignAssetIds, mergeDomainsById, migratePositionalLinks, resolveSecurity } = mod;
+  const failures = [];
+  const t = (name, cond) => { if (!cond) failures.push(name); };
+
+  // Ids are assigned at first write and existing ids are never touched.
+  const withIds = assignAssetIds({ super: { funds: [{ fund: 'Aware', balance: 80000 }, { id: 'keep1234', fund: 'Rest' }] } });
+  t('id-assigned-at-first-write',
+    typeof withIds.super.funds[0].id === 'string' && withIds.super.funds[0].id.length > 0);
+  t('existing-id-untouched', withIds.super.funds[1].id === 'keep1234');
+  t('ids-are-random-not-positional',
+    assignAssetIds({ debts: { items: [{ type: 'other' }] } }).debts.items[0].id !==
+    assignAssetIds({ debts: { items: [{ type: 'other' }] } }).debts.items[0].id);
+
+  // Merge by id: an echoed id updates in place, an id-less item appends,
+  // unmentioned items are retained.
+  const base = { debts: { items: [{ id: 'a1', type: 'credit_card', balance: 6200 }, { id: 'b2', type: 'car_loan', balance: 18400 }], _confidence: 'stated' } };
+  const merged = mergeDomainsById(base, { debts: { items: [{ id: 'a1', balance: 5100 }, { type: 'personal_loan', balance: 9800 }], _confidence: 'stated' } });
+  t('merge-by-id-updates-in-place',
+    merged.debts.items.find(x => x.id === 'a1').balance === 5100 &&
+    merged.debts.items.find(x => x.id === 'a1').type === 'credit_card');
+  t('merge-retains-unmentioned-items',
+    merged.debts.items.some(x => x.id === 'b2' && x.balance === 18400));
+  t('merge-appends-idless-items',
+    merged.debts.items.length === 3 && merged.debts.items.some(x => x.type === 'personal_loan'));
+  t('scalar-arrays-still-replace',
+    mergeDomainsById({ income: { employer_super_on: ['salary', 'partner_salary'] } },
+      { income: { employer_super_on: ['salary'] } }).income.employer_super_on.length === 1);
+
+  // Positional link migration: prop-1 with exactly one property is the
+  // only unambiguous mapping; everything else clears, never remapped.
+  const oneProp = migratePositionalLinks(assignAssetIds({
+    investments: { properties: [{ value_estimate: 640000 }] },
+    income: { other: [{ source: 'rental_residential', linked_asset_id: 'prop-1', amount_annual: 28080 }] },
+  }));
+  t('positional-link-unambiguous-carries',
+    oneProp.income.other[0].linked_asset_id === oneProp.investments.properties[0].id);
+  const twoProps = migratePositionalLinks(assignAssetIds({
+    investments: { properties: [{ value_estimate: 640000 }, { value_estimate: 480000 }] },
+    income: { other: [{ source: 'rental_residential', linked_asset_id: 'prop-2', amount_annual: 28080 }] },
+  }));
+  t('positional-link-ambiguous-clears-never-guesses',
+    twoProps.income.other[0].linked_asset_id === null);
+
+  // Security resolves to unsecured, code-side, for the four products that
+  // cannot carry security — and only for them, and never over an answer.
+  const sec = resolveSecurity({ debts: { items: [
+    { id: 'c1', type: 'credit_card' }, { id: 'h1', type: 'hecs_help' },
+    { id: 'v1', type: 'car_loan' }, { id: 'x1', type: 'bnpl', security: 'other' },
+  ] } });
+  t('security-resolves-unsecurable',
+    sec.debts.items[0].security === 'unsecured' && sec.debts.items[1].security === 'unsecured');
+  t('security-never-resolves-real-loans', sec.debts.items[2].security === undefined);
+  t('security-never-overwrites-an-answer', sec.debts.items[3].security === 'other');
+
+  return { pass: failures.length === 0, total: 12, failures };
 }

@@ -109,19 +109,23 @@
     if (num(inc.rental_income_annual) !== null && !income_unreconciled.includes('legacy:rental_income_annual')) {
       income_unreconciled.push('legacy:rental_income_annual');
     }
-    // Producer: every investment property. Satisfied by a linked income
-    // entry ("prop-N", capture order), a rental-source entry where only one
-    // property exists, or the property's own rent_monthly as a known number
-    // (0 is an explicit zero, null is not-yet-asked).
+    // Producer: every investment property (capture-conduct Part Four /
+    // registry PRODUCERS). Producers link by stable item id. Satisfied by
+    // an income entry linked to the property's id, an UNAMBIGUOUS unlinked
+    // match (exactly one property and an unlinked rental entry — the same
+    // no-guess principle as the positional-link migration), or the
+    // property's own rent_monthly as a known number (0 is an explicit
+    // zero, null is not-yet-asked).
     const props = Array.isArray(inv.properties) ? inv.properties : [];
-    const rentalEntries = other.filter(o => o.source === 'rental_residential' || o.source === 'rental_commercial');
+    const unlinkedRentals = other.filter(o =>
+      (o.source === 'rental_residential' || o.source === 'rental_commercial') && !o.linked_asset_id);
     props.forEach((p, i) => {
       if (!p) return;
-      const id = 'prop-' + (i + 1);
-      const linked = other.some(o => o.linked_asset_id === id);
-      const soleRental = props.length === 1 && rentalEntries.length > 0;
+      const openId = (typeof p.id === 'string' && p.id) ? p.id : 'prop-' + (i + 1);
+      const linked = (typeof p.id === 'string' && p.id) && other.some(o => o.linked_asset_id === p.id);
+      const soleUnambiguous = props.length === 1 && unlinkedRentals.length > 0;
       const ownRent = num(p.rent_monthly) !== null;
-      if (!linked && !soleRental && !ownRent) income_unreconciled.push(id);
+      if (!linked && !soleUnambiguous && !ownRent) income_unreconciled.push(openId);
     });
     // Producer: the company or trust. Satisfied by any entity-flavoured
     // income entry or an explicit link.

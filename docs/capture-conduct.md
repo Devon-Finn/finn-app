@@ -54,6 +54,8 @@ expenses.discretionary_monthly:
 
 **The same-trip rule.** A field that sits on a document the person is already being sent to for a `required` field is itself `required`. `offered` is reserved for fields whose document exists but demands a separate trip.
 
+**Sighted.** The confidence ladder is `document > sighted > stated > estimated > inferred`. `document` means Finn read the artefact. `sighted` means the person was on the source and read it off. A sighted value satisfies a document floor only while no working upload path exists for that field; the capability flag lives in code, not the registry. Where upload does work, the path text offers the upload and a typed answer from the screen is recorded as sighted, not document.
+
 That single rule kills the entire class. A home value, a loan balance, an ETF balance can never again be silently guessed. If it happens, the write throws and it appears in a log, rather than appearing in a walk three weeks later.
 
 **`softeners: forbidden`** stops being a detector that reports after the fact and becomes a property of a templated ask. The ask is assembled from the registry, so it cannot contain "roughly". There is nothing to detect because there is nothing to compose.
@@ -122,8 +124,11 @@ It checks:
 | Enum default | An enum written without its `requires` satisfied |
 | Reconciliation | A declared producer with no income entry and no explicit zero |
 | Path offered | A retrievable field asked without its path text present |
+| Composed ask | An ask for a registered field authored fresh instead of delivered from its template |
 | Single visit | The same institution visited more than once in a session |
 | Em-dash | Any em-dash in the visible stream |
+
+The linter also reports every field currently resting on `sighted`.
 
 Output is a report, not a log line. **Devon runs a walk and reads a report.** He does not find these by eye. The moment a check has a name, it stops being a discovery and becomes a regression.
 

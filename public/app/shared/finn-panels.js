@@ -90,11 +90,17 @@
   };
 
   // Plain-words name for an open reconciliation item (derived.income_unreconciled).
+  // Ids are stable asset ids; "prop-N" appears only for rows the server has
+  // not yet migrated to ids.
   function openItemLabel(id, domains) {
     const d = domains || {};
+    const props = (d.investments && Array.isArray(d.investments.properties)) ? d.investments.properties : [];
+    const byId = props.findIndex(p => p && p.id === id);
+    if (byId !== -1) {
+      return (props.length > 1 ? 'investment property ' + (byId + 1) : 'the investment property') + ', no rent recorded against it yet';
+    }
     if (/^prop-(\d+)$/.test(id)) {
       const n = Number(id.slice(5));
-      const props = (d.investments && Array.isArray(d.investments.properties)) ? d.investments.properties : [];
       return (props.length > 1 ? 'investment property ' + n : 'the investment property') + ', no rent recorded against it yet';
     }
     if (id === 'entity') {

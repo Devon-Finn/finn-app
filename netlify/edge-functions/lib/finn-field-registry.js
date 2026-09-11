@@ -27,9 +27,28 @@
    debts.items[].type) must be present on the same array item, not in the
    merged picture. Enforced since the field-spec Part 2 schema fold.
 
-   Confidence order for the floor: (missing) < estimated < stated < document. */
+   Confidence order for the floor:
+   (missing) < estimated < stated < sighted < document.
+   document means Finn read the artefact; sighted means the person was on
+   the source and read it off. A sighted value satisfies a document floor
+   only while no working upload path exists for that field — that
+   capability flag lives HERE in code (UPLOAD_PATH_WORKS), not in the
+   registry entries. */
 
-export const CONFIDENCE_RANK = { estimated: 1, stated: 2, document: 3 };
+export const CONFIDENCE_RANK = { estimated: 1, stated: 2, sighted: 3, document: 4 };
+
+/* The upload capability flag (Devon, Sept 2026). Verified 2026-09-11: the
+   clarity composer takes PDF / PNG / JPEG / WebP by button, paste and
+   drag-and-drop, single file per turn, 8MB cap; clarity-chat sanitises
+   the blocks and forwards them, read-and-discard. Upload therefore works
+   for every document-backed field today, and sighted does NOT satisfy a
+   document floor anywhere. If the capability breaks or narrows, flip
+   this here and sighted starts satisfying document floors again — the
+   registry entries never change for it. */
+export const UPLOAD_PATH_WORKS = true;
+export function uploadWorks(fieldId) {
+  return UPLOAD_PATH_WORKS;
+}
 
 export const FIELD_REGISTRY = {
   /* ── context ── */
@@ -145,7 +164,27 @@ export const FIELD_REGISTRY = {
   "debts.items[].type":   { label: "what kind of debt it is", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true, requires: ["purpose", "borrower"] },
   "debts.items[].purpose": { label: "what the money was used for", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true },
   "debts.items[].borrower": { label: "whose name the borrowing is in", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true },
-  "debts.items[].security": { label: "what it's secured against", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true },
+  /* security is required, served on the item's own loan path — except the
+     four products that cannot carry security, which resolve to unsecured
+     without any trip (code fills them in applyCapture). */
+  "debts.items[].security": { label: "what it's secured against", accepts_upload: true, confidence_floor: "document", softeners: "forbidden", no_default: true, type_key: "type",
+    retrieval_by_type: {
+      credit_card: { retrieval: "none", confidence_floor: "stated" },
+      bnpl:        { retrieval: "none", confidence_floor: "stated" },
+      hecs_help:   { retrieval: "none", confidence_floor: "stated" },
+      tax_debt:    { retrieval: "none", confidence_floor: "stated" },
+      home_loan:                { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
+      investment_property_loan: { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
+      loan_split:               { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
+      line_of_credit:           { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
+      commercial_loan:          { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
+      business_loan:            { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
+      equipment_finance:        { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
+      car_loan:                 { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
+      personal_loan:            { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
+      family_loan:              { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
+      other:                    { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
+    } },
   "debts.items[].is_split": { label: "whether it's a split of a larger loan", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "debts.items[].parent_loan_id": { label: "which loan it's a split of", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "debts.items[].balance": { label: "what's owing on it", retrieval: "required", evidence: ["statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", feeds: ["debts_total"] },
@@ -157,6 +196,29 @@ export const FIELD_REGISTRY = {
   "flags.hardship":       { label: "hardship", retrieval: "none", confidence_floor: "estimated", softeners: "permitted", never_asked: true },
   "flags.hardship_signal": { label: "what prompted it", retrieval: "none", confidence_floor: "estimated", softeners: "permitted", never_asked: true },
 };
+
+/* ── declared producers (capture-conduct Part Four, build step 5) ──
+   Cross-domain links live HERE, not in the conversation's memory. Before
+   income_total_annual derives, the reconciliation pass walks every
+   producer and asserts an income entry or an explicit zero with a reason;
+   unmatched producers land in flags.income_unreconciled, the total is not
+   presented as complete, and the panel names the open asset.
+
+   The walk itself runs at derive time in public/app/shared/finn-derived.js
+   (derived values are computed at read, never stored); this declaration is
+   the authoritative list the linter checks that walk against. Producers
+   link by stable item id where the producer is an array item; the entity
+   and the holdings are single objects/scalars today and keep the fixed
+   tokens "entity" and "holdings" until they become arrays. */
+export const PRODUCERS = [
+  { key: "investments.properties[]", produces: ["rental_residential", "rental_commercial"],
+    zero_with_reason: "rent_monthly of 0 on the property" },
+  { key: "income.entity", produces: ["business_profit", "trust_distribution", "director_fee"],
+    link_token: "entity" },
+  { key: "investments.holdings", produces: ["dividends", "distributions"],
+    link_token: "holdings" },
+  { key: "income.structure:sole_trader", produces: ["business_profit"] },
+];
 
 /* ── the persistence gate (build step 2, with corrections 1-3) ──
    Runs in the request path, after the write-ahead raw insert and before
@@ -232,7 +294,11 @@ export function persistenceGate(patchDomains, mergedDomains, validRefusals) {
       const conf = (patchDomains[w.domain] || {})._confidence;
       const rank = CONFIDENCE_RANK[conf] ?? 0;
       const floor = CONFIDENCE_RANK[entry.confidence_floor];
-      if (floor !== undefined && rank < floor && !refuse.has(w.id)) {
+      // A sighted value satisfies a document floor only while no working
+      // upload path exists for that field (the capability flag lives in
+      // code, above — not in the registry).
+      const sightedOk = conf === "sighted" && entry.confidence_floor === "document" && !uploadWorks(w.id);
+      if (floor !== undefined && rank < floor && !sightedOk && !refuse.has(w.id)) {
         errors.push(`gate: ${w.id} committed at "${conf ?? "no confidence"}" below floor "${entry.confidence_floor}" with no valid refusal record`);
       }
     }

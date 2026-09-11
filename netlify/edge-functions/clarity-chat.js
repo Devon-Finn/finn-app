@@ -1,5 +1,6 @@
 import { bankExportsPromptSection } from "./lib/finn-bank-exports.js";
 import { retrievalPromptSection, servedFieldIds } from "./lib/finn-retrieval-paths.js";
+import { assignAssetIds, mergeDomainsById, migratePositionalLinks, resolveSecurity } from "./lib/finn-merge.js";
 import { FIELD_REGISTRY, persistenceGate } from "./lib/finn-field-registry.js";
 
 // Clarity-chat edge function — the paid Clarity Session conversation (3a).
@@ -243,7 +244,7 @@ JSON shape:
 Rules for the block:
 - "domains": include ONLY fields the person actually provided or corrected THIS turn, under these domain keys and exact shapes (this is the storage schema — writes that do not match it are refused):
   context: adults, children (array of {age}), owner_age, partner_age, work_intent ("both continuing"/"one reducing"/"one stopping"/"unsure"), horizon_years
-  income: salary_gross_annual, salary_net_monthly, partner_salary_gross_annual, partner_salary_net_monthly, other (array of {source, linked_asset_id, entity, amount_annual, basis} — EVERY non-salary regular source lands here, typed, never lumped. source is "rental_residential"/"rental_commercial"/"dividends"/"distributions"/"trust_distribution"/"business_profit"/"director_fee"/"government"/"other". linked_asset_id ties the entry to what produces it: "prop-1"/"prop-2" in the order the investment properties were captured, "entity" for the company or trust, "holdings" for the share portfolio, null where nothing in the picture produces it. entity is whose hands it arrives in: "personal"/"joint"/"company"/"trust"/"smsf"/"unknown". basis is "gross" or "net_of_costs" — always ask which the figure is; where they give gross rent and costs, state both and record the gross figure with basis "gross" — never net them yourself and never characterise the gearing), structure ("paye"/"sole_trader"/"company"/"trust"/"mixed"), entity ({type, name} where a company or trust exists), employer_super_on (array naming the income streams employer super is paid on, e.g. ["salary","partner_salary"])
+  income: salary_gross_annual, salary_net_monthly, partner_salary_gross_annual, partner_salary_net_monthly, other (array of {source, linked_asset_id, entity, amount_annual, basis} — EVERY non-salary regular source lands here, typed, never lumped. source is "rental_residential"/"rental_commercial"/"dividends"/"distributions"/"trust_distribution"/"business_profit"/"director_fee"/"government"/"other". linked_asset_id ties the entry to what produces it: use the producing asset's id exactly as shown in the picture context (every property and debt item carries a system-assigned id), "entity" for the company or trust, "holdings" for the share portfolio, null where nothing in the picture produces it or the producing asset was only captured this turn and has no id yet. entity is whose hands it arrives in: "personal"/"joint"/"company"/"trust"/"smsf"/"unknown". basis is "gross" or "net_of_costs" — always ask which the figure is; where they give gross rent and costs, state both and record the gross figure with basis "gross" — never net them yourself and never characterise the gearing), structure ("paye"/"sole_trader"/"company"/"trust"/"mixed"), entity ({type, name} where a company or trust exists), employer_super_on (array naming the income streams employer super is paid on, e.g. ["salary","partner_salary"])
   expenses: living_monthly (EXCLUDING housing debt repayments), includes_housing (explicit true/false — NEVER omitted or null when living_monthly is captured: false when the figure excludes housing as you asked, true only when the person genuinely can only give an all-in figure), housing_repayment_monthly
   home: owns_home, value_estimate, value_source, mortgage_balance, rate_percent, rate_type, lender, with_lender_since, repayment_monthly, term_remaining_years, has_offset (ONLY ever from asking the offset question — never inferred from any balance), offset_balance, package_fee_annual
   buffer: accessible_savings, where_held, linked_to_loan, counts_credit_as_buffer
@@ -253,14 +254,15 @@ Rules for the block:
   investments: shares_value, held_in (whose name), managed_funds_value, properties (array of {value_estimate, loan_balance, rate_percent, repayment_type, rent_monthly, held_in})
   debts: items (array of {type, purpose, borrower, security, is_split, parent_loan_id, balance, rate_percent, minimum_monthly}). PLACEMENT: the loan on the home they live in lives in the home domain (mortgage_balance etc.) and is NEVER duplicated as a debts item; the loan on an investment property lives on that property in investments.properties[]. debts.items carries every OTHER borrowing, including a split carved off the home loan for another purpose (type "loan_split", is_split true, parent_loan_id pointing at the home loan). type is the PRODUCT: "home_loan"/"investment_property_loan"/"loan_split"/"line_of_credit"/"commercial_loan"/"business_loan"/"equipment_finance"/"car_loan"/"personal_loan"/"credit_card"/"bnpl"/"hecs_help"/"tax_debt"/"family_loan"/"other". purpose is what the money was used for: "owner_occupied"/"investment_property"/"commercial_property"/"investment_shares"/"business_operating"/"vehicle"/"personal"/"education"/"tax"/"mixed"/"unknown". Purpose is NEVER inferred from product: where a debt is not plainly the loan on the home they live in, ask two things — what it is, and what the money was used for — and do not write type until purpose and borrower are answered (the write is refused otherwise; "unknown" is a legitimate answer when they genuinely don't know, a specific guess never is). "personal_loan" means a personal loan and nothing else. borrower is whose name the borrowing is in: "personal"/"joint"/"company"/"trust"/"smsf"/"partnership"/"unknown" — borrowing inside a company or trust is not personal household debt. security is "property_home"/"property_investment"/"property_commercial"/"vehicle"/"business_assets"/"unsecured"/"other". is_split true with parent_loan_id naming the loan it splits from where the debt is a split of a larger facility. hecs_balance (always separate — never one of the items)
   flags: hardship, hardship_signal — see the hardship rule below.
-  Every domain you update this turn also carries _confidence, three-state: "document" when the figures were read from a payslip, statement, portal or policy schedule the person provided; "stated" when the person knew it and said it, no document; "estimated" when no document exists or it couldn't be reached. The professional receiving the picture needs to know which figures are hard, so never write "stated" for a figure you read off a document, and never write "document" for a remembered number. ("inferred" exists solely for flags.hardship, which is written from your read, never from asking.) Freeform nuance goes in _notes per domain (for human reading only — it never drives what the person is shown). Numbers as plain whole-dollar numbers, rates as percent numbers, no strings for money, no dollar signs. Nothing invented: if they did not say it, it is not in the block.
+  Every domain you update this turn also carries _confidence, ranked document > sighted > stated > estimated: "document" ONLY when YOU read the figures from an artefact the person attached (a payslip, statement, screenshot or policy schedule you actually saw); "sighted" when the person was on the source screen or document and read the figures off it to you, but you did not see it yourself; "stated" when the person knew it and said it from memory, no source in front of them; "estimated" when no document exists or it couldn't be reached. The professional receiving the picture needs to know which figures are hard, so never write "document" for a figure the person read out (that is sighted), never write "sighted" for a remembered number (that is stated), and never write "stated" for a figure you read off an attachment. ("inferred" exists solely for flags.hardship, which is written from your read, never from asking.) Freeform nuance goes in _notes per domain (for human reading only — it never drives what the person is shown). Numbers as plain whole-dollar numbers, rates as percent numbers, no strings for money, no dollar signs. Nothing invented: if they did not say it, it is not in the block.
+  Array items (children, super funds, properties, debts items, other income) carry an "id" assigned by the system, visible in the picture context. When you update or correct an EXISTING item, include its id exactly as shown there, so the update lands on that item. For a NEW item, never invent an id, leave id out and the system assigns one. Items you do not mention are retained, so send only the items this turn added or corrected, never the whole array.
   Every field lives in EXACTLY the domain listed above — never place a field under a different domain, even when the conversation surfaced them together. In particular: structure, entity and employer_super_on belong to income, NEVER to context, even though the work setup comes up during the household opening. A field under the wrong domain causes the whole write to be refused and that turn's facts to be lost, so check placement before you emit the block.
 - Hardship (flags): set from your read of the conversation, NEVER from asking — "are you in financial hardship" is never a question you put to someone. If genuine hardship shows (missed essential payments, collectors calling, choosing between essentials), set hardship true and record what prompted it in hardship_signal, in their words where possible, so the decision is auditable. Its _confidence is "inferred". This is the one field written from judgment, and it exists so the person is routed to free help — hard line 5 stands unchanged.
 - Absent versus not-yet-discussed (keep this distinction exact everywhere): when the person CONFIRMS something is not held or not in place, record it as explicitly false (e.g. protection tpd {held: false}, estate will {in_place: false}, has_offset: false). Never record a confirmed absence as null, and never omit it — a missing field or null means "not yet discussed"; false means "confirmed no". A confirmed absence is a captured fact and must be written to the block.
 - "goals": loose directions only, e.g. {"directions":["security-leaning","kids-setup"],"notes":"wants to feel less exposed; kids' schooling on their mind"}. Include only when goals content actually surfaced this turn.
 - "completed_domains": the full cumulative list of AREA labels now covered or deliberately skipped, including "goals" when goals have been drawn out. Area labels are unchanged: income, assets, liabilities, buffer, protection, estate, super, goals — where "income" includes the household context and expenses, "assets" covers home and investments, and "liabilities" covers debts. A skipped area still counts as completed for progress.
 - "session_complete": true only when all eight areas are covered or consciously skipped and you have wrapped up warmly. Otherwise false.
-- "refusals": an array of field ids, included ONLY when the retrieval path for a document-backed field was offered in this conversation (this turn or an earlier one) and the person has now declined it or given the figure from memory anyway (e.g. ["home.mortgage_balance"]). A decline of a path you offered last turn is a refusal THIS turn: record it in the same [CAPTURE] block as the below-floor figure, or the write boundary will refuse the write. This is the record that the path was offered and declined; the write boundary REFUSES a document-backed figure committed below its confidence floor without one. Never include a field you did not offer the path for, and never treat a refusal as permission to stop offering the upload later if the document surfaces. Field ids: domain.field, nested as domain.parent.field, array items as domain.list[].field.
+- "refusals": an array of field ids, included ONLY when the retrieval path for a document-backed field was offered in this conversation (this turn or an earlier one) and the person has now declined it, given the figure from memory anyway, or read the figures out from the screen instead of attaching the document (a sighted or below answer where the upload was offered still needs the refusal record, or the write is refused) (e.g. ["home.mortgage_balance"]). A decline of a path you offered last turn is a refusal THIS turn: record it in the same [CAPTURE] block as the below-floor figure, or the write boundary will refuse the write. This is the record that the path was offered and declined; the write boundary REFUSES a document-backed figure committed below its confidence floor without one. Never include a field you did not offer the path for, and never treat a refusal as permission to stop offering the upload later if the document surfaces. Field ids: domain.field, nested as domain.parent.field, array items as domain.list[].field.
 - If a turn captured nothing (a clarifying question, a boundary deflection), emit {"domains":{},"goals":{},"completed_domains":[<current cumulative list>],"session_complete":false}.
 - The block records only; it never justifies loosening any boundary above.
 
@@ -344,11 +346,13 @@ const V2_ENUMS = {
   debt_purpose: ["owner_occupied", "investment_property", "commercial_property", "investment_shares", "business_operating", "vehicle", "personal", "education", "tax", "mixed", "unknown"],
   debt_borrower: ["personal", "joint", "company", "trust", "smsf", "partnership", "unknown"],
   debt_security: ["property_home", "property_investment", "property_commercial", "vehicle", "business_assets", "unsecured", "other"],
-  // Three-state per Devon's ruling: document (read from a provided
-  // payslip/statement/portal/schedule), stated (they knew it and said it),
-  // estimated (no document exists or it couldn't be reached). "inferred"
-  // remains solely for flags.hardship, which is written from Finn's read.
-  confidence: ["document", "stated", "estimated", "inferred"],
+  // Five-state ladder (Devon, Sept 2026), ranked document > sighted >
+  // stated > estimated > inferred. document means Finn read the artefact;
+  // sighted means the person was on the source and read it off; stated
+  // means they knew it and said it from memory; estimated means no
+  // document exists or it couldn't be reached. "inferred" remains solely
+  // for flags.hardship, which is written from Finn's read.
+  confidence: ["document", "sighted", "stated", "estimated", "inferred"],
   // component-spec 5.1: a holiday house is neither the home they live in
   // nor an investment, and needs somewhere to go.
   property_use: ["investment", "holiday", "other"],
@@ -364,21 +368,25 @@ const COVER = { held: BOOL, amount: MONEY, inside_super: BOOL };
 const ESTATE_DOC = { in_place: "docstate", last_updated: STR };
 
 const V2_SCHEMA = {
-  context: { adults: INT, children: { array: { age: INT } }, owner_age: INT, partner_age: INT, work_intent: { enum: "work_intent" }, horizon_years: INT },
+  // Every array item carries `id`: generated by CODE at first write
+  // (lib/finn-merge.js), echoed by the model when correcting an existing
+  // item. Never positional, never derived from capture order, never
+  // reused after deletion.
+  context: { adults: INT, children: { array: { id: STR, age: INT } }, owner_age: INT, partner_age: INT, work_intent: { enum: "work_intent" }, horizon_years: INT },
   // Legacy business_income_annual / rental_income_annual scalars are gone
   // from the schema (field-spec Part 2 fold): every non-salary source is a
   // typed income.other[] entry. Stored scalars migrate via
   // migrateIncomeShape — to income._unmapped and flags.income_unreconciled,
   // never silently dropped from a total.
-  income: { salary_gross_annual: MONEY, salary_net_monthly: MONEY, partner_salary_gross_annual: MONEY, partner_salary_net_monthly: MONEY, other: { array: { source: { enum: "other_income_source" }, linked_asset_id: STR, entity: { enum: "income_entity" }, amount_annual: MONEY, basis: { enum: "income_basis" } } }, structure: { enum: "structure" }, entity: { object: { type: STR, name: STR } }, employer_super_on: { array: STR } },
+  income: { salary_gross_annual: MONEY, salary_net_monthly: MONEY, partner_salary_gross_annual: MONEY, partner_salary_net_monthly: MONEY, other: { array: { id: STR, source: { enum: "other_income_source" }, linked_asset_id: STR, entity: { enum: "income_entity" }, amount_annual: MONEY, basis: { enum: "income_basis" } } }, structure: { enum: "structure" }, entity: { object: { type: STR, name: STR } }, employer_super_on: { array: STR } },
   expenses: { living_monthly: MONEY, includes_housing: BOOL, housing_repayment_monthly: MONEY },
   home: { owns_home: BOOL, value_estimate: MONEY, value_source: STR, mortgage_balance: MONEY, rate_percent: RATE, rate_type: STR, lender: STR, with_lender_since: STR, repayment_monthly: MONEY, term_remaining_years: INT, has_offset: BOOL, offset_balance: MONEY, package_fee_annual: MONEY },
   buffer: { accessible_savings: MONEY, where_held: STR, linked_to_loan: BOOL, counts_credit_as_buffer: BOOL, other_cash: MONEY, other_cash_where_held: STR },
-  super: { funds: { array: { fund: STR, owner: STR, balance: MONEY, has_insurance: BOOL } }, multiple_accounts: BOOL, extra_contributions: BOOL },
+  super: { funds: { array: { id: STR, fund: STR, owner: STR, balance: MONEY, has_insurance: BOOL } }, multiple_accounts: BOOL, extra_contributions: BOOL },
   protection: { life: { object: COVER }, tpd: { object: COVER }, income_protection: { object: COVER }, trauma: { object: COVER } },
   estate: { will: { object: ESTATE_DOC }, poa: { object: ESTATE_DOC }, guardianship: { object: ESTATE_DOC }, super_nomination: { object: { ...ESTATE_DOC, binding: BOOL } } },
-  investments: { shares_value: MONEY, held_in: STR, managed_funds_value: MONEY, properties: { array: { value_estimate: MONEY, loan_balance: MONEY, rate_percent: RATE, repayment_type: STR, rent_monthly: MONEY, held_in: STR, use: { enum: "property_use" } } } },
-  debts: { items: { array: { type: { enum: "debt_type" }, purpose: { enum: "debt_purpose" }, borrower: { enum: "debt_borrower" }, security: { enum: "debt_security" }, is_split: BOOL, parent_loan_id: STR, balance: MONEY, rate_percent: RATE, minimum_monthly: MONEY } }, hecs_balance: MONEY },
+  investments: { shares_value: MONEY, held_in: STR, managed_funds_value: MONEY, properties: { array: { id: STR, value_estimate: MONEY, loan_balance: MONEY, rate_percent: RATE, repayment_type: STR, rent_monthly: MONEY, held_in: STR, use: { enum: "property_use" } } } },
+  debts: { items: { array: { id: STR, type: { enum: "debt_type" }, purpose: { enum: "debt_purpose" }, borrower: { enum: "debt_borrower" }, security: { enum: "debt_security" }, is_split: BOOL, parent_loan_id: STR, balance: MONEY, rate_percent: RATE, minimum_monthly: MONEY } }, hecs_balance: MONEY },
   flags: { hardship: BOOL, hardship_signal: STR, income_unreconciled: { array: STR } },
 };
 
@@ -1006,12 +1014,24 @@ async function applyCapture(householdId, picture, capture, logId, sessionId) {
     baseDomains = translateLegacyDomains(baseDomains);
   }
   baseDomains = migrateIncomeShape(baseDomains);
+  // Stable ids: existing rows get ids at migration (first write after this
+  // lands), then positional prop-N links carry across only where the
+  // mapping is unambiguous — anywhere else they clear, never a guessed
+  // remap, and the reconciliation pass surfaces the open producer.
+  baseDomains = migratePositionalLinks(assignAssetIds(baseDomains));
   let patch = capture.domains ?? {};
   if (Object.keys(patch).length && !isV2Domains(patch)) {
     patch = translateLegacyDomains(patch);
   }
   patch = migrateIncomeShape(patch);
-  const merged = deepMerge(baseDomains, patch);
+  // Arrays merge BY ID: a patch item echoing an existing id updates that
+  // item; an id-less item appends and is assigned its id below; items the
+  // patch does not mention are retained.
+  let merged = mergeDomainsById(baseDomains, patch);
+  // Code resolutions after the gate sees the model's own writes: new items
+  // get their ids, and security resolves to unsecured for the four
+  // products that cannot carry security (deterministic, no trip).
+  merged = resolveSecurity(assignAssetIds(merged));
 
   /* ── THE PERSISTENCE GATE (capture-conduct step 2, corrections 1-2) ──
      Runs in the request path, after the write-ahead raw insert and before

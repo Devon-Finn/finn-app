@@ -37,7 +37,7 @@ export const RETRIEVAL_PATHS = {
     where: "The quickest honest read is your lender's app or website, which usually shows their current estimate of the property, or your most recent council rates notice.",
     look_for: "Look for the estimated value or valuation figure. If it shows a range, keep the range, both ends matter.",
     honest: "A rates notice and most portal estimates lag the market, so the figure is a considered estimate rather than a sale price, and that is exactly how I will record it.",
-    offer: "Read the figure to me exactly as it appears, and tell me where it came from.",
+    offer: "Attach a photo or screenshot of the estimate or notice here and I will read it, or read the figure to me exactly as it appears and tell me where it came from.",
     witness: "your most recent council rates notice",
     satisfies: ["home.value_estimate", "home.value_source", "investments.properties[].value_estimate"],
   },
@@ -46,7 +46,7 @@ export const RETRIEVAL_PATHS = {
     where: "Open your banking app or internet banking and go to the loan account itself.",
     look_for: "One screen usually carries everything we need together: the balance owing, the interest rate, whether it is fixed or variable and any fixed expiry, the repayment amount and how often, the remaining term, whether an offset account is attached and what is sitting in it, and the minimum repayment. If a package fee applies it usually shows on the loan summary or the latest statement.",
     honest: "If a figure is not on the screen, say so and we will leave it open rather than filling it in.",
-    offer: "Read them to me one by one, exactly as they appear.",
+    offer: "Attach a screenshot or PDF of that screen here and I will read it, or read them to me one by one, exactly as they appear.",
     witness: "go to the loan account itself",
     satisfies: [
       "home.mortgage_balance", "home.rate_percent", "home.rate_type", "home.lender",
@@ -56,6 +56,7 @@ export const RETRIEVAL_PATHS = {
       "investments.properties[].loan_balance", "investments.properties[].rate_percent",
       "investments.properties[].repayment_type",
       "debts.items[].balance", "debts.items[].rate_percent", "debts.items[].minimum_monthly",
+      "debts.items[].security",
     ],
   },
   investment_platform: {
@@ -63,7 +64,7 @@ export const RETRIEVAL_PATHS = {
     where: "Log in to the platform or broker where the holdings sit, CommSec, Vanguard, Raiz, Stake, Selfwealth, whichever you use, and open the portfolio or holdings screen.",
     look_for: "Look for the total holdings value. For what the holdings paid you, the year's dividends or distributions usually sit under statements, reports or the annual tax statement.",
     honest: "Balances move day to day and that is fine, today's figure is the one we want. Payment-by-payment income adds up awkwardly, so the annual tax statement's total is the honest year figure.",
-    offer: "Read the figures to me exactly as they appear.",
+    offer: "Attach a screenshot of the portfolio screen or the statement here, or read the figures to me exactly as they appear.",
     witness: "open the portfolio or holdings screen",
     satisfies: ["investments.shares_value", "investments.managed_funds_value", "income.other[].amount_annual"],
   },
@@ -72,7 +73,7 @@ export const RETRIEVAL_PATHS = {
     where: "Have your most recent payslip in front of you, from your employer's payroll portal or wherever it lands in your email.",
     look_for: "Look for the gross pay and the net pay for the period, and the super section, which shows the employer contribution and any extra going in through salary sacrifice.",
     honest: "If pay varies period to period, say so, and we will use the figure that is actually typical rather than the best fortnight.",
-    offer: "Read the figures to me exactly as they appear.",
+    offer: "Attach the payslip here, a PDF or a photo both work, or read the figures to me exactly as they appear.",
     witness: "your most recent payslip in front of you",
     satisfies: [
       "income.salary_gross_annual", "income.salary_net_monthly",
@@ -85,7 +86,7 @@ export const RETRIEVAL_PATHS = {
     where: "Log in to your super fund's app or member portal, or have the latest annual statement in front of you. myGov also lists every account under the ATO section if you think there might be more than one.",
     look_for: "Look for the fund name, the current balance, whether insurance sits inside the account, and the beneficiary nomination: whether one is in place, whether it is binding or non-binding, and when it was made.",
     honest: "An annual statement's balance is at the statement date, not today. The portal shows the current figure.",
-    offer: "Read them to me exactly as they appear, one account at a time.",
+    offer: "Attach the statement or a screenshot of the portal here, or read them to me exactly as they appear, one account at a time.",
     witness: "app or member portal, or have the latest annual statement",
     satisfies: [
       "super.funds[].fund", "super.funds[].balance", "super.funds[].has_insurance",
@@ -98,7 +99,7 @@ export const RETRIEVAL_PATHS = {
     where: "The policy schedule is the page that lists each cover and its amount, from the insurer's portal or the document you were sent when the cover started. Where cover sits inside super, the fund's insurance page shows the same thing.",
     look_for: "Look for each cover type by name, life, TPD, income protection, trauma, the amount it would pay, and whether it is held inside super.",
     honest: "Cover through work or inside super is still cover, it just lives in a different place, and where it lives changes what happens to it if you change jobs or funds. That is why I ask where each one sits.",
-    offer: "Read each cover and amount to me exactly as it appears.",
+    offer: "Attach the schedule here, or read each cover and amount to me exactly as it appears.",
     witness: "the page that lists each cover and its amount",
     satisfies: [
       "protection.life.amount", "protection.life.inside_super",
@@ -112,7 +113,7 @@ export const RETRIEVAL_PATHS = {
     where: "Have the lease in front of you, or the most recent statement from the managing agent.",
     look_for: "Look for the rent amount and how often it is charged. On an agent statement, look for the gross rent and the costs taken out as separate figures.",
     honest: "I record the gross rent and the costs separately, both as you give them, never netted together into one number.",
-    offer: "Read the figures to me exactly as they appear.",
+    offer: "Attach the statement or lease here, or read the figures to me exactly as they appear.",
     witness: "the most recent statement from the managing agent",
     satisfies: ["income.other[].amount_annual", "investments.properties[].rent_monthly"],
   },
@@ -121,7 +122,7 @@ export const RETRIEVAL_PATHS = {
     where: "Have the most recent tax return in front of you, or the accountant's year-end figures.",
     look_for: "Look for the business profit, any distributions from a trust, and any director fees, each as its own line rather than one combined figure.",
     honest: "Last year's figures are last year's. If this year looks different, say so and we will record the figure with that context.",
-    offer: "Read each line to me exactly as it appears.",
+    offer: "Attach the relevant pages here, or read each line to me exactly as it appears.",
     witness: "the most recent tax return in front of you",
     satisfies: ["income.other[].amount_annual"],
   },
@@ -130,7 +131,7 @@ export const RETRIEVAL_PATHS = {
     where: "Open your banking app and go to each account where savings or spare cash sits.",
     look_for: "Look for the current balance of each account, and note whether any of them is an offset or is linked against a loan.",
     honest: "If money sits across several accounts, each one counts. A figure from memory is usually the balance from a while ago.",
-    offer: "Read me the balance of each account exactly as it appears.",
+    offer: "Attach a screenshot of the accounts here, or read me the balance of each account exactly as it appears.",
     witness: "each account where savings or spare cash sits",
     satisfies: ["buffer.accessible_savings", "buffer.other_cash"],
   },
@@ -148,7 +149,7 @@ export const RETRIEVAL_PATHS = {
     where: "Log in to myGov and open the ATO section, then look for loan accounts.",
     look_for: "Look for the HELP or HECS account and its current balance.",
     honest: "The balance updates after each year's indexation and any repayments through tax, so the myGov figure is the current one.",
-    offer: "Read the balance to me exactly as it appears.",
+    offer: "Attach a screenshot of that page here, or read the balance to me exactly as it appears.",
     witness: "open the ATO section, then look for loan accounts",
     satisfies: ["debts.hecs_balance"],
   },
@@ -173,6 +174,7 @@ export function retrievalPromptSection() {
   return "\n\n═══ RETRIEVAL PATHS (templated asks — delivered VERBATIM) ═══\n\n" +
     "You decide WHAT to ask about next; these decide HOW the ask for a document-backed figure is worded. When you ask for any figure below, deliver the matching ask text word for word. You may add warmth around it (before or after, in your own voice), but the ask text itself is delivered exactly as written: never reworded, never shortened, never composed fresh. Never offer to skip, defer or come back later as part of the ask; if the person declines, record the refusal in the [CAPTURE] block and move on without suggesting deferral yourself.\n" +
     "One visit covers everything its screen shows: when you send someone to a screen, take every figure it carries in that same visit rather than sending them back later.\n" +
+    "Confidence after the visit: a file they attach and you read is \"document\". Figures they read off their screen and type to you are \"sighted\", never \"document\". Figures from memory stay \"stated\".\n" +
     "Interfaces drift: where the person's screen disagrees with these steps, trust their screen and guide by concept.\n\n" +
     entries;
 }
