@@ -32,6 +32,12 @@
   path = "/api/import-transactions"
   function = "import-transactions"
 
+# Conduct linter reports (capture-conduct step 6). Same JWT gate; reads
+# and runs the per-session conduct report for the member's household.
+[[edge_functions]]
+  path = "/api/conduct-report"
+  function = "conduct-report"
+
 [[headers]]
   for = "/*"
   [headers.values]

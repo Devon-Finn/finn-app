@@ -1,7 +1,13 @@
 import { bankExportsPromptSection } from "./lib/finn-bank-exports.js";
-import { retrievalPromptSection, servedFieldIds } from "./lib/finn-retrieval-paths.js";
+import { RETRIEVAL_PATHS, retrievalPromptSection, substituteAskTokens, assertRequiredServable } from "./lib/finn-retrieval-paths.js";
 import { assignAssetIds, mergeDomainsById, migratePositionalLinks, resolveSecurity } from "./lib/finn-merge.js";
-import { FIELD_REGISTRY, persistenceGate } from "./lib/finn-field-registry.js";
+import { FIELD_REGISTRY, persistenceGate, CONFIDENCE_RANK, PRODUCERS } from "./lib/finn-field-registry.js";
+import { runConductLinter } from "./lib/finn-conduct-linter.js";
+
+// Startup invariant (Devon, Sept 2026): required implies a servable path.
+// A required field whose path is missing or unresolvable is a data bug
+// that must not ship — this throws at module load, failing loudly.
+assertRequiredServable(FIELD_REGISTRY, RETRIEVAL_PATHS);
 
 // Clarity-chat edge function — the paid Clarity Session conversation (3a).
 //
@@ -235,8 +241,8 @@ Remember: you gather, you reflect, you clarify, you educate, you prepare them. Y
 
 **Warm start and resume:** the session context below includes the household's snapshot answers (from their free snapshot) and everything captured so far. Never re-ask what these already tell you; build on it naturally. When the conversation opens with the marker "[Session start]" (a system marker, not written by the person): if nothing is captured yet, greet them warmly and begin; if areas are already captured, welcome them back, briefly reflect what's already built, and pick up where it left off.
 
-**CAPTURE PROTOCOL (machine block — required on every reply):**
-End EVERY reply with a line containing exactly [CAPTURE] followed by one single-line JSON object. Nothing after the JSON. The person never sees this block, never mention it, never explain it, never format it as code.
+**CAPTURE PROTOCOL (machine block — MANDATORY on every reply, no exceptions):**
+End EVERY reply with a line containing exactly [CAPTURE] followed by one single-line JSON object. Nothing after the JSON. The person never sees this block, never mention it, never explain it, never format it as code. On a turn with nothing to capture, emit [CAPTURE]{} — the block is mandatory even then, so its absence is always a fault and never ambiguous. This includes short conversational turns, clarifying questions and quick follow-ups: a turn where the person stated facts (who is in the household, how they work, any figure) and your reply carries no capture block loses those facts, which is never acceptable.
 
 JSON shape:
 {"domains":{...},"goals":{...},"completed_domains":[...],"session_complete":false}
@@ -263,7 +269,7 @@ Rules for the block:
 - "completed_domains": the full cumulative list of AREA labels now covered or deliberately skipped, including "goals" when goals have been drawn out. Area labels are unchanged: income, assets, liabilities, buffer, protection, estate, super, goals — where "income" includes the household context and expenses, "assets" covers home and investments, and "liabilities" covers debts. A skipped area still counts as completed for progress.
 - "session_complete": true only when all eight areas are covered or consciously skipped and you have wrapped up warmly. Otherwise false.
 - "refusals": an array of field ids, included ONLY when the retrieval path for a document-backed field was offered in this conversation (this turn or an earlier one) and the person has now declined it, given the figure from memory anyway, or read the figures out from the screen instead of attaching the document (a sighted or below answer where the upload was offered still needs the refusal record, or the write is refused) (e.g. ["home.mortgage_balance"]). A decline of a path you offered last turn is a refusal THIS turn: record it in the same [CAPTURE] block as the below-floor figure, or the write boundary will refuse the write. This is the record that the path was offered and declined; the write boundary REFUSES a document-backed figure committed below its confidence floor without one. Never include a field you did not offer the path for, and never treat a refusal as permission to stop offering the upload later if the document surfaces. Field ids: domain.field, nested as domain.parent.field, array items as domain.list[].field.
-- If a turn captured nothing (a clarifying question, a boundary deflection), emit {"domains":{},"goals":{},"completed_domains":[<current cumulative list>],"session_complete":false}.
+- If a turn captured nothing (a clarifying question, a boundary deflection), emit [CAPTURE]{} — the empty block. Areas already recorded are kept automatically.
 - The block records only; it never justifies loosening any boundary above.
 
 **TRANSACTION SUMMARY PROTOCOL (machine blocks — the person never sees these):**
@@ -782,13 +788,30 @@ function emDashScrubStream(onDone) {
   let lineBuf = "";
   let seenText = ""; // cumulative model text, to locate the [CAPTURE] boundary
   let substitutions = 0;
+  let asksServed = 0;
   // Trailing whitespace of each visible delta is held back and prepended to
   // the next one, so a dash whose leading space arrived in the previous
-  // chunk still scrubs to "word, next" rather than "word , next".
+  // chunk still scrubs to "word, next" rather than "word , next". The same
+  // hold carries a partial [ASK: token split across deltas, so the token
+  // substitutes as one.
   let heldWs = "";
 
   function scrub(s) {
     return s.replace(/\s*—\s*/g, () => { substitutions++; return ", "; });
+  }
+
+  // CODE EMITS THE ASKS (Devon, Sept 2026): [ASK: path_id] tokens in the
+  // visible stream are replaced with the exact ask text from the path
+  // file. An unrecognised id is a fault, logged, and emits nothing. The
+  // path_served rows are written from the same tokens in the raw text by
+  // the apply chain, so substitution and witnessing can never disagree.
+  function subAsks(s) {
+    const { text, served, unknown } = substituteAskTokens(s);
+    for (const id of unknown) {
+      console.error(`[Finn clarity] ASK FAULT — trigger token with unrecognised path id "${id}" emitted nothing`);
+    }
+    if (served.length) asksServed++;
+    return text;
   }
 
   // Machine text starts at the earliest of [CAPTURE] or [RESOLVE] — the
@@ -803,17 +826,29 @@ function emDashScrubStream(onDone) {
     const markerIx = machineIx(full);
     let out;
     if (markerIx === -1) {
-      out = scrub(heldWs + text);
+      out = subAsks(scrub(heldWs + text));
       heldWs = "";
+      // Hold back a trailing partial [ASK: token (bounded, and only text
+      // that can still grow into one) so a token split across deltas
+      // substitutes as a whole. "[C"/"[R" prefixes never match, so the
+      // machine markers are unaffected.
+      const bi = out.lastIndexOf("[");
+      if (bi !== -1) {
+        const tokTail = out.slice(bi);
+        if (!tokTail.includes("]") && tokTail.length < 40 && /^\[(?:A(?:S(?:K(?::\s?[a-z_]*)?)?)?)?$/.test(tokTail)) {
+          heldWs = tokTail;
+          out = out.slice(0, bi);
+        }
+      }
       const tail = out.match(/\s+$/);
-      if (tail) { heldWs = tail[0]; out = out.slice(0, out.length - tail[0].length); }
+      if (tail) { heldWs = tail[0] + heldWs; out = out.slice(0, out.length - tail[0].length); }
     } else {
       const boundary = markerIx - seenText.length;
       if (boundary <= 0) {
         out = heldWs + text;
         heldWs = "";
       } else {
-        out = scrub(heldWs + text.slice(0, boundary)) + text.slice(boundary);
+        out = subAsks(scrub(heldWs + text.slice(0, boundary))) + text.slice(boundary);
         heldWs = "";
       }
     }
@@ -863,6 +898,9 @@ function emDashScrubStream(onDone) {
       if (lineBuf) controller.enqueue(encoder.encode(lineBuf));
       if (substitutions > 0) {
         console.log(`[Finn clarity] em-dash substitutions in visible reply: ${substitutions}`);
+      }
+      if (asksServed > 0) {
+        console.log(`[Finn clarity] ask tokens substituted in visible reply: ${asksServed}`);
       }
       logSofteners();
       // WRITE-AHEAD: awaited here, in the request path, so the stream does
@@ -939,6 +977,56 @@ async function insertCaptureLog(householdId, rawText, capture, status, sessionId
   return rows && rows[0] ? rows[0].id : null;
 }
 
+/* ── targeted capture re-extraction (Devon, Sept 2026) ──
+   The capture block is mandatory; absence is a fault. This runs ONE
+   re-extraction pass over the single faulting turn: the same capture
+   protocol, the person's last message and the visible reply, output
+   restricted to the [CAPTURE] line. The result flows through the normal
+   gate like any capture. Returns the parsed capture or null. */
+async function reExtractCapture(apiKey, messages, visibleReply) {
+  const protoStart = CLARITY_SYSTEM_PROMPT.indexOf("**CAPTURE PROTOCOL");
+  const protoEnd = CLARITY_SYSTEM_PROMPT.indexOf("**TRANSACTION SUMMARY PROTOCOL");
+  const protocol = (protoStart !== -1 && protoEnd > protoStart)
+    ? CLARITY_SYSTEM_PROMPT.slice(protoStart, protoEnd) : "";
+  const lastUser = [...messages].reverse().find(m => m.role === "user");
+  const personText = typeof lastUser?.content === "string"
+    ? lastUser.content
+    : Array.isArray(lastUser?.content)
+      ? lastUser.content.filter(b => b && b.type === "text").map(b => b.text).join("\n")
+      : "";
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01",
+        "x-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 900,
+        system: "You are the capture extractor for Finn's Clarity Session. A reply was produced without its mandatory capture block. Read the single conversation turn below and emit the capture block that reply SHOULD have ended with, following the protocol exactly. Output ONLY the [CAPTURE] line, nothing before or after it. Facts come only from what the person actually said this turn; nothing invented, and [CAPTURE]{} if the turn genuinely captured nothing.\n\n" + protocol,
+        messages: [{
+          role: "user",
+          content: "The person said:\n" + personText.slice(0, 4000) +
+            "\n\nFinn's visible reply was:\n" + String(visibleReply || "").slice(0, 4000) +
+            "\n\nEmit the [CAPTURE] line for this turn.",
+        }],
+      }),
+    });
+    if (!res.ok) {
+      console.error(`[Finn clarity] re-extraction call failed — ${res.status}`);
+      return null;
+    }
+    const data = await res.json();
+    const text = Array.isArray(data?.content) ? data.content.filter(b => b.type === "text").map(b => b.text).join("") : "";
+    return parseCapture(text);
+  } catch (err) {
+    console.error("[Finn clarity] re-extraction threw:", err);
+    return null;
+  }
+}
+
 /* ── code-witnessed path serving (capture-conduct steps 3-4) ──
    One path_served row per field the served path satisfies, in THIS
    session. These rows are what makes a refusal valid: the gate accepts a
@@ -968,6 +1056,37 @@ async function markCaptureLog(logId, status, extra) {
     body: JSON.stringify({ status, resolved_at: new Date().toISOString(), ...(extra || {}) }),
   });
   if (!res.ok) console.error(`[Finn clarity] capture_log mark ${status} failed — ${res.status}`);
+}
+
+/* ── the conduct linter runner (capture-conduct step 6) ──
+   Fetches the session's capture_log rows and the household's current
+   picture, runs the pure linter, and stores the per-session report. */
+async function runAndStoreConductReport(householdId, sessionId) {
+  const rowsRes = await sbFetch(
+    `/rest/v1/capture_log?household_id=eq.${householdId}&session_id=eq.${sessionId}` +
+    `&select=status,raw_text,capture,errors,field_id,created_at&order=created_at.asc`);
+  const rows = rowsRes.ok ? await rowsRes.json() : [];
+  const picRes = await sbFetch(`/rest/v1/picture?household_id=eq.${householdId}&select=domains,refusals`);
+  const pics = picRes.ok ? await picRes.json() : [];
+  const picture = pics[0] || { domains: {}, refusals: [] };
+  const report = runConductLinter({
+    rows, picture,
+    registry: FIELD_REGISTRY,
+    paths: RETRIEVAL_PATHS,
+    confidenceRank: CONFIDENCE_RANK,
+    producers: PRODUCERS,
+  });
+  const ins = await sbFetch(`/rest/v1/conduct_report`, {
+    method: "POST",
+    headers: { "Prefer": "return=minimal" },
+    body: JSON.stringify({ household_id: householdId, session_id: sessionId, report }),
+  });
+  if (!ins.ok) {
+    console.error(`[Finn clarity] conduct report store failed — ${ins.status}: ${await ins.text()}`);
+  } else {
+    console.log(`[Finn clarity] conduct report stored for session ${sessionId}: ${report.summary.verdict}`);
+  }
+  return report;
 }
 
 // Member-readable status carries a boolean and a timestamp ONLY — error
@@ -1287,7 +1406,10 @@ export default async function handler(request, context) {
     const idx = fullText.indexOf("[CAPTURE]");
     if (idx === -1) { resolveWriteAhead({ logId: null, capture: null, hasMarker: false }); return; }
     const capture = parseCapture(fullText);
-    const logId = await insertCaptureLog(auth.householdId, fullText.slice(idx), capture, "received", sessionId);
+    // The FULL raw reply is stored (visible text + machine block): the
+    // conduct linter reads the visible stream from capture_log, and the
+    // capture parser finds its block by marker either way.
+    const logId = await insertCaptureLog(auth.householdId, fullText, capture, "received", sessionId);
     resolveWriteAhead({ logId, capture, hasMarker: true });
   }));
 
@@ -1299,27 +1421,53 @@ export default async function handler(request, context) {
       writeAhead,
       new Promise(resolve => setTimeout(() => resolve(null), 2000)),
     ]);
-    // Code-witnessed path serving: scan the VISIBLE part of the reply for
-    // the templated asks' witness fragments and record path_served rows.
-    // This runs before the no-capture early return so a serve on a
-    // protocol-violating reply is still witnessed.
+    // Code-authored path serving: the raw reply carries [ASK: path_id]
+    // trigger tokens (the client saw the substituted ask text). The same
+    // regex that substituted them derives the served fields here, so
+    // substitution and witnessing can never disagree. Runs before the
+    // no-capture handling so a serve on a protocol-violating reply is
+    // still recorded.
     const cuts = [fullText.indexOf("[CAPTURE]"), fullText.indexOf("[RESOLVE]")].filter(i => i !== -1);
     const visibleEnd = cuts.length ? Math.min(...cuts) : fullText.length;
-    const served = servedFieldIds(fullText.slice(0, visibleEnd));
-    if (served.length) {
-      await insertPathServed(auth.householdId, sessionId, served);
+    const visibleRaw = fullText.slice(0, visibleEnd);
+    const askResult = substituteAskTokens(visibleRaw);
+    for (const id of askResult.unknown) {
+      console.error(`[Finn clarity] ASK FAULT — trigger token with unrecognised path id "${id}" served nothing`);
     }
-    const idx = fullText.indexOf("[CAPTURE]");
+    if (askResult.served.length) {
+      await insertPathServed(auth.householdId, sessionId, askResult.served);
+    }
+    let idx = fullText.indexOf("[CAPTURE]");
+    let reExtracted = false;
+    let capture = null;
     if (idx === -1) {
-      console.error("[Finn clarity] no capture block in reply — nothing saved this turn");
-      return;
+      // THE CAPTURE BLOCK IS MANDATORY (Devon, Sept 2026): absence is
+      // always a fault. One targeted re-extraction pass runs over this
+      // single turn and the result goes through the normal gate — the
+      // person's stated facts must not be left in the transcript only.
+      console.error("[Finn clarity] CAPTURE ABSENT — reply carried no capture block; running one targeted re-extraction over this turn");
+      capture = await reExtractCapture(apiKey, messages, visibleRaw);
+      if (!capture) {
+        console.error("[Finn clarity] CAPTURE ABSENT — re-extraction produced no usable block; facts from this turn are not captured");
+        await insertCaptureLog(auth.householdId, "[CAPTURE ABSENT — re-extraction FAILED]\n" + fullText, null, "failed", sessionId);
+        await setWriteStatusFalse(auth.householdId);
+        return;
+      }
+      console.error("[Finn clarity] CAPTURE ABSENT — re-extraction recovered a block; applying through the normal gate");
+      reExtracted = true;
     }
     let logId = flushRes ? flushRes.logId : null;
-    let capture = flushRes && flushRes.hasMarker ? flushRes.capture : parseCapture(fullText);
+    if (!reExtracted) {
+      capture = flushRes && flushRes.hasMarker ? flushRes.capture : parseCapture(fullText);
+    }
     if (!logId) {
-      // Client disconnected before flush, or the write-ahead insert failed:
-      // land the raw row now, before any apply step can fail.
-      logId = await insertCaptureLog(auth.householdId, fullText.slice(idx), capture, "received", sessionId);
+      // Client disconnected before flush, the write-ahead insert failed,
+      // or the block came from re-extraction: land the raw row now,
+      // before any apply step can fail. The re-extracted case is tagged
+      // in raw_text so the conduct linter can count absences.
+      logId = await insertCaptureLog(auth.householdId,
+        (reExtracted ? "[REEXTRACTED after absent capture block]\n" : "") + fullText,
+        capture, "received", sessionId);
     }
     if (!capture) {
       console.error("[Finn clarity] REFUSED — capture block did not parse; raw preserved in capture_log");
@@ -1333,6 +1481,15 @@ export default async function handler(request, context) {
       console.error("[Finn clarity] FAILED — capture apply threw; raw preserved in capture_log:", err);
       await markCaptureLog(logId, "failed", { errors: [String((err && err.message) || err)] });
       await setWriteStatusFalse(auth.householdId);
+    }
+    // Conduct linter (capture-conduct step 6): runs automatically at the
+    // end of every session and stores a per-session report.
+    if (capture && capture.session_complete === true && sessionId) {
+      try {
+        await runAndStoreConductReport(auth.householdId, sessionId);
+      } catch (err) {
+        console.error("[Finn clarity] conduct linter run failed:", err);
+      }
     }
   })());
 

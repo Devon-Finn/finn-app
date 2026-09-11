@@ -166,7 +166,9 @@ export const FIELD_REGISTRY = {
   "debts.items[].borrower": { label: "whose name the borrowing is in", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true },
   /* security is required, served on the item's own loan path — except the
      four products that cannot carry security, which resolve to unsecured
-     without any trip (code fills them in applyCapture). */
+     without any trip (code fills them in applyCapture), and family_loan,
+     which has no institution screen: under the required-implies-servable-
+     path invariant it is retrieval none, floor stated. */
   "debts.items[].security": { label: "what it's secured against", accepts_upload: true, confidence_floor: "document", softeners: "forbidden", no_default: true, type_key: "type",
     retrieval_by_type: {
       credit_card: { retrieval: "none", confidence_floor: "stated" },
@@ -182,7 +184,7 @@ export const FIELD_REGISTRY = {
       equipment_finance:        { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
       car_loan:                 { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
       personal_loan:            { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
-      family_loan:              { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
+      family_loan:              { retrieval: "none", confidence_floor: "stated" },
       other:                    { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
     } },
   "debts.items[].is_split": { label: "whether it's a split of a larger loan", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },

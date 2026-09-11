@@ -56,6 +56,10 @@ expenses.discretionary_monthly:
 
 **Sighted.** The confidence ladder is `document > sighted > stated > estimated > inferred`. `document` means Finn read the artefact. `sighted` means the person was on the source and read it off. A sighted value satisfies a document floor only while no working upload path exists for that field; the capability flag lives in code, not the registry. Where upload does work, the path text offers the upload and a typed answer from the screen is recorded as sighted, not document.
 
+**Required implies a servable path.** Asserted as a startup check: any registry entry marked `required` with no resolvable path in the path file fails loudly. A required field that cannot be served is a data bug that must not ship.
+
+**The capture block is mandatory.** The model emits `[CAPTURE]{}` on any turn with nothing to capture, so absence is always a fault and never ambiguous. On absence, code runs one targeted re-extraction pass over that single turn and applies the result through the normal gate. Both the absence and the outcome of the re-extraction are logged. The person's stated facts must not be left in the transcript only.
+
 That single rule kills the entire class. A home value, a loan balance, an ETF balance can never again be silently guessed. If it happens, the write throws and it appears in a log, rather than appearing in a walk three weeks later.
 
 **`softeners: forbidden`** stops being a detector that reports after the fact and becomes a property of a templated ask. The ask is assembled from the registry, so it cannot contain "roughly". There is nothing to detect because there is nothing to compose.
@@ -68,7 +72,7 @@ One file, keyed by path id, the same shape as the existing bank-export file. Ins
 
 Each path carries: where the document lives, what it is called in plain words, what to look for on it, what to be honest about (a rates notice lags the market), and the screenshot offer.
 
-**The model is handed the path text. It never composes it.** Adding a bank, a broker or a valuation source is a data change reviewed once, not a prompt change hoped for every session.
+**Code emits the asks, not the model.** The model emits a trigger token `[ASK: <path_id>]`. Code intercepts it in the stream and substitutes the exact path text from the path file, and writes the path_served rows for every field that path satisfies at the moment of substitution. Code is the author, so witnessing is deterministic. An unrecognised path id in a trigger token is a fault, logged, and emits nothing. The model needs the path ids and what each is for, not the copy. Adding a bank, a broker or a valuation source is a data change reviewed once, not a prompt change hoped for every session.
 
 **One visit, not three.** A path declares every field it can satisfy. Sending someone to their banking app retrieves balance, rate, type, fixed expiry, offset linkage, offset balance, redraw and minimum repayment together. Finn asks once and reads the screen once.
 
@@ -120,17 +124,19 @@ It checks:
 | Check | Fails when |
 |---|---|
 | Confidence floor | A retrievable field committed below floor with no refusal record |
+| Refusal validity | A refusal claimed with no code-witnessed path_served row in the session |
 | Softener | A forbidden softener appears in an ask or a confirmation |
 | Enum default | An enum written without its `requires` satisfied |
 | Reconciliation | A declared producer with no income entry and no explicit zero |
-| Path offered | A retrievable field asked without its path text present |
-| Composed ask | An ask for a registered field authored fresh instead of delivered from its template |
+| Path served | A retrievable field asked without its path text present |
 | Single visit | The same institution visited more than once in a session |
+| Stated rate per offered field | (report) how often each `offered` field rests on stated rather than a source |
+| Fields resting on sighted | (report) every field currently resting on `sighted` |
+| Composed ask | An ask for a registered field authored fresh instead of triggered by its token |
+| Capture block | A reply with no capture block |
 | Em-dash | Any em-dash in the visible stream |
 
-The linter also reports every field currently resting on `sighted`.
-
-Output is a report, not a log line. **Devon runs a walk and reads a report.** He does not find these by eye. The moment a check has a name, it stops being a discovery and becomes a regression.
+Output is a per-session report, not log lines. **Devon runs a walk and reads a report.** He does not find these by eye. The moment a check has a name, it stops being a discovery and becomes a regression.
 
 ---
 

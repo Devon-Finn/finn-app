@@ -13,14 +13,15 @@
    balance, rate, type, offset linkage, offset balance and minimum
    repayment together. Finn asks once and reads the screen once.
 
-   CODE-WITNESSED SERVING: `witness` is an exact sentence fragment that
-   appears verbatim inside the assembled ask. After each reply streams,
-   code scans the visible text for these fragments and writes a
-   path_served capture_log row per satisfied field (servedFieldIds below).
-   A refusal is only valid against a code-witnessed path_served row in the
-   same session, so if the model paraphrases instead of delivering the
-   templated ask, no serve is witnessed and the persistence gate keeps
-   blocking below-floor writes. Paraphrase fails safe.
+   CODE EMITS THE ASKS, NOT THE MODEL (Devon, Sept 2026). The model emits
+   a trigger token [ASK: <path_id>]; code intercepts it in the stream and
+   substitutes the exact ask text assembled here, and writes the
+   path_served rows for every field the path satisfies at the moment of
+   substitution. The model never sees the ask copy, only the path ids and
+   what each is for. An unrecognised path id in a trigger token is a
+   fault, logged, and emits nothing. The earlier witness fragments and
+   visible-text scanning are retired: code is the author, so witnessing
+   is deterministic.
 
    The deferral is never offered alongside the help: no template contains
    it, so there is nothing to detect. Softeners are structurally absent
@@ -38,7 +39,6 @@ export const RETRIEVAL_PATHS = {
     look_for: "Look for the estimated value or valuation figure. If it shows a range, keep the range, both ends matter.",
     honest: "A rates notice and most portal estimates lag the market, so the figure is a considered estimate rather than a sale price, and that is exactly how I will record it.",
     offer: "Attach a photo or screenshot of the estimate or notice here and I will read it, or read the figure to me exactly as it appears and tell me where it came from.",
-    witness: "your most recent council rates notice",
     satisfies: ["home.value_estimate", "home.value_source", "investments.properties[].value_estimate"],
   },
   loan_details: {
@@ -47,7 +47,6 @@ export const RETRIEVAL_PATHS = {
     look_for: "One screen usually carries everything we need together: the balance owing, the interest rate, whether it is fixed or variable and any fixed expiry, the repayment amount and how often, the remaining term, whether an offset account is attached and what is sitting in it, and the minimum repayment. If a package fee applies it usually shows on the loan summary or the latest statement.",
     honest: "If a figure is not on the screen, say so and we will leave it open rather than filling it in.",
     offer: "Attach a screenshot or PDF of that screen here and I will read it, or read them to me one by one, exactly as they appear.",
-    witness: "go to the loan account itself",
     satisfies: [
       "home.mortgage_balance", "home.rate_percent", "home.rate_type", "home.lender",
       "home.repayment_monthly", "home.term_remaining_years", "home.has_offset",
@@ -65,7 +64,6 @@ export const RETRIEVAL_PATHS = {
     look_for: "Look for the total holdings value. For what the holdings paid you, the year's dividends or distributions usually sit under statements, reports or the annual tax statement.",
     honest: "Balances move day to day and that is fine, today's figure is the one we want. Payment-by-payment income adds up awkwardly, so the annual tax statement's total is the honest year figure.",
     offer: "Attach a screenshot of the portfolio screen or the statement here, or read the figures to me exactly as they appear.",
-    witness: "open the portfolio or holdings screen",
     satisfies: ["investments.shares_value", "investments.managed_funds_value", "income.other[].amount_annual"],
   },
   payslip: {
@@ -74,7 +72,6 @@ export const RETRIEVAL_PATHS = {
     look_for: "Look for the gross pay and the net pay for the period, and the super section, which shows the employer contribution and any extra going in through salary sacrifice.",
     honest: "If pay varies period to period, say so, and we will use the figure that is actually typical rather than the best fortnight.",
     offer: "Attach the payslip here, a PDF or a photo both work, or read the figures to me exactly as they appear.",
-    witness: "your most recent payslip in front of you",
     satisfies: [
       "income.salary_gross_annual", "income.salary_net_monthly",
       "income.partner_salary_gross_annual", "income.partner_salary_net_monthly",
@@ -87,7 +84,6 @@ export const RETRIEVAL_PATHS = {
     look_for: "Look for the fund name, the current balance, whether insurance sits inside the account, and the beneficiary nomination: whether one is in place, whether it is binding or non-binding, and when it was made.",
     honest: "An annual statement's balance is at the statement date, not today. The portal shows the current figure.",
     offer: "Attach the statement or a screenshot of the portal here, or read them to me exactly as they appear, one account at a time.",
-    witness: "app or member portal, or have the latest annual statement",
     satisfies: [
       "super.funds[].fund", "super.funds[].balance", "super.funds[].has_insurance",
       "estate.super_nomination.in_place", "estate.super_nomination.binding",
@@ -100,7 +96,6 @@ export const RETRIEVAL_PATHS = {
     look_for: "Look for each cover type by name, life, TPD, income protection, trauma, the amount it would pay, and whether it is held inside super.",
     honest: "Cover through work or inside super is still cover, it just lives in a different place, and where it lives changes what happens to it if you change jobs or funds. That is why I ask where each one sits.",
     offer: "Attach the schedule here, or read each cover and amount to me exactly as it appears.",
-    witness: "the page that lists each cover and its amount",
     satisfies: [
       "protection.life.amount", "protection.life.inside_super",
       "protection.tpd.amount", "protection.tpd.inside_super",
@@ -114,7 +109,6 @@ export const RETRIEVAL_PATHS = {
     look_for: "Look for the rent amount and how often it is charged. On an agent statement, look for the gross rent and the costs taken out as separate figures.",
     honest: "I record the gross rent and the costs separately, both as you give them, never netted together into one number.",
     offer: "Attach the statement or lease here, or read the figures to me exactly as they appear.",
-    witness: "the most recent statement from the managing agent",
     satisfies: ["income.other[].amount_annual", "investments.properties[].rent_monthly"],
   },
   business_income: {
@@ -123,7 +117,6 @@ export const RETRIEVAL_PATHS = {
     look_for: "Look for the business profit, any distributions from a trust, and any director fees, each as its own line rather than one combined figure.",
     honest: "Last year's figures are last year's. If this year looks different, say so and we will record the figure with that context.",
     offer: "Attach the relevant pages here, or read each line to me exactly as it appears.",
-    witness: "the most recent tax return in front of you",
     satisfies: ["income.other[].amount_annual"],
   },
   bank_statement: {
@@ -132,7 +125,6 @@ export const RETRIEVAL_PATHS = {
     look_for: "Look for the current balance of each account, and note whether any of them is an offset or is linked against a loan.",
     honest: "If money sits across several accounts, each one counts. A figure from memory is usually the balance from a while ago.",
     offer: "Attach a screenshot of the accounts here, or read me the balance of each account exactly as it appears.",
-    witness: "each account where savings or spare cash sits",
     satisfies: ["buffer.accessible_savings", "buffer.other_cash"],
   },
   living_costs: {
@@ -141,7 +133,6 @@ export const RETRIEVAL_PATHS = {
     look_for: "Once the file lands here, code does the arithmetic across the whole year, so one-off months do not distort the figure.",
     honest: "A guessed monthly figure is usually well under the real one, which is why the export is worth the two minutes.",
     offer: "Attach the file here when you have it, and I will read it straight away.",
-    witness: "a transaction export covering the last twelve months",
     satisfies: ["expenses.living_monthly"],
   },
   hecs: {
@@ -150,7 +141,6 @@ export const RETRIEVAL_PATHS = {
     look_for: "Look for the HELP or HECS account and its current balance.",
     honest: "The balance updates after each year's indexation and any repayments through tax, so the myGov figure is the current one.",
     offer: "Attach a screenshot of that page here, or read the balance to me exactly as it appears.",
-    witness: "open the ATO section, then look for loan accounts",
     satisfies: ["debts.hecs_balance"],
   },
 };
@@ -165,32 +155,78 @@ export function askFor(pathId) {
   return [p.where, p.look_for, p.honest, p.offer].join(" ");
 }
 
-/* The prompt reference section, appended at request time like the bank
-   export paths. The rules travel with the data they govern. */
+/* The prompt reference section, appended at request time. The model gets
+   the path ids and what each is for — never the ask copy. */
 export function retrievalPromptSection() {
   const entries = Object.entries(RETRIEVAL_PATHS)
-    .map(([id, p]) => "- " + p.name + ":\n  \"" + askFor(id) + "\"")
+    .map(([id, p]) => "- [ASK: " + id + "] — " + p.name)
     .join("\n");
-  return "\n\n═══ RETRIEVAL PATHS (templated asks — delivered VERBATIM) ═══\n\n" +
-    "You decide WHAT to ask about next; these decide HOW the ask for a document-backed figure is worded. When you ask for any figure below, deliver the matching ask text word for word. You may add warmth around it (before or after, in your own voice), but the ask text itself is delivered exactly as written: never reworded, never shortened, never composed fresh. Never offer to skip, defer or come back later as part of the ask; if the person declines, record the refusal in the [CAPTURE] block and move on without suggesting deferral yourself.\n" +
-    "One visit covers everything its screen shows: when you send someone to a screen, take every figure it carries in that same visit rather than sending them back later.\n" +
-    "Confidence after the visit: a file they attach and you read is \"document\". Figures they read off their screen and type to you are \"sighted\", never \"document\". Figures from memory stay \"stated\".\n" +
-    "Interfaces drift: where the person's screen disagrees with these steps, trust their screen and guide by concept.\n\n" +
-    entries;
+  return "\n\n═══ RETRIEVAL PATHS (code authors the asks) ═══\n\n" +
+    "You decide WHAT to ask about next; code decides how the ask for a document-backed figure is worded. When you decide to ask for document-backed figures, emit the matching trigger token below on its own line, exactly as written, where the ask should appear in your reply. The system replaces the token with the full ask text before the person sees it, so never write retrieval instructions in your own words, never describe where a document lives or what to look for on it, and never guess a path id that is not on this list. Warmth around the token, before or after, is yours. Never offer to skip, defer or come back later alongside an ask; if the person declines, record the refusal in the [CAPTURE] block and move on without suggesting deferral yourself.\n" +
+    "One visit covers everything its screen shows: each token's ask gathers every figure that source carries, so emit a token once and take everything it returns rather than sending the person back later.\n" +
+    "Confidence after the visit: a file they attach and you read is \"document\". Figures they read off their screen and type to you are \"sighted\", never \"document\". Figures from memory stay \"stated\".\n\n" +
+    "The tokens:\n" + entries;
 }
 
-/* ── code-witnessed serving ──
-   Scan the visible reply text (before any machine block) for each path's
-   witness fragment; whitespace differences from streaming are tolerated.
-   Returns the field ids to write path_served rows for. */
-export function servedFieldIds(visibleText) {
-  // Whitespace and typographic-apostrophe differences from streaming or
-  // model normalisation are tolerated; anything more is a paraphrase and
-  // deliberately does NOT witness a serve.
-  const norm = String(visibleText || "").replace(/[‘’]/g, "'").replace(/\s+/g, " ");
-  const fields = new Set();
-  for (const p of Object.values(RETRIEVAL_PATHS)) {
-    if (norm.includes(p.witness)) for (const f of p.satisfies) fields.add(f);
+/* ── the trigger token ──
+   [ASK: path_id] — parsing and substitution are the SAME regex, so the
+   waitUntil branch that writes path_served rows and the stream branch
+   that substitutes text can never disagree about what was served. */
+const ASK_TOKEN = /\[ASK:\s*([a-z_]+)\s*\]/g;
+
+/* Path ids for every well-formed token in the text, in order, valid or
+   not — the caller decides how to treat unknown ids. */
+export function parseAskTokens(text) {
+  const ids = [];
+  for (const m of String(text || "").matchAll(ASK_TOKEN)) ids.push(m[1]);
+  return ids;
+}
+
+/* Replace every token in a COMPLETE string with its ask text. Unknown
+   path ids are a fault: logged by the caller via the returned list, and
+   they emit nothing. Returns { text, served, unknown } where served is
+   the deduplicated field ids of every valid path substituted. */
+export function substituteAskTokens(text) {
+  const served = new Set();
+  const unknown = [];
+  const out = String(text || "").replace(ASK_TOKEN, (whole, id) => {
+    const ask = askFor(id);
+    if (ask === null) { unknown.push(id); return ""; }
+    for (const f of RETRIEVAL_PATHS[id].satisfies) served.add(f);
+    return ask;
+  });
+  return { text: out, served: [...served], unknown };
+}
+
+/* ── startup invariant (Devon, Sept 2026): required implies a servable
+   path. Any registry entry (or retrieval_by_type variant) marked
+   required whose paths are missing or do not resolve here fails loudly
+   at startup — a required field that cannot be served is a data bug that
+   must not ship. */
+export function assertRequiredServable(fieldRegistry, paths) {
+  const failures = [];
+  const check = (id, entry, variant) => {
+    if (!entry || entry.retrieval !== "required") return;
+    const where = variant ? `${id} (type ${variant})` : id;
+    const p = entry.paths;
+    if (!Array.isArray(p) || p.length === 0) {
+      failures.push(`${where}: required with no path`);
+      return;
+    }
+    for (const pathId of p) {
+      if (!paths[pathId]) failures.push(`${where}: required with unresolvable path "${pathId}"`);
+    }
+  };
+  for (const [id, entry] of Object.entries(fieldRegistry)) {
+    if (entry.retrieval_by_type) {
+      for (const [variant, v] of Object.entries(entry.retrieval_by_type)) {
+        check(id, { ...entry, ...v }, variant);
+      }
+    } else {
+      check(id, entry, null);
+    }
   }
-  return [...fields];
+  if (failures.length) {
+    throw new Error("required-implies-servable-path invariant violated:\n" + failures.join("\n"));
+  }
 }

@@ -193,7 +193,7 @@ export function runGateTests(mod) {
    alongside the registry and calling runPathTests(regMod, pathsMod). */
 export function runPathTests(regMod, pathsMod) {
   const { FIELD_REGISTRY } = regMod;
-  const { RETRIEVAL_PATHS, askFor, servedFieldIds } = pathsMod;
+  const { RETRIEVAL_PATHS, askFor } = pathsMod;
   const failures = [];
   const t = (name, cond) => { if (!cond) failures.push(name); };
 
@@ -210,11 +210,6 @@ export function runPathTests(regMod, pathsMod) {
   t('every-satisfies-field-registered',
     pathIds.every(id => RETRIEVAL_PATHS[id].satisfies.every(f => FIELD_REGISTRY[f])));
 
-  // The witness fragment appears verbatim in the assembled ask — the
-  // code-witnessing contract depends on it.
-  t('every-witness-inside-its-ask',
-    pathIds.every(id => askFor(id).includes(RETRIEVAL_PATHS[id].witness)));
-
   // Softeners are structurally absent: the ask is assembled from data, so
   // there is nothing to detect.
   const SOFTENERS = /\b(roughly|approximately|ballpark|a rough idea|if you know it)\b/i;
@@ -228,22 +223,119 @@ export function runPathTests(regMod, pathsMod) {
   const DEFERRAL = /\b(skip this|come back to (?:this|it) later|leave (?:this|it) for now|we can do this later)\b/i;
   t('no-deferral-in-any-ask', pathIds.every(id => !DEFERRAL.test(askFor(id))));
 
-  // Witness detection: verbatim delivery is detected through streaming
-  // whitespace and typographic apostrophes; a paraphrase is NOT.
+  /* ── code emits the asks: the [ASK: path_id] trigger token ── */
+  const { parseAskTokens, substituteAskTokens, assertRequiredServable } = pathsMod;
   const loanAsk = askFor('loan_details');
-  t('witness-detects-verbatim-ask',
-    servedFieldIds('Warm words first. ' + loanAsk + ' And warm words after.')
-      .includes('home.mortgage_balance'));
-  t('witness-tolerates-wrapping',
-    servedFieldIds(loanAsk.replace(/ /g, '\n')).includes('home.mortgage_balance'));
-  t('witness-rejects-paraphrase',
-    servedFieldIds('Could you open your banking app and check the loan balance for me?').length === 0);
-  t('witness-serves-whole-visit',   // one visit satisfies every declared field
-    (() => { const s = servedFieldIds(loanAsk);
-      return ['home.rate_percent', 'home.has_offset', 'home.offset_balance', 'buffer.linked_to_loan']
+  t('token-parses',
+    JSON.stringify(parseAskTokens('Warm words. [ASK: loan_details] More words. [ASK: payslip]')) ===
+    JSON.stringify(['loan_details', 'payslip']));
+  t('token-substitutes-exact-text',
+    substituteAskTokens('Before. [ASK: loan_details] After.').text === 'Before. ' + loanAsk + ' After.');
+  t('token-serves-whole-visit',   // one token serves every field its path satisfies
+    (() => { const s = substituteAskTokens('[ASK: loan_details]').served;
+      return ['home.mortgage_balance', 'home.rate_percent', 'home.has_offset', 'home.offset_balance', 'buffer.linked_to_loan', 'debts.items[].security']
         .every(f => s.includes(f)); })());
+  t('token-unknown-id-emits-nothing',
+    (() => { const r = substituteAskTokens('Hm. [ASK: not_a_path] Done.');
+      return r.text === 'Hm.  Done.' && r.served.length === 0 && r.unknown.length === 1 && r.unknown[0] === 'not_a_path'; })());
+  t('prose-never-serves',   // no token, no serve — prose is invisible to the machinery
+    substituteAskTokens('Could you open your banking app and check the loan balance for me?').served.length === 0);
 
-  return { pass: failures.length === 0, total: 10, failures };
+  /* ── the startup invariant: required implies a servable path ── */
+  t('required-implies-servable-path',
+    (() => { try { assertRequiredServable(FIELD_REGISTRY, RETRIEVAL_PATHS); return true; } catch { return false; } })());
+  t('invariant-catches-a-pathless-required',
+    (() => { try {
+      assertRequiredServable({ 'x.y': { retrieval: 'required', confidence_floor: 'document' } }, RETRIEVAL_PATHS);
+      return false; } catch { return true; } })());
+  t('family-loan-security-none-stated',
+    (() => { const v = FIELD_REGISTRY['debts.items[].security'].retrieval_by_type.family_loan;
+      return v.retrieval === 'none' && v.confidence_floor === 'stated'; })());
+
+  return { pass: failures.length === 0, total: 13, failures };
+}
+
+/* ── the conduct linter (lib/finn-conduct-linter.js, step 6) ──
+   Run by blob-importing the linter alongside the registry and paths:
+   runLinterTests(regMod, pathsMod, linterMod). Synthetic sessions, each
+   crafted to trip exactly the checks named. */
+export function runLinterTests(regMod, pathsMod, linterMod) {
+  const { runConductLinter } = linterMod;
+  const failures = [];
+  const t = (name, cond) => { if (!cond) failures.push(name); };
+  const lint = (rows, picture) => runConductLinter({
+    rows, picture,
+    registry: regMod.FIELD_REGISTRY,
+    paths: pathsMod.RETRIEVAL_PATHS,
+    confidenceRank: regMod.CONFIDENCE_RANK,
+    producers: regMod.PRODUCERS,
+  });
+  const check = (report, id) => report.checks.find(c => c.id === id);
+  const at = (s) => new Date(Date.parse('2026-09-11T01:00:00Z') + s * 1000).toISOString();
+  const row = (over) => ({ status: 'applied', raw_text: 'A calm reply.\n[CAPTURE]{"domains":{}}', capture: {}, errors: null, field_id: null, created_at: at(0), ...over });
+
+  // A clean session: one turn, nothing captured, nothing served.
+  const clean = lint([row({})], { domains: {}, refusals: [] });
+  t('clean-session-no-failures', clean.summary.failures === 0);
+  t('report-has-twelve-checks', clean.checks.length === 12);
+
+  // Composed ask: retrieval prose in raw visible text fails; a token does not.
+  const composed = lint([row({ raw_text: 'Please open your banking app and read me the loan balance.\n[CAPTURE]{}' })], { domains: {}, refusals: [] });
+  t('composed-ask-fires-on-prose', check(composed, 'composed_ask').status === 'fail');
+  const tokened = lint([row({ raw_text: 'Here we go. [ASK: loan_details]\n[CAPTURE]{}' })], { domains: {}, refusals: [] });
+  t('composed-ask-quiet-on-token', check(tokened, 'composed_ask').status === 'pass');
+  const exportTalk = lint([row({ raw_text: 'Open the account, look for Export, and choose CSV as the format.\n[CAPTURE]{}' })], { domains: {}, refusals: [] });
+  t('composed-ask-exempts-export-walkthrough', check(exportTalk, 'composed_ask').status === 'pass');
+
+  // Capture block: the recovery tag counts as a fault, with the outcome.
+  const absent = lint([row({ raw_text: '[REEXTRACTED after absent capture block]\nA reply.\n[CAPTURE]{}' })], { domains: {}, refusals: [] });
+  t('capture-block-counts-absences', check(absent, 'capture_block').status === 'fail' && check(absent, 'capture_block').count === 1);
+
+  // Em-dash in raw visible text is reported even though display scrubs it.
+  const dash = lint([row({ raw_text: 'A reply — with a dash.\n[CAPTURE]{}' })], { domains: {}, refusals: [] });
+  t('em-dash-counted', check(dash, 'em_dash').status === 'fail');
+
+  // Confidence floor: a required field resting below floor with no refusal.
+  const resting = lint([row({})], { domains: { home: { mortgage_balance: 512000, _confidence: 'stated' } }, refusals: [] });
+  t('floor-resting-violation-fails', check(resting, 'confidence_floor').status === 'fail');
+  const restingWithRefusal = lint([row({})], { domains: { home: { mortgage_balance: 512000, _confidence: 'stated' } }, refusals: [{ field: 'home.mortgage_balance', session_id: 's' }] });
+  t('floor-refusal-record-passes', check(restingWithRefusal, 'confidence_floor').status === 'pass');
+
+  // Refusal validity: claimed with no path_served row fails; with one passes.
+  const claimRow = row({ capture: { refusals: ['home.mortgage_balance'] }, created_at: at(10) });
+  const unwitnessed = lint([claimRow], { domains: {}, refusals: [] });
+  t('refusal-unwitnessed-fails', check(unwitnessed, 'refusal_validity').status === 'fail');
+  const witnessed = lint([
+    { status: 'path_served', raw_text: null, capture: null, errors: null, field_id: 'home.mortgage_balance', created_at: at(0) },
+    claimRow,
+  ], { domains: {}, refusals: [] });
+  t('refusal-witnessed-passes', check(witnessed, 'refusal_validity').status === 'pass');
+
+  // Path served: a required field captured below document with no serve.
+  const askedCold = lint([row({ capture: { domains: { home: { mortgage_balance: 512000, _confidence: 'sighted' } } } })], { domains: {}, refusals: [] });
+  t('path-served-fails-on-cold-ask', check(askedCold, 'path_served').status === 'fail');
+
+  // Single visit: the same path served in two separate bursts.
+  const twoVisits = lint([
+    { status: 'path_served', raw_text: null, capture: null, errors: null, field_id: 'home.mortgage_balance', created_at: at(0) },
+    { status: 'path_served', raw_text: null, capture: null, errors: null, field_id: 'home.rate_percent', created_at: at(0) },
+    { status: 'path_served', raw_text: null, capture: null, errors: null, field_id: 'home.mortgage_balance', created_at: at(120) },
+    { status: 'path_served', raw_text: null, capture: null, errors: null, field_id: 'home.offset_balance', created_at: at(120) },
+  ], { domains: {}, refusals: [] });
+  t('single-visit-fails-on-second-serve', check(twoVisits, 'single_visit').status === 'fail');
+
+  // Reconciliation: an unmatched producer fails; an explicit zero passes.
+  const openProducer = lint([row({})], { domains: { investments: { properties: [{ id: 'p1', value_estimate: 640000 }], _confidence: 'stated' } }, refusals: [] });
+  t('reconciliation-open-producer-fails', check(openProducer, 'reconciliation').status === 'fail');
+  const zeroed = lint([row({})], { domains: { investments: { properties: [{ id: 'p1', value_estimate: 640000, rent_monthly: 0 }], _confidence: 'stated' } }, refusals: [] });
+  t('reconciliation-explicit-zero-passes', check(zeroed, 'reconciliation').status === 'pass');
+
+  // Sighted resting and stated-rate are reports, never failures.
+  const sighted = lint([row({})], { domains: { home: { lender: 'CBA', mortgage_balance: 512000, _confidence: 'sighted' } }, refusals: [{ field: 'home.mortgage_balance', session_id: 's' }] });
+  t('sighted-is-a-report-not-a-failure',
+    check(sighted, 'sighted_resting').status === 'report' && check(sighted, 'sighted_resting').count > 0);
+
+  return { pass: failures.length === 0, total: 17, failures };
 }
 
 /* ── stable asset ids and id-aware merge (lib/finn-merge.js) ──
