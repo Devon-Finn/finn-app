@@ -172,12 +172,23 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
       .map(o => o.source ? o : { ...o, source: o.type === "family_support" ? "other" : o.type });
     const props = Array.isArray(inv.properties) ? inv.properties : [];
     const unlinkedRentals = other.filter(o => (o.source === "rental_residential" || o.source === "rental_commercial") && !o.linked_asset_id);
+    // A rental producer needs both the income entry AND its costs: a
+    // gross entry carries costs_annual (a figure, or 0 with a stated
+    // reason); net-of-costs carries them inside. Gross with no costs is
+    // unreconciled. rent_monthly of exactly 0 is the explicit zero.
+    const rentalCostsOk = (o) => o.basis === "net_of_costs"
+      || (o.basis === "gross" && typeof o.costs_annual === "number"
+          && (o.costs_annual > 0 || (typeof o.costs_note === "string" && o.costs_note.length > 0)));
     props.forEach((p, i) => {
       if (!p) return;
-      const linked = p.id && other.some(o => o.linked_asset_id === p.id);
-      const sole = props.length === 1 && unlinkedRentals.length > 0;
-      const ownRent = typeof p.rent_monthly === "number";
-      if (!linked && !sole && !ownRent) details.push(`property ${p.id || i + 1}: no income entry and no explicit zero`);
+      if (typeof p.rent_monthly === "number" && p.rent_monthly === 0) return;
+      const linkedEntry = p.id ? other.find(o => o.linked_asset_id === p.id) : undefined;
+      const soleEntry = (!linkedEntry && props.length === 1 && unlinkedRentals.length > 0) ? unlinkedRentals[0] : undefined;
+      const entry = linkedEntry || soleEntry;
+      if (!entry) { details.push(`property ${p.id || i + 1}: no income entry and no explicit zero`); return; }
+      if ((entry.source === "rental_residential" || entry.source === "rental_commercial") && !rentalCostsOk(entry)) {
+        details.push(`property ${p.id || i + 1}: gross rent with no costs recorded (and no stated reason for zero)`);
+      }
     });
     if (inc.entity && typeof inc.entity === "object" && inc.entity.type) {
       if (!other.some(o => o.linked_asset_id === "entity" || ["trust_distribution", "business_profit", "director_fee"].includes(o.source))) {

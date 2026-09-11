@@ -68,6 +68,24 @@ export const FIELD_REGISTRY = {
   "income.other[].linked_asset_id": { label: "which asset or entity it comes from", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "income.other[].entity": { label: "whose hands it arrives in", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true },
   "income.other[].basis": { label: "whether that figure is before or after costs", retrieval: "none", confidence_floor: "stated", softeners: "forbidden", no_default: true },
+  /* Costs reconcile (Devon, Sept 2026): a rental producer needs both the
+     income entry and its costs, or an explicit zero for costs with a
+     stated reason. Same trip as the rent — the agent statement carries
+     both. Non-rental sources rarely carry a costs figure; stated is fine
+     where one exists. */
+  "income.other[].costs_annual": { label: "the costs that come out of it across a year", accepts_upload: true, confidence_floor: "document", softeners: "forbidden", type_key: "source",
+    retrieval_by_type: {
+      rental_residential: { retrieval: "required", evidence: ["agent_statement", "tax_return"], paths: ["rental_income"] },
+      rental_commercial:  { retrieval: "required", evidence: ["agent_statement", "tax_return"], paths: ["rental_income"] },
+      dividends:          { retrieval: "none", confidence_floor: "stated" },
+      distributions:      { retrieval: "none", confidence_floor: "stated" },
+      trust_distribution: { retrieval: "none", confidence_floor: "stated" },
+      business_profit:    { retrieval: "none", confidence_floor: "stated" },
+      director_fee:       { retrieval: "none", confidence_floor: "stated" },
+      government:         { retrieval: "none", confidence_floor: "stated" },
+      other:              { retrieval: "none", confidence_floor: "stated" },
+    } },
+  "income.other[].costs_note": { label: "why the costs are what they are", retrieval: "none", confidence_floor: "stated", softeners: "permitted" },
   "income.other[].amount_annual": { label: "what it brings in across a year", accepts_upload: true, confidence_floor: "document", softeners: "forbidden", feeds: ["income_total_annual"], type_key: "source",
     retrieval_by_type: {
       rental_residential: { retrieval: "required", evidence: ["lease", "agent_statement"], paths: ["rental_income"] },
@@ -187,6 +205,11 @@ export const FIELD_REGISTRY = {
       family_loan:              { retrieval: "none", confidence_floor: "stated" },
       other:                    { retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"] },
     } },
+  /* security says what KIND of asset secures a debt; this says WHICH one,
+     by stable asset id ("home" for the home-domain loan) — the same
+     pattern as linked_asset_id for income. Property equity derives from
+     it, so the loan's dollars live once, as the debts item. */
+  "debts.items[].secured_against_asset_id": { label: "which asset it's secured against", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "debts.items[].is_split": { label: "whether it's a split of a larger loan", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "debts.items[].parent_loan_id": { label: "which loan it's a split of", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   /* The money fields are required off the loan screen for every product

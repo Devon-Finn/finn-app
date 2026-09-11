@@ -17,10 +17,18 @@
      lvr_percent          540000 ÷ 950000 × 100              = 56.8
      surplus_monthly      (7100+5400) − 5200 − 3300
                           − (550+48+0 personal minimums)     = 3402
-     buffer_months        24000 ÷ (5200+3300)                = 2.8
+     buffer_months        24000 ÷ (5200+3300+598) — a buffer
+                          covers what still has to be paid
+                          when income stops                  = 2.6
      super_total          210000 + 145000 + 18000            = 373000
      income_total_annual  120000 + 85000
                           + (52000+4200+9000 other)          = 270200
+                          bases stated, never mixed silently
+     income_costs_annual  the commercial property's costs,
+                          held separately, never netted      = 18000
+     property_equity      commercial: 680000 − 380000 via
+                          secured_against_asset_id           = 300000
+                          holiday: 310000 − 0                = 310000
      debts_total          90000 + 2400 + 15000 (personal;
                           company 380000 and HECS excluded)  = 107400
      debts_total_by_entity  personal 107400 · company 380000
@@ -207,7 +215,9 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
   // picture context, exactly as the model is instructed to).
   s.reply('Now the income those assets produce.', {
     domains: { income: { other: [
-      { source: 'rental_commercial', linked_asset_id: propCommId, entity: 'company', amount_annual: 52000, basis: 'gross' },
+      // Gross rent AND its costs, from the same agent-statement visit:
+      // a rental producer reconciles only when both are recorded.
+      { source: 'rental_commercial', linked_asset_id: propCommId, entity: 'company', amount_annual: 52000, basis: 'gross', costs_annual: 18000 },
       { source: 'dividends', linked_asset_id: 'holdings', entity: 'personal', amount_annual: 4200, basis: 'gross' },
       { source: 'business_profit', linked_asset_id: 'entity', entity: 'company', amount_annual: 9000, basis: 'net_of_costs' },
     ], _confidence: 'document' } },
@@ -237,7 +247,10 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
   s.reply('Statements read, every line.', {
     domains: { debts: { items: [
       { type: 'loan_split', purpose: 'investment_shares', borrower: 'joint', security: 'property_home', is_split: true, parent_loan_id: 'home', balance: 90000, rate_percent: 5.84, minimum_monthly: 550 },
-      { type: 'commercial_loan', purpose: 'commercial_property', borrower: 'company', security: 'property_commercial', is_split: false, parent_loan_id: null, balance: 380000, rate_percent: 6.9, minimum_monthly: 2185 },
+      // secured_against_asset_id names WHICH asset (the commercial
+      // property, by id); the property's equity derives from this link,
+      // so the loan's dollars live once, as the company's debts item.
+      { type: 'commercial_loan', purpose: 'commercial_property', borrower: 'company', security: 'property_commercial', secured_against_asset_id: propCommId, is_split: false, parent_loan_id: null, balance: 380000, rate_percent: 6.9, minimum_monthly: 2185 },
       { type: 'credit_card', purpose: 'personal', borrower: 'personal', balance: 2400, rate_percent: 19.99, minimum_monthly: 48 },
     ], hecs_balance: 12400, _confidence: 'document' },
     }, completed_domains: ['income', 'assets', 'liabilities', 'buffer', 'protection', 'estate', 'super'],
@@ -260,12 +273,15 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
   t('home-equity-410000', der.home_equity === 410000);
   t('lvr-56.8', der.lvr_percent === 56.8);
   t('surplus-3402', der.surplus_monthly === 3402);
-  t('buffer-months-2.8', der.buffer_months === 2.8);
+  t('buffer-months-2.6', der.buffer_months === 2.6);
   t('super-total-373000', der.super_total === 373000);
   t('income-total-270200', der.income_total_annual === 270200);
+  t('income-costs-18000-held-separately', der.income_costs_annual === 18000);
+  t('income-bases-stated-not-silent',
+    der.income_total_bases.includes('gross') && der.income_total_bases.includes('net_of_costs'));
   t('income-reconciled-clean', Array.isArray(der.income_unreconciled) && der.income_unreconciled.length === 0);
-  t('property-equity-null-and-310000',
-    der.property_equity.length === 2 && der.property_equity[0] === null && der.property_equity[1] === 310000);
+  t('property-equity-300000-and-310000',
+    der.property_equity.length === 2 && der.property_equity[0] === 300000 && der.property_equity[1] === 310000);
   t('debts-total-personal-107400', der.debts_total === 107400);
   t('debts-by-entity',
     der.debts_total_by_entity.personal === 107400 && der.debts_total_by_entity.company === 380000 &&
@@ -374,11 +390,12 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
 
   return {
     pass: failures.length === 0,
-    total: 74,
+    total: 76,
     failures,
     hand_computed: {
-      home_equity: 410000, lvr_percent: 56.8, surplus_monthly: 3402, buffer_months: 2.8,
-      super_total: 373000, income_total_annual: 270200,
+      home_equity: 410000, lvr_percent: 56.8, surplus_monthly: 3402, buffer_months: 2.6,
+      super_total: 373000, income_total_annual: 270200, income_costs_annual: 18000,
+      property_equity_commercial: 300000, property_equity_holiday: 310000,
       debts_total_personal: 107400, debts_total_company: 380000,
     },
     insights: EXPECTED_INSIGHTS,

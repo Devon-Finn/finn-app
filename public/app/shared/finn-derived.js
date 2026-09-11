@@ -49,34 +49,37 @@
     // repayment counts as 0 when expenses.includes_housing is true (it is
     // already inside living_monthly) and when the household owns no home.
     const netMonthly = sumKnown([inc.salary_net_monthly, inc.partner_salary_net_monthly]);
+    // Minimums on debt the household pays personally: entity-borrowed debt
+    // is serviced inside the entity, and HECS comes out of pay before it
+    // lands, so neither belongs in the personal surplus or the buffer.
+    const personalMinimums = Array.isArray(debts.items)
+      ? debts.items
+          .filter(it => it && it.type !== 'hecs_help' && !['company', 'trust', 'smsf', 'partnership'].includes(it.borrower))
+          .reduce((a, it) => a + (num(it && it.minimum_monthly) ?? 0), 0)
+      : 0;
+    function monthlyHousing() {
+      if (exp.includes_housing === true) return 0;
+      if (num(exp.housing_repayment_monthly) !== null) return exp.housing_repayment_monthly;
+      if (home.owns_home === false || (num(home.mortgage_balance) !== null && home.mortgage_balance === 0)) return 0;
+      return null;
+    }
     let surplus_monthly = null;
     if (netMonthly !== null && num(exp.living_monthly) !== null) {
-      let housing = null;
-      if (exp.includes_housing === true) housing = 0;
-      else if (num(exp.housing_repayment_monthly) !== null) housing = exp.housing_repayment_monthly;
-      else if (home.owns_home === false || (num(home.mortgage_balance) !== null && home.mortgage_balance === 0)) housing = 0;
+      const housing = monthlyHousing();
       if (housing !== null) {
-        // Minimums on debt the household pays personally: entity-borrowed
-        // debt is serviced inside the entity, and HECS comes out of pay
-        // before it lands, so neither belongs in the personal surplus.
-        const minimums = Array.isArray(debts.items)
-          ? debts.items
-              .filter(it => it && it.type !== 'hecs_help' && !['company', 'trust', 'smsf', 'partnership'].includes(it.borrower))
-              .reduce((a, it) => a + (num(it.minimum_monthly) ?? 0), 0)
-          : 0;
-        surplus_monthly = Math.round(netMonthly - exp.living_monthly - housing - minimums);
+        surplus_monthly = Math.round(netMonthly - exp.living_monthly - housing - personalMinimums);
       }
     }
 
-    // buffer_months = accessible_savings ÷ (living_monthly + housing_repayment_monthly)
+    // buffer_months = accessible_savings ÷ (living_monthly +
+    // housing_repayment_monthly + required debt minimums): a buffer covers
+    // what still has to be paid when income stops, and the minimums keep
+    // falling due.
     let buffer_months = null;
     if (num(buf.accessible_savings) !== null && num(exp.living_monthly) !== null) {
-      let housing = null;
-      if (exp.includes_housing === true) housing = 0;
-      else if (num(exp.housing_repayment_monthly) !== null) housing = exp.housing_repayment_monthly;
-      else if (home.owns_home === false || (num(home.mortgage_balance) !== null && home.mortgage_balance === 0)) housing = 0;
-      if (housing !== null && (exp.living_monthly + housing) > 0) {
-        buffer_months = Math.round(buf.accessible_savings / (exp.living_monthly + housing) * 10) / 10;
+      const housing = monthlyHousing();
+      if (housing !== null && (exp.living_monthly + housing + personalMinimums) > 0) {
+        buffer_months = Math.round(buf.accessible_savings / (exp.living_monthly + housing + personalMinimums) * 10) / 10;
       }
     }
 
@@ -110,22 +113,31 @@
       income_unreconciled.push('legacy:rental_income_annual');
     }
     // Producer: every investment property (capture-conduct Part Four /
-    // registry PRODUCERS). Producers link by stable item id. Satisfied by
-    // an income entry linked to the property's id, an UNAMBIGUOUS unlinked
-    // match (exactly one property and an unlinked rental entry — the same
-    // no-guess principle as the positional-link migration), or the
-    // property's own rent_monthly as a known number (0 is an explicit
-    // zero, null is not-yet-asked).
+    // registry PRODUCERS). Producers link by stable item id. A rental
+    // producer needs BOTH an income entry AND its costs (Devon, Sept
+    // 2026): a gross-basis entry must carry costs_annual — a real figure,
+    // or an explicit zero with a stated reason in costs_note; a
+    // net-of-costs entry carries its costs inside. A property with gross
+    // rent and no costs is unreconciled. rent_monthly of exactly 0 is the
+    // explicit-zero producer (nothing to reconcile); rent_monthly alone
+    // no longer satisfies.
+    const rentalCostsOk = (o) => o.basis === 'net_of_costs'
+      || (o.basis === 'gross' && num(o.costs_annual) !== null
+          && (o.costs_annual > 0 || (typeof o.costs_note === 'string' && o.costs_note.length > 0)));
     const props = Array.isArray(inv.properties) ? inv.properties : [];
     const unlinkedRentals = other.filter(o =>
       (o.source === 'rental_residential' || o.source === 'rental_commercial') && !o.linked_asset_id);
     props.forEach((p, i) => {
       if (!p) return;
       const openId = (typeof p.id === 'string' && p.id) ? p.id : 'prop-' + (i + 1);
-      const linked = (typeof p.id === 'string' && p.id) && other.some(o => o.linked_asset_id === p.id);
-      const soleUnambiguous = props.length === 1 && unlinkedRentals.length > 0;
-      const ownRent = num(p.rent_monthly) !== null;
-      if (!linked && !soleUnambiguous && !ownRent) income_unreconciled.push(openId);
+      if (num(p.rent_monthly) !== null && p.rent_monthly === 0) return; // explicit zero
+      const linkedEntry = (typeof p.id === 'string' && p.id) ? other.find(o => o.linked_asset_id === p.id) : undefined;
+      const soleEntry = (!linkedEntry && props.length === 1 && unlinkedRentals.length > 0) ? unlinkedRentals[0] : undefined;
+      const entry = linkedEntry || soleEntry;
+      if (!entry) { income_unreconciled.push(openId); return; }
+      if ((entry.source === 'rental_residential' || entry.source === 'rental_commercial') && !rentalCostsOk(entry)) {
+        income_unreconciled.push(openId + ':costs');
+      }
     });
     // Producer: the company or trust. Satisfied by any entity-flavoured
     // income entry or an explicit link.
@@ -151,12 +163,33 @@
     const income_total_annual = sumKnown([
       inc.salary_gross_annual, inc.partner_salary_gross_annual, otherAnnual
     ]);
+    // The total never mixes bases SILENTLY: costs on gross entries are
+    // summed separately, and the bases present in the total are named so
+    // the panel states what is shown rather than netting anything itself.
+    const knownCosts = other.map(o => o.costs_annual).filter(v => num(v) !== null);
+    const income_costs_annual = knownCosts.length ? knownCosts.reduce((a, b) => a + b, 0) : null;
+    const income_total_bases = [...new Set(other
+      .filter(o => num(o.amount_annual) !== null && typeof o.basis === 'string')
+      .map(o => o.basis))];
 
-    // property_equity — per investment property: value_estimate − loan_balance
-    const property_equity = Array.isArray(inv.properties)
-      ? inv.properties.map(p => (p && num(p.value_estimate) !== null && num(p.loan_balance) !== null)
-          ? p.value_estimate - p.loan_balance : null)
-      : [];
+    // property_equity — per investment property: value_estimate minus the
+    // loan against it. The loan lives ONCE: either on the property
+    // (loan_balance) or as a debts item secured against it
+    // (secured_against_asset_id), never both.
+    const allDebtItems = Array.isArray(debts.items) ? debts.items.filter(it => it && typeof it === 'object') : [];
+    const securedAgainst = {};
+    for (const it of allDebtItems) {
+      if (typeof it.secured_against_asset_id === 'string' && it.secured_against_asset_id && num(it.balance) !== null) {
+        securedAgainst[it.secured_against_asset_id] = (securedAgainst[it.secured_against_asset_id] || 0) + it.balance;
+      }
+    }
+    const property_equity = props.map(p => {
+      if (!p || num(p.value_estimate) === null) return null;
+      const own = num(p.loan_balance);
+      const secured = (typeof p.id === 'string' && p.id && securedAgainst[p.id] !== undefined) ? securedAgainst[p.id] : null;
+      const loan = own !== null ? own : secured;
+      return loan !== null ? p.value_estimate - loan : null;
+    });
 
     // debts totals derive PER ENTITY (field-spec Part 2): borrowing known
     // to sit inside a company, trust, smsf or partnership is never summed
@@ -174,7 +207,7 @@
       if (num(it.balance) !== null) debts_total_by_entity[b] = (debts_total_by_entity[b] || 0) + it.balance;
     }
 
-    return { home_equity, lvr_percent, surplus_monthly, buffer_months, super_total, income_total_annual, income_unreconciled, property_equity, debts_total, debts_total_by_entity };
+    return { home_equity, lvr_percent, surplus_monthly, buffer_months, super_total, income_total_annual, income_costs_annual, income_total_bases, income_unreconciled, property_equity, debts_total, debts_total_by_entity };
   }
 
   window.finnDerived = { derive };

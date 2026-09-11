@@ -138,13 +138,15 @@ income.other[]:
   entity: personal | joint | company | trust | smsf | unknown
   amount_annual: <number>
   basis: gross | net_of_costs
+  costs_annual: <number>       // the year's costs, where basis is gross
+  costs_note: <string>         // the stated reason where costs are genuinely zero
 
 flags.income_unreconciled: [<asset_id>, ...]
 ```
 
 Gross rent and costs are captured separately. Finn states both. It never nets them silently and never characterises the gearing.
 
-**The reconciliation pass.** Before `income_total_annual` derives, walk every declared producer and assert an income entry or an explicit zero with a reason: every property where `use != owner_occupied`, every company, trust or partnership, every share, ETF or fund holding, and any business in the context domain. Unmatched producers land in `flags.income_unreconciled` and the total is not presented as complete. The panel names the open asset rather than showing a total that omits it.
+**The reconciliation pass.** Before `income_total_annual` derives, walk every declared producer and assert an income entry or an explicit zero with a reason: every property where `use != owner_occupied`, every company, trust or partnership, every share, ETF or fund holding, and any business in the context domain. The reconciliation pass asserts both an income entry **and its costs** for every rental producer, or an explicit zero for costs with a stated reason. A property with gross rent and no costs is unreconciled. Unmatched producers land in `flags.income_unreconciled` and the total is not presented as complete. The panel names the open asset rather than showing a total that omits it. The derived income total must not silently sum gross and net-of-costs figures: present them separately, or state the basis of what is shown.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -299,9 +301,12 @@ debts.items[]:
   borrower:  personal | joint | company | trust | smsf | partnership | unknown
   security:  property_home | property_investment | property_commercial |
              vehicle | business_assets | unsecured | other
+  secured_against_asset_id: <id>
   is_split:  true | false
   parent_loan_id: <id>
 ```
+
+The `security` enum says what **kind** of asset secures a debt; `secured_against_asset_id` says **which one**, by stable asset id (`"home"` for the loan in the home domain) — the same pattern as `linked_asset_id` for income. Property equity derives from it, so a loan's dollars live once, as the debts item.
 
 Purpose is never inferred from product. Where a debt is not plainly the loan on the home they live in, Finn asks two things: what it is, and what the money was used for. `personal_loan` now means a personal loan and nothing else. Borrowing inside a company or trust is not personal household debt and is not summed into a personal total unmarked; totals derive per entity.
 
@@ -330,10 +335,10 @@ The one field on this page written from the model's read rather than a stated an
 | `home_equity` | `home.value_estimate − home.mortgage_balance` |
 | `lvr_percent` | `home.mortgage_balance ÷ home.value_estimate × 100` |
 | `surplus_monthly` | `(all net monthly income) − expenses.living_monthly − expenses.housing_repayment_monthly − sum(debts.minimum_monthly)` |
-| `buffer_months` | `buffer.accessible_savings ÷ (expenses.living_monthly + expenses.housing_repayment_monthly)` |
+| `buffer_months` | `buffer.accessible_savings ÷ (expenses.living_monthly + expenses.housing_repayment_monthly + sum of required personal debt minimums)` — a buffer covers what still has to be paid when income stops |
 | `super_total` | `sum(super.funds[].balance)` |
 | `income_total_annual` | `sum of salary fields + sum(income.other[].amount_annual)` — derives only after the reconciliation pass (§2.2); where `flags.income_unreconciled` is non-empty the total is not presented as complete |
-| `property_equity` | per property: `value_estimate − loan_balance` |
+| `property_equity` | per property: `value_estimate` minus the loan against it — `loan_balance` on the property, or the debts items whose `secured_against_asset_id` is that property |
 | `debts_total` | per entity: `sum(debts.items[].balance)` grouped by `borrower` — the personal total sums `personal` and `joint` only; excluding HECS |
 
 Storing any of these guarantees they drift out of sync with their inputs.

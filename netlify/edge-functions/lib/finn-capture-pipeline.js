@@ -72,7 +72,7 @@ const V2_SCHEMA = {
   // typed income.other[] entry. Stored scalars migrate via
   // migrateIncomeShape — to income._unmapped and flags.income_unreconciled,
   // never silently dropped from a total.
-  income: { salary_gross_annual: MONEY, salary_net_monthly: MONEY, partner_salary_gross_annual: MONEY, partner_salary_net_monthly: MONEY, other: { array: { id: STR, source: { enum: "other_income_source" }, linked_asset_id: STR, entity: { enum: "income_entity" }, amount_annual: MONEY, basis: { enum: "income_basis" } } }, structure: { enum: "structure" }, entity: { object: { type: STR, name: STR } }, employer_super_on: { array: STR } },
+  income: { salary_gross_annual: MONEY, salary_net_monthly: MONEY, partner_salary_gross_annual: MONEY, partner_salary_net_monthly: MONEY, other: { array: { id: STR, source: { enum: "other_income_source" }, linked_asset_id: STR, entity: { enum: "income_entity" }, amount_annual: MONEY, basis: { enum: "income_basis" }, costs_annual: MONEY, costs_note: STR } }, structure: { enum: "structure" }, entity: { object: { type: STR, name: STR } }, employer_super_on: { array: STR } },
   expenses: { living_monthly: MONEY, includes_housing: BOOL, housing_repayment_monthly: MONEY },
   home: { owns_home: BOOL, value_estimate: MONEY, value_source: STR, mortgage_balance: MONEY, rate_percent: RATE, rate_type: STR, lender: STR, with_lender_since: STR, repayment_monthly: MONEY, term_remaining_years: INT, has_offset: BOOL, offset_balance: MONEY, package_fee_annual: MONEY },
   buffer: { accessible_savings: MONEY, where_held: STR, linked_to_loan: BOOL, counts_credit_as_buffer: BOOL, other_cash: MONEY, other_cash_where_held: STR },
@@ -80,7 +80,7 @@ const V2_SCHEMA = {
   protection: { life: { object: COVER }, tpd: { object: COVER }, income_protection: { object: COVER }, trauma: { object: COVER } },
   estate: { will: { object: ESTATE_DOC }, poa: { object: ESTATE_DOC }, guardianship: { object: ESTATE_DOC }, super_nomination: { object: { ...ESTATE_DOC, binding: BOOL } } },
   investments: { shares_value: MONEY, held_in: STR, managed_funds_value: MONEY, properties: { array: { id: STR, value_estimate: MONEY, loan_balance: MONEY, rate_percent: RATE, repayment_type: STR, rent_monthly: MONEY, held_in: STR, use: { enum: "property_use" } } } },
-  debts: { items: { array: { id: STR, type: { enum: "debt_type" }, purpose: { enum: "debt_purpose" }, borrower: { enum: "debt_borrower" }, security: { enum: "debt_security" }, is_split: BOOL, parent_loan_id: STR, balance: MONEY, rate_percent: RATE, minimum_monthly: MONEY } }, hecs_balance: MONEY },
+  debts: { items: { array: { id: STR, type: { enum: "debt_type" }, purpose: { enum: "debt_purpose" }, borrower: { enum: "debt_borrower" }, security: { enum: "debt_security" }, secured_against_asset_id: STR, is_split: BOOL, parent_loan_id: STR, balance: MONEY, rate_percent: RATE, minimum_monthly: MONEY } }, hecs_balance: MONEY },
   flags: { hardship: BOOL, hardship_signal: STR, income_unreconciled: { array: STR } },
 };
 

@@ -109,7 +109,7 @@ export const RETRIEVAL_PATHS = {
     look_for: "Look for the rent amount and how often it is charged. On an agent statement, look for the gross rent and the costs taken out as separate figures.",
     honest: "I record the gross rent and the costs separately, both as you give them, never netted together into one number.",
     offer: "Attach the statement or lease here, or read the figures to me exactly as they appear.",
-    satisfies: ["income.other[].amount_annual", "investments.properties[].rent_monthly"],
+    satisfies: ["income.other[].amount_annual", "income.other[].costs_annual", "investments.properties[].rent_monthly"],
   },
   business_income: {
     name: "the business and entity income, from the year-end figures",

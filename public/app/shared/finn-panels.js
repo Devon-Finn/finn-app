@@ -95,6 +95,12 @@
   function openItemLabel(id, domains) {
     const d = domains || {};
     const props = (d.investments && Array.isArray(d.investments.properties)) ? d.investments.properties : [];
+    if (/:costs$/.test(id)) {
+      const baseId = id.slice(0, -6);
+      const ix = props.findIndex(p => p && p.id === baseId);
+      const name = ix !== -1 && props.length > 1 ? 'investment property ' + (ix + 1) : 'the investment property';
+      return 'costs on ' + name + ' not recorded yet, the rent shown is before costs';
+    }
     const byId = props.findIndex(p => p && p.id === id);
     if (byId !== -1) {
       return (props.length > 1 ? 'investment property ' + (byId + 1) : 'the investment property') + ', no rent recorded against it yet';
@@ -456,8 +462,17 @@
           rows.push({ label: conf(inc, label), op: rows.length ? '+' : '', value: money(o.amount_annual) });
         }
         const totalIncomplete = openItems.length > 0;
-        rows.push({ label: totalIncomplete ? 'Recorded so far' : 'Across the year', op: '=', value: money(der.income_total_annual), missing: money(der.income_total_annual) === null, result: true });
+        // The total never mixes bases silently: where a gross figure is in
+        // the sum, the total says so, and recorded costs render separately,
+        // never netted into it.
+        const grossInTotal = arr(der.income_total_bases).includes('gross');
+        const totalLabel = totalIncomplete ? 'Recorded so far'
+          : grossInTotal ? 'Across the year, before costs where marked' : 'Across the year';
+        rows.push({ label: totalLabel, op: '=', value: money(der.income_total_annual), missing: money(der.income_total_annual) === null, result: true });
         html += calcSection('How the income is made up', rows);
+        if (money(der.income_costs_annual)) {
+          html += '<div class="fp-teach"><p class="fp-intro">Costs recorded against those figures: ' + money(der.income_costs_annual) + ' a year, held separately, not netted into the total.</p></div>';
+        }
         // The reconciliation pass names what's still open: the total is
         // never presented as complete while a producer has no income entry
         // and no explicit zero against it.
