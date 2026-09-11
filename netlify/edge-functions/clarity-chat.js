@@ -1,4 +1,5 @@
 import { bankExportsPromptSection } from "./lib/finn-bank-exports.js";
+import { retrievalPromptSection, servedFieldIds } from "./lib/finn-retrieval-paths.js";
 import { FIELD_REGISTRY, persistenceGate } from "./lib/finn-field-registry.js";
 
 // Clarity-chat edge function — the paid Clarity Session conversation (3a).
@@ -930,6 +931,27 @@ async function insertCaptureLog(householdId, rawText, capture, status, sessionId
   return rows && rows[0] ? rows[0].id : null;
 }
 
+/* ── code-witnessed path serving (capture-conduct steps 3-4) ──
+   One path_served row per field the served path satisfies, in THIS
+   session. These rows are what makes a refusal valid: the gate accepts a
+   below-floor write only where the person was actually shown the path
+   text (witnessed here) and then declined. Losing a row degrades SAFE
+   (the refusal stays invalid and the gate keeps blocking), so this write
+   lives in the apply chain rather than the request path. */
+async function insertPathServed(householdId, sessionId, fieldIds) {
+  if (!fieldIds.length || !sessionId) return;
+  const res = await sbFetch(`/rest/v1/capture_log`, {
+    method: "POST",
+    headers: { "Prefer": "return=minimal" },
+    body: JSON.stringify(fieldIds.map(f => ({
+      household_id: householdId, status: "path_served", session_id: sessionId, field_id: f,
+    }))),
+  });
+  if (!res.ok) {
+    console.error(`[Finn clarity] path_served insert failed — ${res.status}: ${await res.text()}`);
+  }
+}
+
 async function markCaptureLog(logId, status, extra) {
   if (!logId) return;
   const res = await sbFetch(`/rest/v1/capture_log?id=eq.${logId}`, {
@@ -1214,7 +1236,7 @@ export default async function handler(request, context) {
         model: "claude-sonnet-4-6",
         max_tokens: 1000,
         stream: true,
-        system: CLARITY_SYSTEM_PROMPT + bankExportsPromptSection() + contextBlock,
+        system: CLARITY_SYSTEM_PROMPT + bankExportsPromptSection() + retrievalPromptSection() + contextBlock,
         messages,
       }),
     });
@@ -1257,6 +1279,16 @@ export default async function handler(request, context) {
       writeAhead,
       new Promise(resolve => setTimeout(() => resolve(null), 2000)),
     ]);
+    // Code-witnessed path serving: scan the VISIBLE part of the reply for
+    // the templated asks' witness fragments and record path_served rows.
+    // This runs before the no-capture early return so a serve on a
+    // protocol-violating reply is still witnessed.
+    const cuts = [fullText.indexOf("[CAPTURE]"), fullText.indexOf("[RESOLVE]")].filter(i => i !== -1);
+    const visibleEnd = cuts.length ? Math.min(...cuts) : fullText.length;
+    const served = servedFieldIds(fullText.slice(0, visibleEnd));
+    if (served.length) {
+      await insertPathServed(auth.householdId, sessionId, served);
+    }
     const idx = fullText.indexOf("[CAPTURE]");
     if (idx === -1) {
       console.error("[Finn clarity] no capture block in reply — nothing saved this turn");

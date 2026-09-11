@@ -152,3 +152,61 @@ export function runGateTests(mod) {
 
   return { pass: failures.length === 0, total: 34, failures };
 }
+
+/* ── capture-conduct steps 3-4: the retrieval path file and the
+   templated asks. Run by blob-importing lib/finn-retrieval-paths.js
+   alongside the registry and calling runPathTests(regMod, pathsMod). */
+export function runPathTests(regMod, pathsMod) {
+  const { FIELD_REGISTRY } = regMod;
+  const { RETRIEVAL_PATHS, askFor, servedFieldIds } = pathsMod;
+  const failures = [];
+  const t = (name, cond) => { if (!cond) failures.push(name); };
+
+  const pathIds = Object.keys(RETRIEVAL_PATHS);
+  const entries = Object.entries(FIELD_REGISTRY);
+
+  // Every path id the registry points at exists in the path file.
+  const referenced = new Set();
+  for (const [, e] of entries) for (const p of e.paths || []) referenced.add(p);
+  t('every-registry-path-id-resolves',
+    [...referenced].every(p => RETRIEVAL_PATHS[p]));
+
+  // Every field a path claims to satisfy is a registered field.
+  t('every-satisfies-field-registered',
+    pathIds.every(id => RETRIEVAL_PATHS[id].satisfies.every(f => FIELD_REGISTRY[f])));
+
+  // The witness fragment appears verbatim in the assembled ask — the
+  // code-witnessing contract depends on it.
+  t('every-witness-inside-its-ask',
+    pathIds.every(id => askFor(id).includes(RETRIEVAL_PATHS[id].witness)));
+
+  // Softeners are structurally absent: the ask is assembled from data, so
+  // there is nothing to detect.
+  const SOFTENERS = /\b(roughly|approximately|ballpark|a rough idea|if you know it)\b/i;
+  t('no-softener-in-any-ask', pathIds.every(id => !SOFTENERS.test(askFor(id))));
+
+  // No em-dash anywhere in ask text (visible-stream brand rule).
+  t('no-emdash-in-any-ask', pathIds.every(id => !askFor(id).includes('—')));
+
+  // The deferral is never offered: no template suggests skipping or
+  // coming back later.
+  const DEFERRAL = /\b(skip this|come back to (?:this|it) later|leave (?:this|it) for now|we can do this later)\b/i;
+  t('no-deferral-in-any-ask', pathIds.every(id => !DEFERRAL.test(askFor(id))));
+
+  // Witness detection: verbatim delivery is detected through streaming
+  // whitespace and typographic apostrophes; a paraphrase is NOT.
+  const loanAsk = askFor('loan_details');
+  t('witness-detects-verbatim-ask',
+    servedFieldIds('Warm words first. ' + loanAsk + ' And warm words after.')
+      .includes('home.mortgage_balance'));
+  t('witness-tolerates-wrapping',
+    servedFieldIds(loanAsk.replace(/ /g, '\n')).includes('home.mortgage_balance'));
+  t('witness-rejects-paraphrase',
+    servedFieldIds('Could you open your banking app and check the loan balance for me?').length === 0);
+  t('witness-serves-whole-visit',   // one visit satisfies every declared field
+    (() => { const s = servedFieldIds(loanAsk);
+      return ['home.rate_percent', 'home.has_offset', 'home.offset_balance', 'buffer.linked_to_loan']
+        .every(f => s.includes(f)); })());
+
+  return { pass: failures.length === 0, total: 10, failures };
+}
