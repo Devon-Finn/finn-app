@@ -42,10 +42,12 @@
 
    Run in the Browser pane: blob-import the pipeline, registry, paths,
    merge and linter libs plus finn-derived.js and finn-triggers.js (the
-   last two attach to window), then call
+   last two attach to window), plus finn-components.js and finn-panels.js
+   and the parsed finn-library.json, then call
      runFixtureHousehold({ pipeline, registry, paths, linter,
                            derive: window.finnDerived.derive,
-                           evaluate: window.finnTriggers.evaluate })       */
+                           evaluate: window.finnTriggers.evaluate,
+                           panels: window.finnPanels, library })          */
 
 const YEAR_NOW = 2026;
 
@@ -104,7 +106,7 @@ function makeSession(pipeline, pathsMod, sessionId, startPicture) {
   return { reply, replyWithoutCapture, rows: () => rows, picture: () => picture };
 }
 
-export function runFixtureHousehold({ pipeline, registry, paths, linter, derive, evaluate }) {
+export function runFixtureHousehold({ pipeline, registry, paths, linter, derive, evaluate, panels, library }) {
   const failures = [];
   const t = (name, cond) => { if (!cond) failures.push(name); };
   const lint = (rows, picture) => linter.runConductLinter({
@@ -323,6 +325,29 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
   t('loan-split-alone-fires-neither', !has81(evalDebts(splitOnly, mortgaged)) && !has81(evalDebts(splitOnly, renting)));
   const companyLoan = [{ id: 'pl2', type: 'personal_loan', borrower: 'company', balance: 30000, rate_percent: 9.9, minimum_monthly: 640 }];
   t('company-borrower-personal-loan-fires-neither', !has81(evalDebts(companyLoan, mortgaged)) && !has81(evalDebts(companyLoan, renting)));
+  // 4.1 fired on multiple_accounts alone, with no single owner holding two
+  // funds, omits its position line rather than rendering "none recorded" in
+  // both slots. The insight still fires and still renders on tile 4. Needs
+  // panels + library; missing either fails the check, never skips it.
+  {
+    let ok = false;
+    try {
+      const flagOnly = { super: { funds: [
+        { id: 'f1', fund: 'Fund One', owner: 'you', balance: 60000, has_insurance: null },
+        { id: 'f2', fund: 'Fund Two', owner: 'partner', balance: 40000, has_insurance: null },
+      ], multiple_accounts: true, _confidence: 'stated' } };
+      const fDer = derive(flagOnly);
+      const fEv = evaluate(flagOnly, { yearNow: YEAR_NOW, derived: fDer });
+      const entry41 = library.insights.find(e => e.id === '4.1');
+      const tileHtml = panels.renderTile(4, flagOnly, fDer, fEv.tiles.find(x => x.tile === 4), library);
+      ok = fEv.insight_ids.includes('4.1')
+        && panels.fillPositionLine(entry41.position_line, flagOnly, fDer) === null
+        && tileHtml.includes(entry41.title)
+        && !tileHtml.includes('none recorded none recorded')
+        && !tileHtml.includes('none recorded holds');
+    } catch (e) { ok = false; }
+    t('4.1-no-single-owner-position-line-omitted', ok);
+  }
   t('lender-note-once-on-tile-1', ev.tiles[0].lender_paid_note_once === true);
   t('ownership-block-stands-down',
     ev.tiles[6].insights.find(i => i.id === '7.2').ownership_block_suppressed === true);
@@ -421,7 +446,7 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
 
   return {
     pass: failures.length === 0,
-    total: 81,
+    total: 82,
     failures,
     hand_computed: {
       home_equity: 410000, lvr_percent: 56.8, surplus_monthly: 3402, buffer_months: 2.6,

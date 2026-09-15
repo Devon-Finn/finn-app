@@ -173,8 +173,11 @@
       accessible_savings: money(buf.accessible_savings),
       where_held: text(buf.where_held) && esc(text(buf.where_held)),
       // Carries the verb, so the template reads for "you" and a name alike.
-      owner_display: multiOwner ? (multiOwner[0] === 'you' ? 'You hold' : esc(multiOwner[0]) + ' holds') : null,
-      fund_count_display: multiOwner ? String(multiOwner[1]) : null,
+      // With no single owner holding two funds (4.1 fired on
+      // multiple_accounts alone) both are undefined, not null: the line is
+      // omitted rather than rendering "none recorded" twice. 4.1 still fires.
+      owner_display: multiOwner ? (multiOwner[0] === 'you' ? 'You hold' : esc(multiOwner[0]) + ' holds') : undefined,
+      fund_count_display: multiOwner ? String(multiOwner[1]) : undefined,
       life_display: coverDisplay(prot.life) ?? undefined,
       ip_display: coverDisplay(prot.income_protection) ?? undefined,
       tpd_display: coverDisplay(prot.tpd) ?? undefined,
