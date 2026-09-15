@@ -680,7 +680,7 @@ function renderHero(completed) {
   document.getElementById('progLabel').textContent = n + ' of 8 areas built';
   document.getElementById('progFill').style.width = (n / 8 * 100) + '%';
   if (n === 8) {
-    document.getElementById('heroLine').innerHTML = 'Your picture’s <span class="fr">complete</span>.';
+    document.getElementById('heroLine').innerHTML = 'Every area’s <span class="fr">covered</span>.';
     document.getElementById('hdrT').textContent = 'Your picture, captured';
   }
 }
@@ -770,9 +770,10 @@ document.getElementById('dpBack').addEventListener('click', closeDetail);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
 
 /* ── conversation ── */
-// A refused server-side save must never pass silently in a paid session.
-// After each turn we re-read last_write_status; a fresh failure surfaces
-// as a visible system notice inviting the person to re-share the detail.
+// A turn that could not be saved at all must never pass silently in a paid
+// session. After each turn we re-read last_write_status; a fresh total
+// failure surfaces as a quiet notice. It never asks the person to repeat
+// themselves (15 Sept walk).
 let lastNoticedFailure = null;
 function checkWriteStatus(turnStartedAt) {
   const s = lastPicture && lastPicture.last_write_status;
@@ -782,7 +783,9 @@ function checkWriteStatus(turnStartedAt) {
   lastNoticedFailure = s.at;
   const div = document.createElement('div');
   div.className = 'msg sys-note';
-  div.textContent = 'Heads up — the details from your last message didn’t save to your picture properly. Nothing is lost (they’ve been set aside for review), but they’re not in your picture yet. Mind sharing that last part again?';
+  // Shown only when a whole turn could not be saved (a partial save is
+  // handled by Finn re-asking in its own words). Finn owns the slip.
+  div.textContent = 'I didn’t manage to note that last part properly. I’ll pick it up again with you in a moment, so there’s no need to do anything differently.';
   messagesEl.appendChild(div);
   scrollChat();
 }

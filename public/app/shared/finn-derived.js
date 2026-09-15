@@ -34,13 +34,18 @@
     const inv = d.investments || {};
     const debts = d.debts || {};
 
-    // home_equity = home.value_estimate − home.mortgage_balance
+    // home_equity = home.value_estimate − everything secured on the home:
+    // the home loan plus any debts item linked to it
+    // (secured_against_asset_id "home", e.g. a split used for shares).
+    const homeSecured = (Array.isArray(debts.items) ? debts.items : [])
+      .filter(it => it && it.secured_against_asset_id === 'home' && num(it.balance) !== null)
+      .reduce((a, it) => a + it.balance, 0);
     const home_equity = (num(home.value_estimate) !== null && num(home.mortgage_balance) !== null)
-      ? home.value_estimate - home.mortgage_balance : null;
+      ? home.value_estimate - home.mortgage_balance - homeSecured : null;
 
-    // lvr_percent = mortgage_balance ÷ value_estimate × 100
+    // lvr_percent = lending secured on the home ÷ value_estimate × 100
     const lvr_percent = (num(home.mortgage_balance) !== null && num(home.value_estimate) !== null && home.value_estimate > 0)
-      ? Math.round(home.mortgage_balance / home.value_estimate * 1000) / 10 : null;
+      ? Math.round((home.mortgage_balance + homeSecured) / home.value_estimate * 1000) / 10 : null;
 
     // surplus_monthly = (all net monthly income) − living_monthly
     //                   − housing_repayment_monthly − sum(debts minimums)
@@ -60,6 +65,9 @@
     function monthlyHousing() {
       if (exp.includes_housing === true) return 0;
       if (num(exp.housing_repayment_monthly) !== null) return exp.housing_repayment_monthly;
+      // The loan screen gives the home loan repayment; use it when the
+      // expenses copy was not captured separately.
+      if (num(home.repayment_monthly) !== null) return home.repayment_monthly;
       if (home.owns_home === false || (num(home.mortgage_balance) !== null && home.mortgage_balance === 0)) return 0;
       return null;
     }

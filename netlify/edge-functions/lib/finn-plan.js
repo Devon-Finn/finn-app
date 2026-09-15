@@ -1,0 +1,412 @@
+/* THE INFORMATION PLAN — the guide model's layer 2
+   (Finn-Guide-Model-Discovery-Design-Sept2026, Devon's direction after the
+   15 Sept walk).
+
+   Finn runs the Clarity Session like an experienced planner's discovery
+   meeting, without a planner's conclusions. Behind every turn, CODE works
+   out what the picture still needs, where each piece goes, and which trip
+   gets it. The model reads this as its working notes; code owns it.
+
+   Pure: buildPlan(domains, goals) → plan. No IO, no model.
+
+   THE GUARDRAIL (tested): the plan is driven by the SHAPE of the household
+   (presence, structure, cardinality, completeness), never by MAGNITUDE.
+   No branch below compares a figure's size, except the explicit-zero
+   convention (a 0 means "none", which is presence, not size). Scaling
+   every figure leaves the plan unchanged.
+
+   What it decides:
+   - the situation map: which branches the household's shape opens
+   - per area: the required fields, which are missing, which are stored but
+     unverified, which were put off by the person
+   - the sweeps still to ask (code-emitted fixed questions)
+   - the trips: missing and unverified items grouped by where they live
+   - coverage: an area is covered when nothing required is missing (a
+     to-verify or deferred item counts as handled) and its sweeps are asked
+   - whether the session may close */
+
+import { FIELD_REGISTRY, resolveEntry } from "./finn-field-registry.js";
+
+export const AREAS = ["income", "assets", "liabilities", "buffer", "super", "protection", "estate", "goals"];
+
+// Code-emitted sweep questions. The model emits [SWEEP: id]; code
+// substitutes the text and records the sweep as asked.
+export const SWEEPS = {
+  other_income: {
+    area: "income",
+    text: "Apart from what we've covered, does any other money come in regularly? Rent, dividends or distributions, anything paid out of a company or trust, a side business, government payments, or support from family.",
+  },
+  other_assets: {
+    area: "assets",
+    text: "Beyond the home and super, what else do you own? Another property, shares or ETFs, managed funds, crypto, cash held somewhere separate, or anything held inside a company, trust or SMSF. Even if it feels small, it helps to have it on the list.",
+  },
+  other_debts: {
+    area: "liabilities",
+    text: "Now the borrowing side, all of it in one go. Apart from the home loan, is there anything else owing? A credit card, a car loan, a personal loan, buy now pay later, a split off the mortgage, a line of credit, HECS, money owed to family or the tax office, and anything borrowed inside a company or trust.",
+  },
+  other_super: {
+    area: "super",
+    text: "Does either of you have more than one super account? Old jobs often leave one behind. myGov lists every account in your name under the ATO section, so if there's any doubt, that's the place to check.",
+  },
+};
+
+const TRIP_LABELS = {
+  payslip: "a payslip",
+  loan_details: "the banking app, on the loan screen",
+  bank_statement: "the banking app, on the account balances",
+  living_costs: "twelve months of transactions",
+  super_statement: "the super fund's app or myGov",
+  policy_schedule: "the insurance page or policy schedule",
+  investment_platform: "the investing platform",
+  home_value: "a lender valuation, rates notice or property estimate",
+  rental_income: "the lease or agent statement",
+  business_income: "the tax return or accountant's figures",
+  hecs: "myGov, ATO section",
+  conversation: "just a conversation",
+};
+
+const ENTITY_BORROWERS = ["company", "trust", "smsf", "partnership"];
+const UNSECURABLE = ["credit_card", "bnpl", "hecs_help", "tax_debt"];
+
+const isObj = v => v && typeof v === "object" && !Array.isArray(v);
+const arr = v => Array.isArray(v) ? v.filter(isObj) : [];
+const has = v => v !== null && v !== undefined && v !== "";
+const num = v => typeof v === "number" && isFinite(v);
+
+// Labels for plan-only ids that are not registry fields.
+const EXTRA_LABELS = {
+  "context.children": "whether there are children, and their ages",
+  "super.funds": "each super account",
+  "income.other.entity": "what the company or trust earns or pays out to you",
+  "income.other.holdings": "the dividends or distributions from the shares",
+  "income.other.property": "the rent from this property",
+  "income.other.business": "the business profit",
+  "investments.properties[].loan": "what's owing against this property, or that nothing is",
+  "debts.hecs_balance": "any HECS or HELP balance (none is an answer)",
+  "protection.inside_super_detail": "which cover sits inside the super fund that has insurance",
+  "goals.directions": "what they want, in their own words",
+};
+
+function labelFor(field, item) {
+  if (EXTRA_LABELS[field]) return EXTRA_LABELS[field];
+  const e = resolveEntry(FIELD_REGISTRY[field], item);
+  return e && e.label ? e.label : field;
+}
+function tripFor(field, item) {
+  const e = resolveEntry(FIELD_REGISTRY[field], item);
+  if (e && e.retrieval !== "none" && Array.isArray(e.paths) && e.paths.length) return e.paths[0];
+  if (field === "income.other.property") return "rental_income";
+  if (field === "income.other.holdings") return "investment_platform";
+  if (field === "income.other.entity" || field === "income.other.business") return "business_income";
+  if (field === "investments.properties[].loan") return "loan_details";
+  if (field === "debts.hecs_balance") return "hecs";
+  if (field === "super.funds" || field === "protection.inside_super_detail") return "super_statement";
+  return "conversation";
+}
+
+function itemLabel(domain, item) {
+  if (domain === "super") return (item.fund || "a super account") + (item.owner ? " (" + item.owner + ")" : "");
+  if (domain === "debts") return String(item.type || "a debt").replace(/_/g, " ") + (item.borrower ? " (" + item.borrower + ")" : "");
+  if (domain === "investments") return "property" + (item.held_in ? " held in " + item.held_in : "") + (item.use ? ", " + item.use : "");
+  if (domain === "income") return String(item.source || "income").replace(/_/g, " ");
+  return domain;
+}
+
+/* The ledger: flags.to_verify entries keyed field|item_id. */
+function ledgerIndex(domains) {
+  const idx = new Map();
+  const tv = domains && isObj(domains.flags) && Array.isArray(domains.flags.to_verify) ? domains.flags.to_verify : [];
+  for (const e of tv) if (isObj(e) && e.field) idx.set(e.field + "|" + (e.item_id || ""), e);
+  return { idx, list: tv.filter(isObj) };
+}
+
+export function buildPlan(domains, goals, opts = {}) {
+  const d = isObj(domains) ? domains : {};
+  const g = isObj(goals) ? goals : {};
+  const ctx = d.context || {}, inc = d.income || {}, exp = d.expenses || {}, home = d.home || {};
+  const buf = d.buffer || {}, sup = d.super || {}, prot = d.protection || {}, est = d.estate || {};
+  const inv = d.investments || {}, debts = d.debts || {};
+  const flags = isObj(d.flags) ? d.flags : {};
+  const sweepsAsked = new Set(Array.isArray(flags.sweeps_asked) ? flags.sweeps_asked : []);
+  const { idx: ledger, list: ledgerList } = ledgerIndex(d);
+
+  const props = arr(inv.properties);
+  const funds = arr(sup.funds);
+  const items = arr(debts.items);
+  const other = arr(inc.other);
+  const kids = Array.isArray(ctx.children) ? ctx.children : null;
+  const couple = num(ctx.adults) && ctx.adults >= 2;
+  const hasEntity = (isObj(inc.entity) && has(inc.entity.type)) || ["company", "trust"].includes(inc.structure)
+    || props.some(p => ENTITY_BORROWERS.includes(String(p.held_in || "").toLowerCase()))
+    || items.some(it => ENTITY_BORROWERS.includes(it.borrower));
+  const hasHoldings = (num(inv.shares_value) && inv.shares_value !== 0) || (num(inv.managed_funds_value) && inv.managed_funds_value !== 0);
+  const ownsHome = home.owns_home === true;
+  const mortgaged = ownsHome && !(num(home.mortgage_balance) && home.mortgage_balance === 0);
+
+  const areas = {};
+  for (const a of AREAS) areas[a] = { required: [], missing: [], to_verify: [], deferred: [], sweeps: [] };
+
+  // need(area, field, present, item?, domainForItem?)
+  function need(area, field, present, item, domainKey) {
+    const itemId = item && item.id ? item.id : null;
+    const key = field + "|" + (itemId || "");
+    const entry = ledger.get(key);
+    const rec = {
+      field, item_id: itemId,
+      label: labelFor(field, item) + (item && domainKey ? ", " + itemLabel(domainKey, item) : ""),
+      trip: tripFor(field, item),
+    };
+    areas[area].required.push(rec);
+    if (present) {
+      if (entry && entry.reason !== "deferred") areas[area].to_verify.push({ ...rec, reason: entry.reason, confidence: entry.confidence });
+      return;
+    }
+    if (entry && entry.reason === "deferred") { areas[area].deferred.push({ ...rec, nudges: entry.nudges || 1 }); return; }
+    areas[area].missing.push(rec);
+  }
+  function sweep(area, id) {
+    areas[area].sweeps.push({ id, asked: sweepsAsked.has(id) });
+  }
+
+  /* ── income (household context, income, expenses) ── */
+  need("income", "context.adults", has(ctx.adults));
+  need("income", "context.owner_age", has(ctx.owner_age));
+  if (couple) need("income", "context.partner_age", has(ctx.partner_age));
+  need("income", "context.children", kids !== null);
+  need("income", "income.structure", has(inc.structure));
+  if (["paye", "company", "mixed"].includes(inc.structure) || !has(inc.structure)) {
+    need("income", "income.salary_gross_annual", has(inc.salary_gross_annual));
+    if (!(num(inc.salary_gross_annual) && inc.salary_gross_annual === 0)) {
+      need("income", "income.salary_net_monthly", has(inc.salary_net_monthly));
+    }
+  }
+  if (couple) {
+    need("income", "income.partner_salary_gross_annual", has(inc.partner_salary_gross_annual));
+    if (!(num(inc.partner_salary_gross_annual) && inc.partner_salary_gross_annual === 0)) {
+      need("income", "income.partner_salary_net_monthly", has(inc.partner_salary_net_monthly));
+    }
+  }
+  if (num(inc.salary_gross_annual) || num(inc.partner_salary_gross_annual)) {
+    need("income", "income.employer_super_on", Array.isArray(inc.employer_super_on));
+  }
+  // Producers: every income-producing thing needs its income (or an
+  // explicit zero). Presence-driven only.
+  for (const p of props) {
+    if (num(p.rent_monthly) && p.rent_monthly === 0) continue;
+    const entry = other.find(o => o.linked_asset_id && o.linked_asset_id === p.id)
+      || (props.length === 1 ? other.find(o => ["rental_residential", "rental_commercial"].includes(o.source) && !o.linked_asset_id) : undefined);
+    need("income", "income.other.property", !!(entry && has(entry.amount_annual)), p, "investments");
+    if (entry && entry.basis === "gross") {
+      need("income", "income.other[].costs_annual", has(entry.costs_annual), entry, "income");
+    } else if (entry && !has(entry.basis)) {
+      need("income", "income.other[].basis", false, entry, "income");
+    }
+  }
+  if (hasEntity) {
+    const ent = other.find(o => o.linked_asset_id === "entity" || ["trust_distribution", "business_profit", "director_fee"].includes(o.source));
+    need("income", "income.other.entity", !!(ent && has(ent.amount_annual)));
+  }
+  if (hasHoldings) {
+    const div = other.find(o => o.linked_asset_id === "holdings" || ["dividends", "distributions"].includes(o.source));
+    need("income", "income.other.holdings", !!(div && has(div.amount_annual)));
+  }
+  if (inc.structure === "sole_trader") {
+    const bp = other.find(o => o.source === "business_profit");
+    need("income", "income.other.business", !!(bp && has(bp.amount_annual)));
+  }
+  need("income", "expenses.living_monthly", has(exp.living_monthly));
+  if (has(exp.living_monthly)) need("income", "expenses.includes_housing", typeof exp.includes_housing === "boolean");
+  sweep("income", "other_income");
+
+  /* ── assets (home, investments) ── */
+  need("assets", "home.owns_home", typeof home.owns_home === "boolean");
+  if (ownsHome) {
+    need("assets", "home.value_estimate", has(home.value_estimate));
+    need("assets", "home.value_source", has(home.value_source));
+  }
+  for (const p of props) {
+    need("assets", "investments.properties[].value_estimate", has(p.value_estimate), p, "investments");
+    need("assets", "investments.properties[].held_in", has(p.held_in), p, "investments");
+    need("assets", "investments.properties[].use", has(p.use), p, "investments");
+  }
+  if (has(inv.shares_value) || has(inv.managed_funds_value)) {
+    need("assets", "investments.held_in", has(inv.held_in));
+  }
+  sweep("assets", "other_assets");
+
+  /* ── liabilities (home loan, property loans, debts, HECS) ── */
+  if (ownsHome) {
+    need("liabilities", "home.mortgage_balance", has(home.mortgage_balance));
+    if (mortgaged) {
+      for (const f of ["rate_percent", "rate_type", "lender", "repayment_monthly", "term_remaining_years"]) {
+        need("liabilities", "home." + f, has(home[f]));
+      }
+      need("liabilities", "home.has_offset", typeof home.has_offset === "boolean");
+      if (home.has_offset === true) need("liabilities", "home.offset_balance", has(home.offset_balance));
+    }
+  }
+  for (const p of props) {
+    const secured = items.some(it => it.secured_against_asset_id && it.secured_against_asset_id === p.id);
+    need("liabilities", "investments.properties[].loan", has(p.loan_balance) || secured, p, "investments");
+  }
+  for (const it of items) {
+    need("liabilities", "debts.items[].type", has(it.type), it, "debts");
+    need("liabilities", "debts.items[].purpose", has(it.purpose), it, "debts");
+    need("liabilities", "debts.items[].borrower", has(it.borrower), it, "debts");
+    need("liabilities", "debts.items[].balance", has(it.balance), it, "debts");
+    const clearedCard = it.type === "credit_card" && it.cleared_monthly === true;
+    if (it.type === "credit_card") need("liabilities", "debts.items[].cleared_monthly", typeof it.cleared_monthly === "boolean", it, "debts");
+    if (!clearedCard && it.type !== "hecs_help") {
+      need("liabilities", "debts.items[].rate_percent", has(it.rate_percent), it, "debts");
+      need("liabilities", "debts.items[].minimum_monthly", has(it.minimum_monthly), it, "debts");
+    }
+    if (!UNSECURABLE.includes(it.type) && it.type !== "family_loan") {
+      need("liabilities", "debts.items[].security", has(it.security), it, "debts");
+    }
+  }
+  need("liabilities", "debts.hecs_balance", has(debts.hecs_balance) || items.some(it => it.type === "hecs_help"));
+  sweep("liabilities", "other_debts");
+
+  /* ── buffer ── */
+  need("buffer", "buffer.accessible_savings", has(buf.accessible_savings));
+  need("buffer", "buffer.where_held", has(buf.where_held));
+
+  /* ── super ── */
+  need("super", "super.funds", funds.length > 0);
+  for (const f of funds) {
+    need("super", "super.funds[].fund", has(f.fund), f, "super");
+    need("super", "super.funds[].owner", has(f.owner), f, "super");
+    need("super", "super.funds[].balance", has(f.balance), f, "super");
+    need("super", "super.funds[].has_insurance", typeof f.has_insurance === "boolean", f, "super");
+  }
+  if (funds.length) need("super", "super.extra_contributions", typeof sup.extra_contributions === "boolean");
+  sweep("super", "other_super");
+
+  /* ── protection ── */
+  const covers = ["life", "tpd", "income_protection", "trauma"];
+  for (const c of covers) {
+    const cv = isObj(prot[c]) ? prot[c] : {};
+    need("protection", `protection.${c}.held`, typeof cv.held === "boolean");
+    if (cv.held === true) {
+      need("protection", `protection.${c}.amount`, has(cv.amount));
+      need("protection", `protection.${c}.inside_super`, typeof cv.inside_super === "boolean");
+    }
+  }
+  // A fund with insurance inside it means some cover is held inside super.
+  // If nothing in protection says so, the picture contradicts itself.
+  if (funds.some(f => f.has_insurance === true) && !covers.some(c => isObj(prot[c]) && prot[c].held === true && prot[c].inside_super === true)) {
+    need("protection", "protection.inside_super_detail", false);
+  }
+
+  /* ── estate ── */
+  need("estate", "estate.will.in_place", isObj(est.will) && has(est.will.in_place));
+  if (isObj(est.will) && est.will.in_place === true) need("estate", "estate.will.last_updated", has(est.will.last_updated));
+  need("estate", "estate.poa.in_place", isObj(est.poa) && has(est.poa.in_place));
+  if (kids && kids.length) need("estate", "estate.guardianship.in_place", isObj(est.guardianship) && has(est.guardianship.in_place));
+  if (funds.length) need("estate", "estate.super_nomination.in_place", isObj(est.super_nomination) && has(est.super_nomination.in_place));
+
+  /* ── goals ── */
+  need("goals", "goals.directions", Array.isArray(g.directions) && g.directions.length > 0);
+
+  /* ── coverage ── */
+  const covered = [];
+  for (const a of AREAS) {
+    const A = areas[a];
+    A.sweeps_pending = A.sweeps.filter(s => !s.asked).map(s => s.id);
+    A.covered = A.missing.length === 0 && A.sweeps_pending.length === 0;
+    if (A.covered) covered.push(a);
+  }
+
+  /* ── situation map (shape only) ── */
+  const signals = [];
+  if (has(ctx.adults)) signals.push(couple ? "couple" : "single adult");
+  if (kids) signals.push(kids.length ? kids.length + " child" + (kids.length === 1 ? "" : "ren") : "no children");
+  if (has(inc.structure)) signals.push("income structure: " + inc.structure);
+  if (hasEntity) signals.push("a company or trust is in the picture: gather its assets, its borrowing, and what it earns or pays out");
+  if (typeof home.owns_home === "boolean") signals.push(ownsHome ? "owns the home" : "does not own the home");
+  if (props.length) signals.push(props.length + " other propert" + (props.length === 1 ? "y" : "ies") + ": each needs value, whose name, use, loan, and its rent and costs");
+  if (has(inv.shares_value) || has(inv.managed_funds_value)) signals.push("holds shares or funds: needs whose name and what they pay out");
+  if (items.length) signals.push(items.length + " debt item" + (items.length === 1 ? "" : "s") + " beyond the home loan");
+  if (funds.length) signals.push(funds.length + " super account" + (funds.length === 1 ? "" : "s"));
+  if (funds.some(f => f.has_insurance === true)) signals.push("insurance sits inside super: find which covers and how much");
+
+  // Shape phase: the household's shape is not yet mapped.
+  const shapeOpen = [];
+  if (!has(ctx.adults)) shapeOpen.push("who is in the household");
+  if (kids === null) shapeOpen.push("children and ages");
+  if (!has(inc.structure)) shapeOpen.push("how each income is earned (employee, own company, sole trader, trust)");
+  if (typeof home.owns_home !== "boolean") shapeOpen.push("whether they own the home they live in");
+  for (const id of ["other_assets", "other_debts", "other_super", "other_income"]) {
+    if (!sweepsAsked.has(id)) shapeOpen.push("[SWEEP: " + id + "]");
+  }
+  const phase = shapeOpen.length ? "shape" : "trips";
+
+  // Trips: missing + to_verify grouped by source, most items first.
+  const tripMap = new Map();
+  for (const a of AREAS) {
+    for (const r of [...areas[a].missing.map(x => ({ ...x, status: "missing" })), ...areas[a].to_verify.map(x => ({ ...x, status: "to verify" }))]) {
+      if (!tripMap.has(r.trip)) tripMap.set(r.trip, []);
+      tripMap.get(r.trip).push({ ...r, area: a });
+    }
+  }
+  const trips = [...tripMap.entries()]
+    .map(([id, list]) => ({ id, where: TRIP_LABELS[id] || id, items: list }))
+    .sort((x, y) => (x.id === "conversation") - (y.id === "conversation") || y.items.filter(i => i.status === "missing").length - x.items.filter(i => i.status === "missing").length);
+
+  const missingAll = AREAS.flatMap(a => areas[a].missing.map(m => ({ ...m, area: a })));
+  const deferredAll = AREAS.flatMap(a => areas[a].deferred.map(m => ({ ...m, area: a })));
+  const toVerifyAll = AREAS.flatMap(a => areas[a].to_verify.map(m => ({ ...m, area: a })));
+  const sweepsPending = AREAS.flatMap(a => areas[a].sweeps_pending);
+  const allCovered = covered.length === AREAS.length;
+
+  return {
+    phase, signals, shapeOpen, areas, covered, trips,
+    missing: missingAll, deferred: deferredAll, to_verify: toVerifyAll,
+    sweeps_pending: sweepsPending,
+    ledger: ledgerList,
+    can_close: allCovered,
+  };
+}
+
+/* The plan as the model's working notes. Compact, factual, no figures. */
+export function planPromptSection(plan, opts = {}) {
+  const L = [];
+  L.push("\n\n═══ FINN'S WORKING NOTES (computed by code every turn; the person never sees this) ═══");
+  L.push("Use these to decide what to ask next. They describe what the picture still NEEDS, never what anything means. Never select or prioritise a question because of the size of a figure.");
+  L.push("Item references are shown as {field#item_id}; use exactly those in \"deferrals\" when the person puts one off.");
+  L.push("Phase: " + (plan.phase === "shape" ? "SHAPE, map the household before gathering figures." : "TRIPS, gather figures one source at a time."));
+  if (plan.signals.length) L.push("Household shape so far: " + plan.signals.join("; ") + ".");
+  if (plan.shapeOpen.length) L.push("Shape still to map: " + plan.shapeOpen.join("; ") + ".");
+  const areaLine = AREAS.map(a => {
+    const A = plan.areas[a];
+    if (A.covered) return a + " covered";
+    const bits = [];
+    if (A.missing.length) bits.push(A.missing.length + " missing");
+    if (A.to_verify.length) bits.push(A.to_verify.length + " to verify");
+    if (A.deferred.length) bits.push(A.deferred.length + " put off");
+    if (A.sweeps_pending.length) bits.push("sweep not asked");
+    return a + " (" + bits.join(", ") + ")";
+  });
+  L.push("Areas: " + areaLine.join("; ") + ".");
+  if (plan.trips.length) {
+    L.push("By source (take everything on one source in a single visit):");
+    for (const t of plan.trips.slice(0, 8)) {
+      const tag = i => i.label + " {" + i.field + (i.item_id ? "#" + i.item_id : "") + "}";
+      const miss = t.items.filter(i => i.status === "missing").map(tag);
+      const ver = t.items.filter(i => i.status === "to verify").map(tag);
+      L.push("- " + t.where + ": " + [miss.length ? "missing: " + miss.slice(0, 10).join("; ") : "", ver.length ? "stored but unverified: " + ver.slice(0, 8).join("; ") : ""].filter(Boolean).join(" | "));
+    }
+  }
+  if (plan.deferred.length) {
+    L.push("Put off by the person (re-raise when it's easy to grab, e.g. they're already on that source; never push an item with 2 nudges): " +
+      plan.deferred.map(x => x.label + " [nudges " + (x.nudges || 1) + "/2, field " + x.field + (x.item_id ? ", item " + x.item_id : "") + "]").slice(0, 14).join("; ") + ".");
+  }
+  if (plan.sweeps_pending.length) L.push("Sweeps not yet asked: " + plan.sweeps_pending.map(s => "[SWEEP: " + s + "]").join(" ") + ".");
+  if (opts.unsaved && opts.unsaved.length) {
+    L.push("Last turn these details did not save: " + opts.unsaved.slice(0, 8).join("; ") + ". Ask for them again naturally, owning it as your slip, and capture them correctly this time.");
+  }
+  L.push(plan.can_close
+    ? "Closing: every area is covered. When the person is ready, emit [FRAME: close] then walk every item still to verify or put off, one line each with where it lives, then set session_complete true."
+    : "Closing is NOT available yet: code will refuse session_complete until every area above is covered (each missing item gathered or put off by the person, every sweep asked). Do not wrap up, summarise as finished, or ask 'anything else before we wrap up' while items remain.");
+  return L.join("\n");
+}

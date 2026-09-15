@@ -13,6 +13,7 @@
 import { FIELD_REGISTRY, CONFIDENCE_RANK, PRODUCERS } from "./lib/finn-field-registry.js";
 import { RETRIEVAL_PATHS, assertRequiredServable } from "./lib/finn-retrieval-paths.js";
 import { runConductLinter } from "./lib/finn-conduct-linter.js";
+import { buildPlan } from "./lib/finn-plan.js";
 
 assertRequiredServable(FIELD_REGISTRY, RETRIEVAL_PATHS);
 
@@ -72,7 +73,7 @@ async function runAndStore(householdId, sessionId) {
     `/rest/v1/capture_log?household_id=eq.${householdId}&session_id=eq.${sessionId}` +
     `&select=status,raw_text,capture,errors,field_id,created_at&order=created_at.asc`);
   const rows = rowsRes.ok ? await rowsRes.json() : [];
-  const picRes = await sbFetch(`/rest/v1/picture?household_id=eq.${householdId}&select=domains,refusals`);
+  const picRes = await sbFetch(`/rest/v1/picture?household_id=eq.${householdId}&select=domains,goals,refusals`);
   const pics = picRes.ok ? await picRes.json() : [];
   const picture = pics[0] || { domains: {}, refusals: [] };
   const report = runConductLinter({
@@ -81,6 +82,7 @@ async function runAndStore(householdId, sessionId) {
     paths: RETRIEVAL_PATHS,
     confidenceRank: CONFIDENCE_RANK,
     producers: PRODUCERS,
+    plan: buildPlan,
   });
   const ins = await sbFetch(`/rest/v1/conduct_report`, {
     method: "POST",

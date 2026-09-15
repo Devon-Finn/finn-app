@@ -12,107 +12,71 @@ export function runGateTests(mod) {
   const { FIELD_REGISTRY, persistenceGate } = mod;
   const failures = [];
   const t = (name, cond) => { if (!cond) failures.push(name); };
+  // STORE EVERY FIGURE, FLAG IT TO VERIFY (Devon, 15 Sept 2026). The gate
+  // never refuses a figure for its evidence level; it flags it. Only an
+  // enum written without its item-sibling requires is refused, leaf only.
+  const G = (patch, merged, ref) => persistenceGate(patch, merged, ref || new Set());
+  const flagged = (r, id, reason) => r.flags.some(f => f.field === id && (!reason || f.reason === reason));
+  const cleared = (r, id) => r.clears.some(c => c.field === id);
 
-  // Replicates clarity-chat's validity computation, per the contract.
-  const validSet = (claimed, servedThisSession) =>
-    new Set(claimed.filter(f => servedThisSession.has(f)));
-
-  /* ── the original floor/requires cases, under three-state retrieval ── */
-  t('required-stated-blocked',
-    persistenceGate({ home: { mortgage_balance: 512000, _confidence: 'stated' } }, { home: { mortgage_balance: 512000 } }, new Set()).errors.length === 1);
-  t('required-document-passes',
-    persistenceGate({ home: { mortgage_balance: 512000, _confidence: 'document' } }, { home: {} }, new Set()).ok);
+  /* ── floors are verification status now ── */
+  const stated = G({ home: { mortgage_balance: 512000, _confidence: 'stated' } }, { home: { mortgage_balance: 512000 } });
+  t('required-stated-stores-and-flags', stated.ok && stated.strip.length === 0 && flagged(stated, 'home.mortgage_balance', 'below_floor'));
+  const doc = G({ home: { mortgage_balance: 512000, _confidence: 'document' } }, { home: {} });
+  t('required-document-clears', doc.ok && cleared(doc, 'home.mortgage_balance') && doc.flags.length === 0);
   t('floor-estimated-passes-estimated',
-    persistenceGate({ home: { value_estimate: 900000, _confidence: 'estimated' } }, { home: {} }, new Set()).ok);
-  t('missing-confidence-blocked',
-    persistenceGate({ home: { mortgage_balance: 512000 } }, { home: { mortgage_balance: 512000 } }, new Set()).errors.length === 1);
-  t('offered-stated-passes-no-record',   // offered accepts a stated answer, no refusal needed
-    persistenceGate({ home: { lender: 'CBA', _confidence: 'stated' } }, { home: {} }, new Set()).ok);
-  t('none-passes',
-    persistenceGate({ context: { owner_age: 41, _confidence: 'stated' } }, { context: {} }, new Set()).ok);
-  t('requires-offset-blocked',
-    persistenceGate({ home: { offset_balance: 0, _confidence: 'document' } }, { home: { offset_balance: 0 } }, new Set()).errors.join().includes('home.has_offset'));
+    cleared(G({ home: { value_estimate: 900000, _confidence: 'estimated' } }, { home: {} }), 'home.value_estimate'));
+  const noConf = G({ home: { mortgage_balance: 512000 } }, { home: { mortgage_balance: 512000 } });
+  t('missing-confidence-stores-flagged-unrecorded', noConf.ok && noConf.flags.some(f => f.field === 'home.mortgage_balance' && f.confidence === 'unrecorded'));
+  t('offered-stated-clears',
+    cleared(G({ home: { lender: 'CBA', _confidence: 'stated' } }, { home: {} }), 'home.lender'));
+  t('none-passes-silently', (() => { const r = G({ context: { owner_age: 41, _confidence: 'stated' } }, { context: {} }); return r.ok && r.flags.length === 0; })());
+  const off = G({ home: { offset_balance: 0, _confidence: 'document' } }, { home: { offset_balance: 0 } });
+  t('dotted-requires-soft-flag-not-refusal', off.ok && off.strip.length === 0 && flagged(off, 'home.offset_balance', 'needs:home.has_offset'));
   t('requires-satisfied-from-base',
-    persistenceGate({ home: { offset_balance: 0, _confidence: 'document' } }, { home: { offset_balance: 0, has_offset: true } }, new Set()).ok);
-  t('requires-living-includes-housing',
-    persistenceGate({ expenses: { living_monthly: 5000, _confidence: 'document' } }, { expenses: { living_monthly: 5000 } }, new Set()).errors.length === 1);
+    G({ home: { offset_balance: 0, _confidence: 'document' } }, { home: { offset_balance: 0, has_offset: true } }).flags.length === 0);
+  t('requires-living-includes-housing-soft',
+    flagged(G({ expenses: { living_monthly: 5000, _confidence: 'document' } }, { expenses: { living_monthly: 5000 } }), 'expenses.living_monthly', 'needs:expenses.includes_housing'));
   t('requires-same-patch-ok',
-    persistenceGate({ expenses: { living_monthly: 5000, includes_housing: false, _confidence: 'document' } }, { expenses: { living_monthly: 5000, includes_housing: false } }, new Set()).ok);
-  t('array-field-blocked',
-    persistenceGate({ super: { funds: [{ balance: 80000 }], _confidence: 'stated' } }, { super: { funds: [{ balance: 80000 }] } }, new Set()).errors.join().includes('super.funds[].balance'));
+    G({ expenses: { living_monthly: 5000, includes_housing: false, _confidence: 'document' } }, { expenses: { living_monthly: 5000, includes_housing: false } }).flags.length === 0);
+  const fund = G({ super: { funds: [{ id: 'f1', balance: 80000 }], _confidence: 'stated' } }, { super: { funds: [{ id: 'f1', balance: 80000 }] } });
+  t('array-field-flagged-with-item-id', fund.ok && fund.flags.some(f => f.field === 'super.funds[].balance' && f.item_id === 'f1'));
+  const itemConf = G({ super: { funds: [{ id: 'f2', balance: 80000, _confidence: 'document' }], _confidence: 'stated' } }, { super: {} });
+  t('item-level-confidence-wins', cleared(itemConf, 'super.funds[].balance') && !flagged(itemConf, 'super.funds[].balance'));
   t('never-asked-skipped',
-    persistenceGate({ flags: { hardship: true, _confidence: 'inferred' } }, { flags: { hardship: true } }, new Set()).ok);
+    G({ flags: { hardship: true, _confidence: 'inferred' } }, { flags: { hardship: true } }).flags.length === 0);
 
-  /* ── retrieval_by_type: income.other[] (source-keyed since the Part 2 fold) ── */
-  t('other-government-stated-passes',
-    persistenceGate({ income: { other: [{ source: 'government', entity: 'personal', amount_annual: 8000 }], structure: 'paye', _confidence: 'stated' } },
-      { income: { structure: 'paye' } }, new Set()).ok);
-  t('other-dividends-stated-blocked',
-    persistenceGate({ income: { other: [{ source: 'dividends', linked_asset_id: 'holdings', amount_annual: 3000 }], _confidence: 'stated' } },
-      { income: {} }, new Set()).errors.join().includes('income.other[].amount_annual'));
+  /* ── retrieval_by_type: income.other[] ── */
+  t('other-government-stated-clears',
+    cleared(G({ income: { other: [{ source: 'government', entity: 'personal', amount_annual: 8000 }], structure: 'paye', _confidence: 'stated' } }, { income: { structure: 'paye' } }), 'income.other[].amount_annual'));
+  t('other-dividends-stated-flagged',
+    flagged(G({ income: { other: [{ source: 'dividends', linked_asset_id: 'holdings', amount_annual: 3000 }], _confidence: 'stated' } }, { income: {} }), 'income.other[].amount_annual', 'below_floor'));
   t('other-unknown-source-strictest',
-    persistenceGate({ income: { other: [{ amount_annual: 3000 }], _confidence: 'stated' } },
-      { income: {} }, new Set()).errors.join().includes('income.other[].amount_annual'));
-  t('other-dividends-document-passes',
-    persistenceGate({ income: { other: [{ source: 'dividends', linked_asset_id: 'holdings', amount_annual: 3000 }], _confidence: 'document' } },
-      { income: {} }, new Set()).ok);
-  t('other-director-fee-stated-blocked',
-    persistenceGate({ income: { other: [{ source: 'director_fee', entity: 'company', amount_annual: 20000 }], _confidence: 'stated' } },
-      { income: {} }, new Set()).errors.join().includes('income.other[].amount_annual'));
-  t('other-other-source-stated-passes',
-    persistenceGate({ income: { other: [{ source: 'other', entity: 'personal', amount_annual: 5000 }], _confidence: 'stated' } },
-      { income: {} }, new Set()).ok);
+    flagged(G({ income: { other: [{ amount_annual: 3000 }], _confidence: 'stated' } }, { income: {} }), 'income.other[].amount_annual'));
+  t('other-dividends-document-clears',
+    cleared(G({ income: { other: [{ source: 'dividends', linked_asset_id: 'holdings', amount_annual: 3000 }], _confidence: 'document' } }, { income: {} }), 'income.other[].amount_annual'));
+  t('other-director-fee-stated-flagged',
+    flagged(G({ income: { other: [{ source: 'director_fee', entity: 'company', amount_annual: 20000 }], _confidence: 'stated' } }, { income: {} }), 'income.other[].amount_annual'));
+  t('other-other-source-stated-clears',
+    cleared(G({ income: { other: [{ source: 'other', entity: 'personal', amount_annual: 5000 }], _confidence: 'stated' } }, { income: {} }), 'income.other[].amount_annual'));
 
-  /* ── debts.items[].type requires [purpose, borrower] — ENFORCED, item-sibling ── */
-  t('debt-type-without-purpose-blocked',
-    persistenceGate({ debts: { items: [{ type: 'personal_loan', balance: 9800 }], _confidence: 'document' } },
-      { debts: { items: [{ type: 'personal_loan', balance: 9800 }] } }, new Set()).errors.join().includes('purpose'));
+  /* ── debts.items[].type requires [purpose, borrower]: the one hard refusal, leaf only ── */
+  const noPurpose = G({ debts: { items: [{ type: 'personal_loan', balance: 9800 }], _confidence: 'document' } }, { debts: { items: [{ type: 'personal_loan', balance: 9800 }] } });
+  t('debt-type-without-purpose-refused', !noPurpose.ok && noPurpose.errors.join().includes('purpose'));
+  t('debt-type-refusal-strips-only-type', noPurpose.strip.length === 1 && noPurpose.strip[0].field === 'debts.items[].type' && cleared(noPurpose, 'debts.items[].balance'));
   t('debt-type-with-purpose-borrower-passes',
-    persistenceGate({ debts: { items: [{ type: 'personal_loan', purpose: 'vehicle', borrower: 'personal', balance: 9800 }], _confidence: 'document' } },
-      { debts: {} }, new Set()).ok);
-  t('debt-type-unknown-values-pass',   // "unknown" is a legitimate, reachable value
-    persistenceGate({ debts: { items: [{ type: 'other', purpose: 'unknown', borrower: 'unknown', balance: 500 }], _confidence: 'document' } },
-      { debts: {} }, new Set()).ok);
-  t('debt-purpose-not-in-merged-only',  // sibling requires check the ITEM, not the merged picture
-    persistenceGate({ debts: { items: [{ type: 'loan_split', balance: 80000 }], _confidence: 'document' } },
-      { debts: { items: [{ type: 'home_loan', purpose: 'owner_occupied', borrower: 'joint' }] } }, new Set()).errors.join().includes('borrower'));
+    G({ debts: { items: [{ type: 'personal_loan', purpose: 'vehicle', borrower: 'personal', balance: 9800 }], _confidence: 'document' } }, { debts: {} }).ok);
+  t('debt-type-unknown-values-pass',
+    G({ debts: { items: [{ type: 'other', purpose: 'unknown', borrower: 'unknown', balance: 500 }], _confidence: 'document' } }, { debts: {} }).ok);
+  t('debt-purpose-not-in-merged-only',
+    G({ debts: { items: [{ type: 'loan_split', balance: 80000 }], _confidence: 'document' } }, { debts: { items: [{ type: 'home_loan', purpose: 'owner_occupied', borrower: 'joint' }] } }).errors.join().includes('borrower'));
 
-  /* ── correction 6: the forced-refusal fixture ──
-     A scripted session where the person declines a required field twice. */
-  const SESSION = 's-1';
-  const served = new Set();          // path_served events, code-written
-  const claimed = [];                // refusals the model records
-  // Turn 1: the person declines before any path text was served (the model
-  // jumped ahead). Refusal claimed, but NOT code-witnessed → invalid →
-  // the gate still fires.
-  claimed.push('home.mortgage_balance');
-  let g1 = persistenceGate(
-    { home: { mortgage_balance: 512000, _confidence: 'stated' } },
-    { home: { mortgage_balance: 512000 } },
-    validSet(claimed, served));
-  t('decline-1-unwitnessed-still-fires', g1.errors.length === 1);
-  // Code serves the path (step 4 behaviour), the person declines again.
-  served.add('home.mortgage_balance');
-  let g2 = persistenceGate(
-    { home: { mortgage_balance: 512000, _confidence: 'stated' } },
-    { home: { mortgage_balance: 512000 } },
-    validSet(claimed, served));
-  t('decline-2-witnessed-passes', g2.ok);
-  // Same session, later turn: the refusal stays valid (sticky in-session).
-  let g3 = persistenceGate(
-    { home: { mortgage_balance: 515000, _confidence: 'stated' } },
-    { home: { mortgage_balance: 515000 } },
-    validSet(claimed, served));
-  t('same-session-sticky', g3.ok);
-  // A LATER session: path_served events are per-session, so the served set
-  // is empty again — the refusal has expired and the gate fires until the
-  // path is served and declined afresh.
-  const servedNextSession = new Set();
-  let g4 = persistenceGate(
-    { home: { mortgage_balance: 512000, _confidence: 'stated' } },
-    { home: { mortgage_balance: 512000 } },
-    validSet(claimed, servedNextSession));
-  t('next-session-expired-fires', g4.errors.length === 1);
+  /* ── declines: a declined source with a figure given is stored as declined_source ── */
+  const served = new Set(['home.mortgage_balance']);
+  const declined = G({ home: { mortgage_balance: 512000, _confidence: 'stated' } }, { home: { mortgage_balance: 512000 } }, served);
+  t('declined-source-stores-and-labels', declined.ok && flagged(declined, 'home.mortgage_balance', 'declined_source'));
+  const unwitnessed = G({ home: { mortgage_balance: 512000, _confidence: 'stated' } }, { home: { mortgage_balance: 512000 } }, new Set());
+  t('unwitnessed-decline-still-stores', unwitnessed.ok && flagged(unwitnessed, 'home.mortgage_balance', 'below_floor'));
 
   /* ── registry shape assertions ── */
   const entries = Object.entries(FIELD_REGISTRY);
@@ -128,8 +92,6 @@ export function runGateTests(mod) {
     && !FIELD_REGISTRY['income.other[].type'] && !FIELD_REGISTRY['income.other[].label']);
   t('legacy-income-scalars-deregistered',
     !FIELD_REGISTRY['income.business_income_annual'] && !FIELD_REGISTRY['income.rental_income_annual']);
-  // The same-trip promotions (Devon, Sept 2026): all required, all floored
-  // at document.
   const PROMOTED = [
     'protection.life.inside_super', 'protection.tpd.inside_super',
     'protection.trauma.inside_super', 'protection.income_protection.inside_super',
@@ -140,7 +102,6 @@ export function runGateTests(mod) {
   ];
   t('same-trip-promotions-required-document',
     PROMOTED.every(id => FIELD_REGISTRY[id] && FIELD_REGISTRY[id].retrieval === 'required' && FIELD_REGISTRY[id].confidence_floor === 'document'));
-  // The separate-trip fields stay offered.
   const STAY_OFFERED = ['home.package_fee_annual', 'debts.hecs_balance',
     'estate.will.last_updated', 'estate.poa.last_updated', 'estate.guardianship.last_updated'];
   t('separate-trip-fields-stay-offered',
@@ -150,34 +111,24 @@ export function runGateTests(mod) {
       return !e.requires_pending_schema && Array.isArray(e.requires) &&
         e.requires.includes('purpose') && e.requires.includes('borrower'); })());
 
-  /* ── sighted (Devon, Sept 2026): document > sighted > stated > estimated.
-     Upload works today (UPLOAD_PATH_WORKS true), so sighted does NOT
-     satisfy a document floor anywhere — it ranks below document and the
-     gate fires. The satisfies-when-no-upload branch flips in code, not in
-     the registry. ── */
+  /* ── sighted ranks between stated and document; with upload working it
+     does not clear a document floor, so it is stored and flagged. ── */
   t('sighted-ranks-between-stated-and-document',
     mod.CONFIDENCE_RANK.sighted === 3 && mod.CONFIDENCE_RANK.document === 4 &&
     mod.CONFIDENCE_RANK.stated === 2 && mod.CONFIDENCE_RANK.estimated === 1);
-  t('sighted-blocked-while-upload-works',
-    persistenceGate({ home: { mortgage_balance: 512000, _confidence: 'sighted' } }, { home: { mortgage_balance: 512000 } }, new Set()).errors.length === 1);
+  const sighted = G({ home: { mortgage_balance: 512000, _confidence: 'sighted' } }, { home: { mortgage_balance: 512000 } });
+  t('sighted-stored-and-flagged-while-upload-works', sighted.ok && sighted.flags.some(f => f.field === 'home.mortgage_balance' && f.confidence === 'sighted'));
   t('upload-capability-flag-lives-in-code',
     mod.UPLOAD_PATH_WORKS === true && typeof mod.uploadWorks === 'function');
 
-  /* ── security required by type (Devon item 4): unsecurable products
-     resolve without a trip; every real loan product needs the loan path. ── */
-  t('security-credit-card-stated-passes',
-    persistenceGate({ debts: { items: [{ type: 'credit_card', purpose: 'personal', borrower: 'personal', security: 'unsecured' }], _confidence: 'stated' } },
-      { debts: {} }, new Set()).ok);
-  t('security-car-loan-stated-blocked',
-    persistenceGate({ debts: { items: [{ type: 'car_loan', purpose: 'vehicle', borrower: 'personal', security: 'vehicle', balance: 18400 }], _confidence: 'document' } },
-      { debts: {} }, new Set()).ok
-    && persistenceGate({ debts: { items: [{ type: 'car_loan', purpose: 'vehicle', borrower: 'personal', security: 'vehicle' }], _confidence: 'stated' } },
-      { debts: {} }, new Set()).errors.join().includes('debts.items[].security'));
+  /* ── security by type ── */
+  t('security-credit-card-stated-clears',
+    cleared(G({ debts: { items: [{ type: 'credit_card', purpose: 'personal', borrower: 'personal', security: 'unsecured' }], _confidence: 'stated' } }, { debts: {} }), 'debts.items[].security'));
+  t('security-car-loan-stated-flagged',
+    flagged(G({ debts: { items: [{ type: 'car_loan', purpose: 'vehicle', borrower: 'personal', security: 'vehicle' }], _confidence: 'stated' } }, { debts: {} }), 'debts.items[].security'));
   t('security-unknown-type-strictest',
-    persistenceGate({ debts: { items: [{ purpose: 'unknown', borrower: 'unknown', security: 'other' }], _confidence: 'stated' } },
-      { debts: {} }, new Set()).errors.join().includes('debts.items[].security'));
+    flagged(G({ debts: { items: [{ purpose: 'unknown', borrower: 'unknown', security: 'other' }], _confidence: 'stated' } }, { debts: {} }), 'debts.items[].security'));
 
-  /* ── step 5: producers are declared in the registry, not remembered. ── */
   t('producers-declared',
     Array.isArray(mod.PRODUCERS) && mod.PRODUCERS.length === 4 &&
     mod.PRODUCERS.some(p => p.key === 'investments.properties[]') &&
@@ -185,7 +136,7 @@ export function runGateTests(mod) {
     mod.PRODUCERS.some(p => p.key === 'investments.holdings') &&
     mod.PRODUCERS.some(p => p.key === 'income.structure:sole_trader'));
 
-  return { pass: failures.length === 0, total: 41, failures };
+  return { pass: failures.length === 0, total: 44, failures };
 }
 
 /* ── capture-conduct steps 3-4: the retrieval path file and the
@@ -277,7 +228,7 @@ export function runLinterTests(regMod, pathsMod, linterMod) {
   // A clean session: one turn, nothing captured, nothing served.
   const clean = lint([row({})], { domains: {}, refusals: [] });
   t('clean-session-no-failures', clean.summary.failures === 0);
-  t('report-has-twelve-checks', clean.checks.length === 12);
+  t('report-has-nineteen-checks', clean.checks.length === 19);
 
   // Composed ask: retrieval prose in raw visible text fails; a token does not.
   const composed = lint([row({ raw_text: 'Please open your banking app and read me the loan balance.\n[CAPTURE]{}' })], { domains: {}, refusals: [] });
@@ -295,11 +246,9 @@ export function runLinterTests(regMod, pathsMod, linterMod) {
   const dash = lint([row({ raw_text: 'A reply — with a dash.\n[CAPTURE]{}' })], { domains: {}, refusals: [] });
   t('em-dash-counted', check(dash, 'em_dash').status === 'fail');
 
-  // Confidence floor: a required field resting below floor with no refusal.
-  const resting = lint([row({})], { domains: { home: { mortgage_balance: 512000, _confidence: 'stated' } }, refusals: [] });
-  t('floor-resting-violation-fails', check(resting, 'confidence_floor').status === 'fail');
-  const restingWithRefusal = lint([row({})], { domains: { home: { mortgage_balance: 512000, _confidence: 'stated' } }, refusals: [{ field: 'home.mortgage_balance', session_id: 's' }] });
-  t('floor-refusal-record-passes', check(restingWithRefusal, 'confidence_floor').status === 'pass');
+  // To verify: a report listing the ledger, never a failure.
+  const resting = lint([row({})], { domains: { home: { mortgage_balance: 512000, _confidence: 'stated' }, flags: { to_verify: [{ field: 'home.mortgage_balance', item_id: null, confidence: 'stated', floor: 'document', reason: 'below_floor' }] } }, refusals: [] });
+  t('to-verify-is-a-report', check(resting, 'confidence_floor').status === 'report' && check(resting, 'confidence_floor').count >= 2);
 
   // Refusal validity: claimed with no path_served row fails; with one passes.
   const claimRow = row({ capture: { refusals: ['home.mortgage_balance'] }, created_at: at(10) });

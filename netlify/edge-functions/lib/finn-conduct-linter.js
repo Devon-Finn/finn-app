@@ -19,8 +19,17 @@
    - A reply whose capture block was absent is tagged in raw_text by the
      recovery path ([REEXTRACTED... / [CAPTURE ABSENT...). */
 
-const SOFTENERS = /\b(roughly|approximately|ballpark|a rough idea|if you know it)\b/i;
-const FACT_KEYWORDS = /\b(rate|balance|owing|term|repayment|cover|super balance)\b/i;
+// Widened after the 15 Sept walk, which leaked "roughly what does it
+// bring in", "roughly what do those costs run to" and "a rough sense of
+// what it's worth" past the old list.
+const SOFTENERS = /\b(roughly|approximately|ballpark|a rough (?:idea|sense|figure)|rough sense|about how much|if you know it)\b/i;
+const FACT_KEYWORDS = /\b(rate|balance|owing|term|repayment|cover|super|rent|costs?|worth|value|bring in|earn|pays?|income|fees?)\b/i;
+// Estimate-type asks keep an honest "roughly": living costs and a home
+// value with no document yet are estimates. A sentence naming only those
+// is exempt.
+const ESTIMATE_OK = /\b(spend|spending|goes out|living costs?|typical month)\b/i;
+const CLOSE_CLAIM = /\b(complete picture|picture is complete|genuinely complete|well done|you're all done|that's everything)\b/i;
+const SELF_INTRO = /\bI'?m Finn\b/;
 // Retrieval-instruction prose. CSV/export sentences are exempt: the bank
 // export walkthrough is reference data the model relays in its own words.
 const ASK_PROSE = /\b(open your|log in to|banking app|internet banking|in front of you|attach (?:a|the|it)|screenshot of)\b/i;
@@ -75,7 +84,7 @@ function resolveEntry(registry, id, item) {
   return byType ? { ...entry, ...byType } : { ...entry, retrieval: "required" };
 }
 
-export function runConductLinter({ rows, picture, registry, paths, confidenceRank, producers }) {
+export function runConductLinter({ rows, picture, registry, paths, confidenceRank, producers, plan: planFn }) {
   const checks = [];
   const add = (id, name, status, details) =>
     checks.push({ id, name, status, count: details.length, details: details.slice(0, 25) });
@@ -92,26 +101,17 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
   const domains = (picture && picture.domains) || {};
   const refusalFields = new Set(((picture && picture.refusals) || []).map(r => r && r.field).filter(Boolean));
 
-  /* 1 · Confidence floor: a required field resting below its floor in the
-     final picture with no refusal record. Attempts the gate caught are
-     listed for the record but do NOT fail — the write was refused and
-     nothing rests below floor; the linter flags leaks, not blocks. */
+  /* 1 · Resting below the evidence floor (REPORT, since 15 Sept): every
+     figure is stored; the ones below their floor sit in flags.to_verify
+     and are listed here with how they were given. */
   {
     const details = [];
-    for (const w of leafWrites(domains)) {
-      const e = resolveEntry(registry, w.id, w.item);
-      if (!e || e.never_asked || e.retrieval !== "required") continue;
-      const conf = (domains[w.domain] || {})._confidence;
-      const rank = confidenceRank[conf] ?? 0;
-      const floor = confidenceRank[e.confidence_floor];
-      if (floor !== undefined && rank < floor && !refusalFields.has(w.id)) {
-        details.push(`${w.id} rests at "${conf ?? "no confidence"}" below floor "${e.confidence_floor}" with no refusal record`);
-      }
-    }
-    const failing = details.length > 0;
-    const caught = allRows.filter(r => r.status === "refused" && Array.isArray(r.errors) && r.errors.some(e => String(e).includes("below floor")));
-    for (const r of caught) details.push(`(caught by gate, write refused) ${r.errors.filter(e => String(e).includes("below floor")).join("; ")}`);
-    add("confidence_floor", "Confidence floor", failing ? "fail" : "pass", details);
+    const tv = domains.flags && Array.isArray(domains.flags.to_verify) ? domains.flags.to_verify : [];
+    const byReason = {};
+    for (const e of tv) byReason[e.reason] = (byReason[e.reason] || 0) + 1;
+    if (tv.length) details.push(Object.entries(byReason).map(([k, v]) => `${v} ${k}`).join(", "));
+    for (const e of tv) details.push(`${e.field}${e.item_id ? "#" + e.item_id : ""}: ${e.reason}${e.confidence ? " (" + e.confidence + ")" : ""}`);
+    add("confidence_floor", "To verify (stored below the evidence floor, or put off)", "report", details);
   }
 
   /* 2 · Refusal validity: a refusal claimed in an APPLIED capture with no
@@ -139,7 +139,7 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
     const details = [];
     for (const r of captureRows) {
       for (const s of sentences(visibleOf(r.raw_text))) {
-        if (SOFTENERS.test(s) && FACT_KEYWORDS.test(s)) details.push(`"${s.slice(0, 140)}"`);
+        if (SOFTENERS.test(s) && FACT_KEYWORDS.test(s) && !(ESTIMATE_OK.test(s) && !/\b(rent|balance|rate|owing|super|fees?)\b/i.test(s))) details.push(`"${s.slice(0, 140)}"`);
       }
     }
     add("softener", "Softener", details.length ? "fail" : "pass", details);
@@ -220,7 +220,7 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
       for (const w of leafWrites(capDomains)) {
         const e = resolveEntry(registry, w.id, w.item);
         if (!e || e.never_asked || e.retrieval !== "required") continue;
-        const conf = (capDomains[w.domain] || {})._confidence;
+        const conf = (w.item && w.item._confidence) || (capDomains[w.domain] || {})._confidence;
         if (conf === "document") continue;
         if (!servedFields.has(w.id) && !seen.has(w.id)) {
           seen.add(w.id);
@@ -324,6 +324,130 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
     }
     if (n) details.push(`${n} em-dash${n === 1 ? "" : "es"} in the raw visible stream (scrubbed before display)`);
     add("em_dash", "Em-dash", n ? "fail" : "pass", details);
+  }
+
+  /* 13 · LOST FACT (fail, the headline metric since 15 Sept): a field
+     captured in any turn this session that is absent from the final
+     picture and not recorded as put off. */
+  {
+    const details = [];
+    const tv = domains.flags && Array.isArray(domains.flags.to_verify) ? domains.flags.to_verify : [];
+    const deferred = new Set(tv.filter(e => e.reason === "deferred").map(e => e.field));
+    const present = (id) => {
+      const parts = id.split(".");
+      let node = domains;
+      for (let i = 0; i < parts.length; i++) {
+        const p = parts[i];
+        if (p.endsWith("[]")) {
+          const list = node && Array.isArray(node[p.slice(0, -2)]) ? node[p.slice(0, -2)] : [];
+          const rest = parts.slice(i + 1);
+          return list.some(it => { let n = it; for (const q of rest) n = n && typeof n === "object" ? n[q] : undefined; return n !== null && n !== undefined; });
+        }
+        node = node && typeof node === "object" ? node[p] : undefined;
+      }
+      return node !== null && node !== undefined;
+    };
+    const seen = new Set();
+    for (const r of captureRows) {
+      const capDomains = r.capture && r.capture.domains ? r.capture.domains : {};
+      for (const w of leafWrites(capDomains)) {
+        if (seen.has(w.id)) continue;
+        seen.add(w.id);
+        if (!(w.domain in domains) && !present(w.id)) { if (!deferred.has(w.id)) details.push(`${w.id} was given but is not in the picture`); continue; }
+        if (!present(w.id) && !deferred.has(w.id)) details.push(`${w.id} was given but is not in the picture`);
+      }
+    }
+    add("lost_fact", "Lost facts", details.length ? "fail" : "pass", details);
+  }
+
+  /* 14 · ACKNOWLEDGED, NOT CAPTURED (fail): a reply restates a dollar
+     figure that neither this turn's capture nor any earlier capture holds
+     ("Got it, $71,500" with an empty block). */
+  {
+    const details = [];
+    const known = new Set();
+    const addNums = (v) => {
+      if (typeof v === "number") { known.add(Math.round(v)); known.add(Math.round(v * 12)); known.add(Math.round(v / 12)); }
+      else if (v && typeof v === "object") for (const x of Object.values(v)) addNums(x);
+    };
+    const ordered = captureRows.slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    for (const r of ordered) {
+      addNums(r.capture && r.capture.domains);
+      const vis = visibleOf(r.raw_text);
+      for (const m of vis.matchAll(/\$\s?(\d[\d,]*(?:\.\d+)?)\s?(k\b|m\b|million\b)?/gi)) {
+        let v = parseFloat(m[1].replace(/,/g, ""));
+        if (m[2]) v *= /^k/i.test(m[2]) ? 1000 : 1000000;
+        v = Math.round(v);
+        if (v < 10 || known.has(v)) continue;
+        details.push(`"${m[0]}" acknowledged but not captured: ${vis.slice(Math.max(0, m.index - 40), m.index + 40).replace(/\s+/g, " ").trim()}`);
+        known.add(v);
+      }
+    }
+    add("acknowledged_not_captured", "Acknowledged, not captured", details.length ? "fail" : "pass", details);
+  }
+
+  /* 15 · Opening (fail): a composed self-introduction instead of the
+     code-served preframe. */
+  {
+    const details = [];
+    for (const r of captureRows) {
+      const vis = visibleOf(r.raw_text);
+      if (SELF_INTRO.test(vis) && !vis.includes("[FRAME: open]")) details.push(`composed opening: "${vis.slice(0, 100)}"`);
+    }
+    add("opening_frame", "Opening preframe", details.length ? "fail" : "pass", details);
+  }
+
+  /* 16 · Nudge cap (fail): an item put off more than twice. */
+  {
+    const details = [];
+    const count = {};
+    for (const r of captureRows) {
+      for (const d of (r.capture && Array.isArray(r.capture.deferrals) ? r.capture.deferrals : [])) {
+        const k = typeof d === "string" ? d : (d && d.field ? d.field + (d.item_id ? "#" + d.item_id : "") : null);
+        if (k) count[k] = (count[k] || 0) + 1;
+      }
+    }
+    for (const [k, n] of Object.entries(count)) if (n > 2) details.push(`${k} nudged ${n} times`);
+    add("nudge_cap", "Nudge cap", details.length ? "fail" : "pass", details);
+  }
+
+  /* 17 · Premature close (fail): the picture called complete, or
+     session_complete claimed, while the plan still has open areas. */
+  {
+    const details = [];
+    const plan = typeof planFn === "function" ? planFn(domains, (picture && picture.goals) || {}) : null;
+    for (const r of captureRows) {
+      const vis = visibleOf(r.raw_text);
+      const m = vis.match(CLOSE_CLAIM);
+      if (m) details.push(`completion language: "${m[0]}"`);
+      if (r.capture && r.capture.session_complete === true && plan && !plan.can_close) {
+        details.push(`session_complete claimed with ${plan.missing.length} missing item(s) and sweeps pending [${plan.sweeps_pending.join(", ")}]`);
+      }
+    }
+    add("premature_close", "Premature close", details.length ? "fail" : "pass", details);
+  }
+
+  /* 18 · Coverage (report): what the plan says at report time. */
+  {
+    const details = [];
+    const plan = typeof planFn === "function" ? planFn(domains, (picture && picture.goals) || {}) : null;
+    if (plan) {
+      details.push(`covered: ${plan.covered.join(", ") || "none"}`);
+      if (plan.sweeps_pending.length) details.push(`sweeps not asked: ${plan.sweeps_pending.join(", ")}`);
+      for (const m of plan.missing.slice(0, 20)) details.push(`missing (${m.area}): ${m.label}`);
+      for (const m of plan.deferred.slice(0, 20)) details.push(`put off (${m.area}): ${m.label}`);
+    }
+    add("coverage", "Coverage", "report", details);
+  }
+
+  /* 19 · Partial writes (report): turns where some fields were dropped. */
+  {
+    const details = [];
+    for (const r of captureRows) {
+      if (r.status === "applied" && Array.isArray(r.errors) && r.errors.length) details.push(r.errors.join("; ").slice(0, 200));
+      if (r.status === "refused" || r.status === "failed") details.push(`${r.status}: ${(r.errors || []).join("; ").slice(0, 200)}`);
+    }
+    add("partial_writes", "Dropped fields", "report", details);
   }
 
   const failures = checks.filter(c => c.status === "fail").length;

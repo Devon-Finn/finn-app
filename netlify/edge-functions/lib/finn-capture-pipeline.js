@@ -9,8 +9,9 @@
    The schema constants, validators and translators below are moved
    verbatim from clarity-chat (Sept 2026) — same bytes, new home. */
 
-import { FIELD_REGISTRY, persistenceGate } from "./finn-field-registry.js";
-import { assignAssetIds, mergeDomainsById, migratePositionalLinks, resolveSecurity } from "./finn-merge.js";
+import { FIELD_REGISTRY, persistenceGate, leafWrites } from "./finn-field-registry.js";
+import { assignAssetIds, mergeDomainsById, migratePositionalLinks, resolveSecurity, adoptNaturalIds } from "./finn-merge.js";
+import { buildPlan, AREAS, SWEEPS } from "./finn-plan.js";
 
 /* ════════════ SCHEMA v2 — field-spec.md Part 2 (Step 1) ════════════
    The domains JSONB target shape. Conventions, enforced here:
@@ -81,7 +82,11 @@ const V2_SCHEMA = {
   estate: { will: { object: ESTATE_DOC }, poa: { object: ESTATE_DOC }, guardianship: { object: ESTATE_DOC }, super_nomination: { object: { ...ESTATE_DOC, binding: BOOL } } },
   investments: { shares_value: MONEY, held_in: STR, managed_funds_value: MONEY, properties: { array: { id: STR, value_estimate: MONEY, loan_balance: MONEY, rate_percent: RATE, repayment_type: STR, rent_monthly: MONEY, held_in: STR, use: { enum: "property_use" } } } },
   debts: { items: { array: { id: STR, type: { enum: "debt_type" }, purpose: { enum: "debt_purpose" }, borrower: { enum: "debt_borrower" }, security: { enum: "debt_security" }, secured_against_asset_id: STR, is_split: BOOL, parent_loan_id: STR, cleared_monthly: BOOL, balance: MONEY, rate_percent: RATE, minimum_monthly: MONEY } }, hecs_balance: MONEY },
-  flags: { hardship: BOOL, hardship_signal: STR, income_unreconciled: { array: STR } },
+  // to_verify and sweeps_asked are CODE-WRITTEN (the model's copies are
+  // stripped before merge): the verification ledger and the sweeps asked.
+  flags: { hardship: BOOL, hardship_signal: STR, income_unreconciled: { array: STR },
+    to_verify: { array: { field: STR, item_id: STR, confidence: STR, floor: STR, reason: STR, nudges: INT, at: STR } },
+    sweeps_asked: { array: STR } },
 };
 
 // Validate + normalise one value against a field spec. Returns the
@@ -137,6 +142,9 @@ function v2CheckValue(spec, v, path, errors) {
 function v2CheckObject(shape, obj, path, errors) {
   const out = {};
   for (const [k, v] of Object.entries(obj)) {
+    // An item-level confidence is read by the gate, then dropped here: the
+    // stored confidence lives on the domain and in the to_verify ledger.
+    if (k === "_confidence") continue;
     if (!(k in shape)) { errors.push(path + "." + k + ": unknown field"); continue; }
     const checked = v2CheckValue(shape[k], v, path + "." + k, errors);
     if (checked !== undefined) out[k] = checked;
@@ -457,37 +465,63 @@ function deepMerge(base, patch) {
 
 
 /* ── the core (pure) ──
-   Everything applyCapture decides, with no IO: the caller supplies the
-   picture row, the parsed capture, the session id, and the set of field
-   ids with code-witnessed path_served rows for this session. Returns
-   what to do, never does it.
+   STORE EVERY FIGURE, FLAG IT TO VERIFY (Devon, 15 Sept 2026).
 
-   status "applied":  { domains, goals, completedDomains, refusalsOut,
-                        anomalies }
-   status "refused":  { kind: "gate" | "validation", errors, merged,
-                        anomalies }
-   refusalsOut is undefined when the stored refusals need no change. */
-export function applyCaptureCore({ picture, capture, sessionId, servedFields }) {
+   Everything applyCapture decides, with no IO. The caller supplies the
+   picture row, the parsed capture, the session id, the set of field ids
+   with code-witnessed path_served rows this session, the sweep ids served
+   this turn, and whether the close frame has been served this session.
+
+   A turn is never refused whole. Malformed or misclassified leaves are
+   dropped individually and reported in `errors`; every valid fact in the
+   same capture commits. status is "applied" in every normal case; errors
+   non-empty means a PARTIAL write (the caller records it and tells the
+   model next turn what didn't save).
+
+   Returns { status: "applied", domains, goals, completedDomains,
+             refusalsOut, anomalies, errors, dropped, plan,
+             sessionComplete, sessionCompleteRefused } */
+function stripLeaf(patch, s) {
+  const dom = patch[s.domain];
+  if (!dom || typeof dom !== "object") return;
+  if (s.itemRef) { delete s.itemRef[s.sub]; return; }
+  if (s.sub !== undefined) {
+    if (dom[s.key] && typeof dom[s.key] === "object") delete dom[s.key][s.sub];
+    return;
+  }
+  delete dom[s.key];
+}
+
+function cloneJson(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }
+
+export function applyCaptureCore({ picture, capture, sessionId, servedFields, sweepsServed, closeServed }) {
   const anomalies = [];
+  const errors = [];
   const served = servedFields instanceof Set ? servedFields : new Set(servedFields || []);
+  capture = cloneJson(capture ?? {}) || {};
 
-  // Defensive re-homing: the model occasionally emits a domain as a
-  // SIBLING of "domains" instead of inside it. Ignoring unexpected
-  // top-level keys would be silent data loss, so unambiguous domain names
-  // are folded back into domains (loudly) before processing.
-  const KNOWN_TOP = new Set(["domains", "goals", "completed_domains", "session_complete", "refusals"]);
-  for (const [k, v] of Object.entries(capture ?? {})) {
+  // Defensive re-homing: a domain emitted as a SIBLING of "domains" is
+  // folded back in (loudly) rather than dropped.
+  const KNOWN_TOP = new Set(["domains", "goals", "completed_domains", "session_complete", "refusals", "deferrals"]);
+  for (const [k, v] of Object.entries(capture)) {
     if (KNOWN_TOP.has(k)) continue;
-    if (k in V2_SCHEMA && v && typeof v === "object" && !Array.isArray(v)) {
+    if ((k in V2_SCHEMA || ["assets", "liabilities"].includes(k)) && v && typeof v === "object" && !Array.isArray(v)) {
       anomalies.push(`domain "${k}" emitted outside "domains" — re-homed rather than dropped`);
-      capture.domains = capture.domains || {};
-      capture.domains[k] = capture.domains[k] ? deepMerge(capture.domains[k], v) : v;
-    } else if (["assets", "liabilities"].includes(k) && v && typeof v === "object") {
-      anomalies.push(`legacy domain "${k}" emitted outside "domains" — re-homed rather than dropped`);
       capture.domains = capture.domains || {};
       capture.domains[k] = capture.domains[k] ? deepMerge(capture.domains[k], v) : v;
     } else {
       anomalies.push(`unknown top-level key "${k}" ignored (value type: ${typeof v})`);
+    }
+  }
+  // The reverse slip: control keys emitted INSIDE domains (15 Sept walk:
+  // completed_domains inside domains refused a whole turn).
+  if (capture.domains && typeof capture.domains === "object") {
+    for (const k of ["completed_domains", "session_complete", "goals", "refusals", "deferrals"]) {
+      if (k in capture.domains) {
+        anomalies.push(`control key "${k}" emitted inside "domains" — lifted out`);
+        if (!(k in capture)) capture[k] = capture.domains[k];
+        delete capture.domains[k];
+      }
     }
   }
 
@@ -496,28 +530,29 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields }) 
     baseDomains = translateLegacyDomains(baseDomains);
   }
   baseDomains = migrateIncomeShape(baseDomains);
-  // Stable ids: existing rows get ids at migration, then positional
-  // prop-N links carry across only where the mapping is unambiguous —
-  // anywhere else they clear, never a guessed remap, and the
-  // reconciliation pass surfaces the open producer.
   baseDomains = migratePositionalLinks(assignAssetIds(baseDomains));
+
   let patch = capture.domains ?? {};
   if (Object.keys(patch).length && !isV2Domains(patch)) {
     patch = translateLegacyDomains(patch);
   }
   patch = migrateIncomeShape(patch);
-  // Arrays merge BY ID: a patch item echoing an existing id updates that
-  // item; an id-less item appends and is assigned its id below; items the
-  // patch does not mention are retained; { id, _remove: true } deletes.
-  let merged = mergeDomainsById(baseDomains, patch);
-  // Code resolutions after the gate sees the model's own writes: new
-  // items get their ids, and security resolves to unsecured for the four
-  // products that cannot carry security (deterministic, no trip).
-  merged = resolveSecurity(assignAssetIds(merged));
+  // Code owns the ledger and the sweep record; a model copy is ignored.
+  if (patch.flags && typeof patch.flags === "object") {
+    for (const k of ["to_verify", "sweeps_asked", "income_unreconciled"]) {
+      if (k in patch.flags) { anomalies.push(`model wrote flags.${k} — code-owned, ignored`); delete patch.flags[k]; }
+    }
+  }
+  // Unknown domains are dropped individually, never the whole turn.
+  for (const k of Object.keys(patch)) {
+    if (!(k in V2_SCHEMA)) { errors.push(k + ": unknown domain (dropped)"); delete patch[k]; }
+  }
+  // Id-less re-sends of an existing item update it rather than duplicate
+  // it; genuinely new items get their ids now, so the ledger can key them.
+  patch = assignAssetIds(adoptNaturalIds(baseDomains, patch));
 
-  // THE PERSISTENCE GATE. Refusals are CODE-WITNESSED and SESSION-SCOPED:
-  // valid only where a path_served row exists for the field in THIS
-  // session (the caller queried them into servedFields).
+  // THE GATE: verification status, plus the few hard classification
+  // refusals, stripped leaf by leaf.
   const claimedRefusals = new Set([
     ...(Array.isArray(picture.refusals) ? picture.refusals : [])
       .filter(r => r && r.field && sessionId && r.session_id === sessionId).map(r => r.field),
@@ -525,34 +560,129 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields }) 
       .filter(f => typeof f === "string" && FIELD_REGISTRY[f]),
   ]);
   const validRefusals = new Set([...claimedRefusals].filter(f => served.has(f)));
+  let merged = mergeDomainsById(baseDomains, patch);
   const gate = persistenceGate(patch, merged, validRefusals);
-  if (!gate.ok) {
-    return { status: "refused", kind: "gate", errors: gate.errors, merged, anomalies };
+  const dropped = [];
+  if (gate.strip.length) {
+    for (const st of gate.strip) { stripLeaf(patch, st); dropped.push(st.field); }
+    errors.push(...gate.errors);
+    merged = mergeDomainsById(baseDomains, patch);
+  }
+  merged = resolveSecurity(assignAssetIds(merged));
+
+  // Validation: invalid leaves drop, valid ones commit.
+  const check = validateDomainsV2(merged);
+  if (!check.ok) errors.push(...check.errors);
+  let domains = check.value || {};
+
+  /* ── the verification ledger (flags.to_verify) ── */
+  const now = new Date().toISOString();
+  const keyOf = (f, i) => f + "|" + (i || "");
+  const ledger = new Map();
+  const prior = domains.flags && Array.isArray(domains.flags.to_verify) ? domains.flags.to_verify : [];
+  for (const e of prior) if (e && e.field) ledger.set(keyOf(e.field, e.item_id), e);
+  for (const c of gate.clears) {
+    const k = keyOf(c.field, c.item_id);
+    if (ledger.has(k) && !String(ledger.get(k).reason || "").startsWith("needs:")) ledger.delete(k);
+  }
+  for (const f of gate.flags) {
+    if (dropped.includes(f.field)) continue;
+    const k = keyOf(f.field, f.item_id);
+    const prev = ledger.get(k);
+    ledger.set(k, { field: f.field, item_id: f.item_id || null, confidence: f.confidence, floor: f.floor, reason: f.reason, nudges: prev && prev.nudges ? prev.nudges : 0, at: now });
+  }
+  const valueAt = (field, itemId) => {
+    const parts = field.split(".");
+    if (field.includes("[]")) {
+      const [dk, arrKey] = [parts[0], parts[1].replace("[]", "")];
+      const list = domains[dk] && Array.isArray(domains[dk][arrKey]) ? domains[dk][arrKey] : [];
+      const it = itemId ? list.find(x => x && x.id === itemId) : null;
+      return it ? it[parts[2]] : undefined;
+    }
+    let node = domains;
+    for (const p of parts) node = node && typeof node === "object" ? node[p] : undefined;
+    return node;
+  };
+  // Deferrals: the person put an item off. Recorded with a nudge count so
+  // the plan can cap the pushing at two.
+  const deferralList = (Array.isArray(capture.deferrals) ? capture.deferrals : []).map(x =>
+    typeof x === "string" ? { field: x.split("#")[0], item_id: x.includes("#") ? x.split("#")[1] || null : null } : (x && typeof x === "object" && typeof x.field === "string" ? { field: x.field, item_id: typeof x.item_id === "string" ? x.item_id : null } : null)).filter(Boolean);
+  // A legacy refusal with no figure given is a deferral too.
+  for (const f of (Array.isArray(capture.refusals) ? capture.refusals : [])) {
+    if (typeof f === "string" && !leafWrites(patch).some(w => w.id === f)) deferralList.push({ field: f, item_id: null });
+  }
+  for (const df of deferralList) {
+    const k = keyOf(df.field, df.item_id);
+    const prev = ledger.get(k);
+    const stored = df.field.includes("[]") ? (df.item_id ? valueAt(df.field, df.item_id) : undefined) : valueAt(df.field, null);
+    if ((prev && prev.reason !== "deferred") || (stored !== null && stored !== undefined)) {
+      // A stored-but-unverified figure the person won't source: note it.
+      ledger.set(k, { field: df.field, item_id: df.item_id, confidence: prev ? prev.confidence : null, floor: prev ? prev.floor : null, reason: "declined_source", nudges: Math.min(((prev && prev.nudges) || 0) + 1, 9), at: now });
+    } else {
+      ledger.set(k, { field: df.field, item_id: df.item_id, confidence: null, floor: null, reason: "deferred", nudges: Math.min(((prev && prev.nudges) || 0) + 1, 9), at: now });
+    }
+  }
+  // Resolve needs:<req> once the prerequisite is present; drop entries for
+  // removed items and for deferred fields that now hold a value.
+  const liveIds = new Set();
+  for (const dk of ["context", "super", "investments", "debts", "income"]) {
+    const dom = domains[dk];
+    if (!dom) continue;
+    for (const v of Object.values(dom)) if (Array.isArray(v)) for (const it of v) if (it && it.id) liveIds.add(it.id);
+  }
+  const presentField = (req) => {
+    let node = domains;
+    for (const p of req.split(".")) node = node && typeof node === "object" ? node[p] : undefined;
+    return node !== null && node !== undefined;
+  };
+  for (const [k, e] of [...ledger.entries()]) {
+    if (e.item_id && !liveIds.has(e.item_id) && e.field.includes("[]")) { ledger.delete(k); continue; }
+    if (String(e.reason).startsWith("needs:") && presentField(String(e.reason).slice(6))) { ledger.delete(k); continue; }
+    if (e.reason === "deferred" && e.field.includes(".") && !e.field.startsWith("income.other.") && !e.field.startsWith("protection.inside")) {
+      const v = valueAt(e.field, e.item_id);
+      if (v !== null && v !== undefined && !deferralList.some(df => keyOf(df.field, df.item_id) === k)) ledger.delete(k);
+    }
+  }
+  // Sweeps asked (code-witnessed: the caller passes the ids it substituted).
+  const sweeps = new Set(domains.flags && Array.isArray(domains.flags.sweeps_asked) ? domains.flags.sweeps_asked : []);
+  for (const id of (Array.isArray(sweepsServed) ? sweepsServed : [])) if (SWEEPS[id]) sweeps.add(id);
+  if (ledger.size || sweeps.size || domains.flags) {
+    domains = { ...domains, flags: { ...(domains.flags || {}), to_verify: [...ledger.values()], sweeps_asked: [...sweeps] } };
   }
 
-  // Persist this session's newly recorded refusals (session-tagged) and
-  // prune expired ones from other sessions.
+  // Refusal records kept for audit (session-tagged, other sessions pruned).
   const capRefusals = (Array.isArray(capture.refusals) ? capture.refusals : [])
     .filter(f => typeof f === "string" && FIELD_REGISTRY[f]);
   const existing = Array.isArray(picture.refusals) ? picture.refusals : [];
   const kept = existing.filter(r => r && r.field && (!sessionId || r.session_id === sessionId));
   const keptFields = new Set(kept.map(r => r.field));
   const added = capRefusals.filter(f => !keptFields.has(f))
-    .map(f => ({ field: f, at: new Date().toISOString(), session_id: sessionId }));
+    .map(f => ({ field: f, at: now, session_id: sessionId }));
   const refusalsOut = (added.length || kept.length !== existing.length) ? [...kept, ...added] : undefined;
 
-  const check = validateDomainsV2(merged);
-  if (!check.ok) {
-    return { status: "refused", kind: "validation", errors: check.errors, merged, anomalies };
+  const goals = deepMerge(picture.goals ?? {}, capture.goals ?? {});
+
+  // CODE decides coverage (the model's completed_domains is advisory).
+  const plan = buildPlan(domains, goals);
+  const completedDomains = AREAS.filter(a => plan.covered.includes(a));
+  const claimedDone = Array.isArray(capture.completed_domains) ? capture.completed_domains : [];
+  const overclaimed = claimedDone.filter(a => AREAS.includes(a) && !plan.covered.includes(a));
+  if (overclaimed.length) anomalies.push("model claimed areas code does not count as covered: " + overclaimed.join(", "));
+
+  // session_complete only when every area is covered and the close frame
+  // has walked the open items.
+  let sessionComplete = false, sessionCompleteRefused = false;
+  if (capture.session_complete === true) {
+    if (plan.can_close && closeServed === true) sessionComplete = true;
+    else {
+      sessionCompleteRefused = true;
+      anomalies.push("session_complete refused: " + (!plan.can_close
+        ? plan.missing.length + " missing, sweeps pending [" + plan.sweeps_pending.join(",") + "]"
+        : "close frame not served"));
+    }
   }
 
-  const goals = deepMerge(picture.goals ?? {}, capture.goals ?? {});
-  const prevDone = Array.isArray(picture.completed_domains) ? picture.completed_domains : [];
-  const newDone = Array.isArray(capture.completed_domains) ? capture.completed_domains : [];
-  const VALID = ["income", "assets", "liabilities", "buffer", "protection", "estate", "super", "goals"];
-  const completedDomains = [...new Set([...prevDone, ...newDone])].filter(d => VALID.includes(d));
-
-  return { status: "applied", domains: check.value, goals, completedDomains, refusalsOut, anomalies };
+  return { status: "applied", domains, goals, completedDomains, refusalsOut, anomalies, errors, dropped, plan, sessionComplete, sessionCompleteRefused };
 }
 
 export {

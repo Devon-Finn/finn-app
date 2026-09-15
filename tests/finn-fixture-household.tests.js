@@ -66,7 +66,9 @@ function makeSession(pipeline, pathsMod, sessionId, startPicture) {
     }
     const servedFields = new Set(rows.filter(r => r.status === 'path_served').map(r => r.field_id));
     const raw = rawVisible + '\n[CAPTURE]' + JSON.stringify(capture);
-    const result = pipeline.applyCaptureCore({ picture, capture, sessionId, servedFields });
+    const sweepsServed = [...rawVisible.matchAll(/\[SWEEP:\s*([a-z_]+)\s*\]/g)].map(m => m[1]);
+    const closeServed = rows.some(r => String(r.raw_text || '').includes('[FRAME: close]')) || rawVisible.includes('[FRAME: close]');
+    const result = pipeline.applyCaptureCore({ picture, capture, sessionId, servedFields, sweepsServed, closeServed });
     if (result.status === 'applied') {
       picture = {
         ...picture,
@@ -75,7 +77,7 @@ function makeSession(pipeline, pathsMod, sessionId, startPicture) {
         completed_domains: result.completedDomains,
         refusals: result.refusalsOut !== undefined ? result.refusalsOut : picture.refusals,
       };
-      rows.push({ status: 'applied', raw_text: raw, capture, errors: null, field_id: null, created_at: created });
+      rows.push({ status: 'applied', raw_text: raw, capture, errors: result.errors && result.errors.length ? result.errors : null, field_id: null, created_at: created });
     } else {
       rows.push({ status: 'refused', raw_text: raw, capture, errors: result.errors, field_id: null, created_at: created });
     }
@@ -106,7 +108,7 @@ function makeSession(pipeline, pathsMod, sessionId, startPicture) {
   return { reply, replyWithoutCapture, rows: () => rows, picture: () => picture };
 }
 
-export function runFixtureHousehold({ pipeline, registry, paths, linter, derive, evaluate, panels, library }) {
+export function runFixtureHousehold({ pipeline, registry, paths, linter, derive, evaluate, panels, library, plan }) {
   const failures = [];
   const t = (name, cond) => { if (!cond) failures.push(name); };
   const lint = (rows, picture) => linter.runConductLinter({
@@ -115,6 +117,7 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
     paths: paths.RETRIEVAL_PATHS,
     confidenceRank: registry.CONFIDENCE_RANK,
     producers: registry.PRODUCERS,
+    plan: plan ? plan.buildPlan : undefined,
   });
 
   /* ════════ the main session ════════ */
@@ -133,16 +136,14 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
   s.reply('Both read, thank you.', {
     domains: { income: { salary_gross_annual: 120000, salary_net_monthly: 7100, partner_salary_gross_annual: 85000, partner_salary_net_monthly: 5400, employer_super_on: ['salary', 'partner_salary'], _confidence: 'document' } },
   });
-  // T4 — DECLINE 1, before any serve: the refusal is unwitnessed, so the
-  // gate refuses the below-floor figure. Nothing is lost: the row holds it.
+  // T4 — the person gives the balance from memory before any source was
+  // offered. STORE EVERY FIGURE (15 Sept): it commits, flagged to verify.
   const decline1 = s.reply('Understood.', {
     domains: { home: { owns_home: true, mortgage_balance: 540000, _confidence: 'stated' } },
-    refusals: ['home.mortgage_balance'],
   });
-  t('decline-1-unwitnessed-gate-fires',
-    decline1.status === 'refused' && decline1.kind === 'gate' && decline1.errors.join().includes('home.mortgage_balance'));
-  t('decline-1-nothing-lost',
-    s.rows().some(r => r.status === 'refused' && r.capture && r.capture.domains.home.mortgage_balance === 540000));
+  t('memory-figure-stored', decline1.status === 'applied' && s.picture().domains.home.mortgage_balance === 540000);
+  t('memory-figure-flagged-to-verify',
+    s.picture().domains.flags.to_verify.some(e => e.field === 'home.mortgage_balance' && e.reason === 'below_floor' && e.confidence === 'stated'));
   // T5 — the loan path is served.
   s.reply('When you are ready, here is the way in. [ASK: loan_details]', {});
   // T6 — DECLINE 2, now witnessed: the same figure lands with the refusal.
@@ -151,13 +152,17 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
     refusals: ['home.mortgage_balance'],
   });
   t('decline-2-witnessed-applies', decline2.status === 'applied');
+  t('declined-source-labelled',
+    s.picture().domains.flags.to_verify.some(e => e.field === 'home.mortgage_balance' && e.reason === 'declined_source'));
   t('refusal-recorded-session-tagged',
     s.picture().refusals.some(r => r.field === 'home.mortgage_balance' && r.session_id === 'fx-session-1'));
   // T7 — the person relents and attaches the loan statement: whole home
   // domain at document, offset linked and holding nothing.
-  s.reply('Got it, and read.', {
+  const t7 = s.reply('Got it, and read.', {
     domains: { home: { owns_home: true, value_estimate: 950000, value_source: 'lender estimate and rates notice', mortgage_balance: 540000, rate_percent: 5.84, rate_type: 'fixed, expires June 2027', lender: 'CBA', repayment_monthly: 3300, term_remaining_years: 24, has_offset: true, offset_balance: 0, _confidence: 'document' } },
   });
+  t('document-clears-the-flag',
+    !s.picture().domains.flags.to_verify.some(e => e.field === 'home.mortgage_balance'));
   // T8/T9 — living costs via the export path, code did the sums.
   s.reply('The fullest read of the spending is the export. [ASK: living_costs]', {});
   s.reply('The file landed and the year is summed.', {
@@ -272,8 +277,7 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
   t('card-security-auto-resolved',
     D.debts.items.find(i => i.type === 'credit_card').security === 'unsecured');
   t('four-debt-items-final', D.debts.items.length === 4);
-  t('exactly-one-gate-refusal',
-    s.rows().filter(r => r.status === 'refused').length === 1);
+  t('no-turn-refused', s.rows().filter(r => r.status === 'refused').length === 0);
 
   /* ── the hand-computed figures ── */
   const der = derive(D);
@@ -354,7 +358,7 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
 
   /* ── the linter over the whole session: twelve rows, all passing ── */
   const report = lint(s.rows(), P);
-  t('linter-twelve-rows', report.checks.length === 12);
+  t('linter-nineteen-rows', report.checks.length === 19);
   t('linter-zero-failures', report.summary.failures === 0);
   for (const c of report.checks) {
     t('linter-row-' + c.id + '-not-failing', c.status !== 'fail');
@@ -406,8 +410,20 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
     t('neg-' + name + '-and-nothing-else', report.summary.failures === 1);
   };
 
-  failsOnly('confidence-floor',
-    lint([], { domains: { home: { mortgage_balance: 512000, _confidence: 'stated' } }, refusals: [] }), 'confidence_floor');
+  failsOnly('lost-fact',
+    lint([applied('Thanks.\n[CAPTURE]{}', { domains: { context: { owner_age: 42, _confidence: 'stated' } } })], emptyPic), 'lost_fact');
+  failsOnly('acknowledged-not-captured',
+    lint([applied('Got it, $71,500 in ETFs.\n[CAPTURE]{}', {})], emptyPic), 'acknowledged_not_captured');
+  failsOnly('opening-frame',
+    lint([applied("Hi there, I'm Finn. Tell me about your household.\n[CAPTURE]{}", {})], emptyPic), 'opening_frame');
+  failsOnly('nudge-cap',
+    lint([
+      applied('Noted.\n[CAPTURE]{}', { deferrals: ['income.salary_net_monthly'] }),
+      applied('Noted.\n[CAPTURE]{}', { deferrals: ['income.salary_net_monthly'] }),
+      applied('Noted.\n[CAPTURE]{}', { deferrals: ['income.salary_net_monthly'] }),
+    ], emptyPic), 'nudge_cap');
+  failsOnly('premature-close',
+    lint([applied("That's a genuinely complete picture to take to a professional.\n[CAPTURE]{}", {})], emptyPic), 'premature_close');
   failsOnly('refusal-validity',
     lint([applied('A reply.\n[CAPTURE]{}', { refusals: ['home.mortgage_balance'] })], emptyPic), 'refusal_validity');
   failsOnly('softener',
@@ -417,7 +433,8 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
   failsOnly('reconciliation',
     lint([], { domains: { investments: { properties: [{ id: 'p1', value_estimate: 640000 }], _confidence: 'stated' } }, refusals: [] }), 'reconciliation');
   failsOnly('path-served',
-    lint([applied('A reply.\n[CAPTURE]{}', { domains: { home: { mortgage_balance: 512000, _confidence: 'sighted' } } })], emptyPic), 'path_served');
+    lint([applied('A reply.\n[CAPTURE]{}', { domains: { home: { mortgage_balance: 512000, _confidence: 'sighted' } } })],
+      { domains: { home: { mortgage_balance: 512000, _confidence: 'sighted' } }, refusals: [] }), 'path_served');
   failsOnly('single-visit',
     lint([
       servedRow('home.mortgage_balance', '2026-09-11T03:00:00.000Z'),
@@ -444,9 +461,50 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
   failsOnly('em-dash',
     lint([applied('So — here we are.\n[CAPTURE]{}')], emptyPic), 'em_dash');
 
+  /* ════════ the 15 Sept walk, replayed ════════
+     Devon typed his figures; the old gate refused 18 of 54 turns and the
+     picture ended almost empty. Replayed with the model's actual capture
+     slips: stated figures, a split with only item-level confidence,
+     completed_domains inside domains, and a fund list re-sent without ids. */
+  {
+    const w = makeSession(pipeline, paths, 'fx-walk-0915');
+    w.reply('Thanks Sam.', { domains: { context: { adults: 2, owner_age: 42, partner_age: 40, children: [{ age: 9 }, { age: 6 }], _confidence: 'stated' } } });
+    w.reply('[ASK: payslip]', { domains: { income: { structure: 'company', entity: { type: 'company' }, _confidence: 'stated' } } });
+    w.reply('We will work with those.', { domains: { income: { salary_gross_annual: 118000, partner_salary_gross_annual: 72000, _confidence: 'stated' } }, refusals: ['income.salary_net_monthly', 'income.partner_salary_net_monthly'] });
+    w.reply('The rent and costs.', { domains: { income: { other: [{ source: 'rental_commercial', linked_asset_id: null, entity: 'company', amount_annual: 42000, basis: 'gross', costs_annual: 6800 }], _confidence: 'stated' } } });
+    w.reply('[ASK: loan_details]', { domains: { home: { owns_home: true, value_estimate: 850000, value_source: 'owner estimate', _confidence: 'estimated' } } });
+    w.reply('That is clear.', { domains: { home: { mortgage_balance: 412000, rate_percent: 6.09, rate_type: 'variable', repayment_monthly: 2780, term_remaining_years: 22, has_offset: true, offset_balance: 38000, _confidence: 'stated' } } });
+    w.reply('Thanks.', { domains: { debts: { items: [{ type: 'commercial_loan', purpose: 'commercial_property', borrower: 'company', security: 'property_commercial', balance: 380000, rate_percent: 6.9 }], _confidence: 'stated' } } });
+    w.reply('Good.', { domains: { super: { funds: [{ fund: 'Australian Super', owner: 'you', balance: 186000 }], _confidence: 'stated' } } });
+    w.reply('So two for you.', { domains: { super: { funds: [
+      { fund: 'REST', owner: 'you', balance: 7400 }, { fund: 'Australian Super', owner: 'you', balance: 186000 }, { fund: 'Hostplus', owner: 'partner', balance: 121000 },
+    ], multiple_accounts: true, _confidence: 'stated' } } });
+    w.reply('And insurance.', { domains: { super: { funds: [{ fund: 'REST', owner: 'you', has_insurance: false }, { fund: 'Australian Super', owner: 'you', has_insurance: true }], _confidence: 'stated' } } });
+    w.reply('The split.', { domains: { debts: { items: [{ type: 'loan_split', purpose: 'investment_shares', borrower: 'joint', security: 'property_home', is_split: true, balance: 60000, rate_percent: 6.24, _confidence: 'stated' }] } } });
+    const slip = w.reply('Anything else?', { domains: { completed_domains: ['income'], investments: { shares_value: 71500, held_in: 'joint', _confidence: 'stated' }, home: { not_a_field: 1 } }, goals: {} });
+    const WD = w.picture().domains;
+    t('walk-no-turn-refused', w.rows().filter(r => r.status !== 'path_served').every(r => r.status === 'applied'));
+    t('walk-salaries-kept', WD.income.salary_gross_annual === 118000 && WD.income.partner_salary_gross_annual === 72000);
+    t('walk-rent-and-costs-kept', WD.income.other.length === 1 && WD.income.other[0].amount_annual === 42000 && WD.income.other[0].costs_annual === 6800);
+    t('walk-mortgage-kept', WD.home.mortgage_balance === 412000 && WD.home.offset_balance === 38000 && WD.home.has_offset === true);
+    t('walk-funds-not-duplicated', WD.super.funds.length === 3);
+    t('walk-fund-insurance-landed-on-existing', WD.super.funds.find(f => f.fund === 'Australian Super').has_insurance === true && WD.super.funds.find(f => f.fund === 'Australian Super').balance === 186000);
+    t('walk-both-loans-kept', WD.debts.items.length === 2 && WD.debts.items.some(i => i.type === 'loan_split' && i.balance === 60000));
+    t('walk-slip-partial-not-whole', slip.status === 'applied' && slip.errors.some(e => e.includes('not_a_field')) && WD.investments.shares_value === 71500);
+    t('walk-control-key-lifted', slip.anomalies.some(a => a.includes('completed_domains')));
+    t('walk-typed-figures-flagged', ['income.salary_gross_annual', 'home.mortgage_balance', 'super.funds[].balance', 'investments.shares_value', 'debts.items[].balance']
+      .every(f => WD.flags.to_verify.some(e => e.field === f)));
+    t('walk-completion-code-derived', !w.picture().completed_domains.includes('income'));
+    const wr = lint(w.rows(), w.picture());
+    const lost = wr.checks.find(c => c.id === 'lost_fact');
+    t('walk-lost-facts-only-the-bad-field', lost.status === 'fail' && lost.details.length === 1 && lost.details[0].includes('not_a_field'));
+    const closeTry = w.reply('Here is everything.', { session_complete: true });
+    t('walk-close-refused-with-open-items', closeTry.sessionCompleteRefused === true && closeTry.sessionComplete === false);
+  }
+
   return {
     pass: failures.length === 0,
-    total: 82,
+    total: 106,
     failures,
     hand_computed: {
       home_equity: 410000, lvr_percent: 56.8, surplus_monthly: 3402, buffer_months: 2.6,

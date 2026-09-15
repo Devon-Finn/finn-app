@@ -181,3 +181,39 @@ Steps 1 and 2 are the whole point. Everything after them is content that inherit
 Raised September 2026 after Devon's walk of `clarity-3b` produced five findings of one class. Supersedes Part One of the capture-accuracy addendum, which described the three retrieval fixes as separate items. The debt and income schema changes in that document stand and are inputs here. The ledger layout in it is independent and unaffected.
 
 *Capture was the last place in Finn where a rule lived only in a prompt. It doesn't any more.*
+
+---
+
+## PART SEVEN — STORE EVERY FIGURE, AND THE GUIDE MODEL (15 September 2026)
+
+Devon's walk of household C lost almost every figure he typed. 18 of 54 turns were refused whole because a typed figure sat below a `document` floor with no refusal record. The heads-up notice fired each time and asked him to repeat himself, and questions repeated because the model never learned the first answer was gone. Deferred items were never re-raised, assets were never swept, and Finn called the picture complete. **Devon's decision: store every figure, flag it to verify.** This part supersedes "the database refuses to store a guess" wherever it appears above.
+
+### The floor is a verification status, not a write barrier
+
+Nothing the person gives is lost. Every figure is stored with how it was given (`document`, `sighted`, `stated`, `estimated`). A figure below its floor goes into `flags.to_verify` (reason `below_floor`, or `declined_source` when the person turned down the source). The plan re-raises it, the close walks it, and the professional sees it as unverified. A figure at or above its floor clears its entry. Array items may carry their own `_confidence`.
+
+Only one thing is refused: an enum written without its item-sibling requires (`debts.items[].type` before `purpose` and `borrower`). Only that leaf is refused. Dotted requires flag `needs:<field>` and never block. Unknown fields and domains drop individually. **A turn is never refused whole.** A partial write is logged with its errors; the next turn's working notes tell Finn what didn't save, and Finn re-asks in its own words. The page notice appears only when a whole turn could not be saved, and it never asks the person to repeat themselves.
+
+Saves read the picture fresh and write conditionally on `updated_at`, retrying on conflict, so a quick reply can't overwrite the previous turn. A new turn waits briefly for the previous save to land. An id-less re-send of an existing item adopts that item's id by natural key (fund name and owner, debt type and borrower, and so on) instead of appending a duplicate.
+
+### The guide model (lib/finn-plan.js)
+
+Every turn, code builds the **information plan** from the picture: the household's shape, each area's required fields (missing, to verify, put off), the sweeps not yet asked, and the open items grouped by source. The model receives it as FINN'S WORKING NOTES. **Code decides coverage.** The model's `completed_domains` is advisory. `session_complete` is refused unless every area is covered and `[FRAME: close]` has been served this session.
+
+The plan is driven by the shape of the household, never by magnitude. This is tested: scaling every figure leaves the plan unchanged, and the notes carry no figures.
+
+### Code-emitted copy (lib/finn-tokens.js)
+
+| Token | Copy |
+|---|---|
+| `[ASK: id]` | retrieval asks (unchanged) |
+| `[SWEEP: other_income / other_assets / other_debts / other_super]` | the "anything else?" questions; an area is not covered until its sweep is asked |
+| `[FRAME: open]` | the preframe. A fresh session never reaches the model; code streams it. |
+| `[FRAME: close]` | opens the close's walk of open items |
+| `[NUDGE: first]` / `[NUDGE: accept]` | the skip protocol, capped at two nudges per item |
+
+`deferrals` in the capture block records what the person put off (`field` or `field#item_id`), with a nudge count in the ledger.
+
+### New conduct checks
+
+Lost facts (the headline metric), acknowledged but not captured, opening preframe, nudge cap and premature close all fail. To verify, coverage and dropped fields are reports. The confidence-floor check is now a report of the to-verify ledger.

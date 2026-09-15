@@ -149,3 +149,52 @@ export function resolveSecurity(domains) {
   if (!changed) return domains;
   return { ...domains, debts: { ...debts, items } };
 }
+
+/* Natural-key adoption (15 Sept walk): the model sometimes re-sends an
+   existing item WITHOUT its id (a fund repeated to add has_insurance, a
+   loan repeated to add its rate). Appending those duplicates the item. An
+   id-less patch item that matches EXACTLY ONE existing item on its natural
+   key adopts that item's id, so it updates in place. No match, or more
+   than one, and it appends as before: ambiguity never guesses. */
+function normName(s) {
+  return String(s || "").toLowerCase().replace(/\bsuper(annuation)?\b/g, "").replace(/[^a-z0-9]/g, "");
+}
+const NATURAL_KEYS = {
+  "super.funds": (b, p) => p.fund && b.fund && normName(b.fund) === normName(p.fund)
+    && (!p.owner || !b.owner || String(b.owner).toLowerCase() === String(p.owner).toLowerCase()),
+  "debts.items": (b, p) => p.type && b.type === p.type
+    && (!p.borrower || !b.borrower || b.borrower === p.borrower)
+    && (!p.purpose || !b.purpose || b.purpose === p.purpose),
+  "investments.properties": (b, p) => (p.held_in && b.held_in && String(b.held_in).toLowerCase() === String(p.held_in).toLowerCase()
+    && (!p.use || !b.use || b.use === p.use))
+    || (typeof p.value_estimate === "number" && b.value_estimate === p.value_estimate),
+  "income.other": (b, p) => p.source && b.source === p.source
+    && (!p.linked_asset_id || !b.linked_asset_id || b.linked_asset_id === p.linked_asset_id)
+    && (!p.entity || !b.entity || b.entity === p.entity),
+  "context.children": (b, p) => typeof p.age === "number" && b.age === p.age,
+};
+export function adoptNaturalIds(base, patch) {
+  if (!isObj(patch) || !isObj(base)) return patch;
+  const out = { ...patch };
+  for (const [domainKey, fields] of Object.entries(ARRAY_ITEM_FIELDS)) {
+    const pd = out[domainKey], bd = base[domainKey];
+    if (!isObj(pd) || !isObj(bd)) continue;
+    let nd = null;
+    for (const f of fields) {
+      const match = NATURAL_KEYS[domainKey + "." + f];
+      if (!match || !Array.isArray(pd[f]) || !Array.isArray(bd[f])) continue;
+      const taken = new Set(pd[f].filter(i => isObj(i) && typeof i.id === "string").map(i => i.id));
+      const arr = pd[f].map(item => {
+        if (!isObj(item) || (typeof item.id === "string" && item.id) || item._remove) return item;
+        const hits = bd[f].filter(b => isObj(b) && b.id && !taken.has(b.id) && match(b, item));
+        if (hits.length !== 1) return item;
+        taken.add(hits[0].id);
+        return { ...item, id: hits[0].id };
+      });
+      nd = nd || { ...pd };
+      nd[f] = arr;
+    }
+    if (nd) out[domainKey] = nd;
+  }
+  return out;
+}

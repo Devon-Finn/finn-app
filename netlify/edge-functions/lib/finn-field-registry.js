@@ -256,18 +256,34 @@ export const PRODUCERS = [
   { key: "income.structure:sole_trader", produces: ["business_profit"] },
 ];
 
-/* ── the persistence gate (build step 2, with corrections 1-3) ──
-   Runs in the request path, after the write-ahead raw insert and before
-   the validated merge commits. Pure: the CALLER computes which refusals
-   are VALID (a refusal is valid only where a code-written path_served
-   event exists for that field id in the SAME session; refusals from
-   earlier sessions have expired). Until step 4's templated asks write
-   path_served events, no refusal is valid — correct and intended.
+/* ── the persistence gate: STORE EVERY FIGURE, FLAG IT TO VERIFY ──
+   (Devon's decision after the 15 Sept walk, which lost almost every figure
+   he typed because a below-floor write refused the whole turn.)
 
-   1. retrieval "required": may not commit below confidence_floor without
-      a valid refusal. "offered"/"none": no floor enforcement.
-   2. requires: every required field present in the merged picture.
-   A missing _confidence ranks below everything. */
+   The evidence floor is a VERIFICATION STATUS, not a write barrier.
+   Nothing the person gives is lost: every figure is stored with how it was
+   given, and a figure below its floor is flagged to verify (reason
+   "below_floor"), re-raised by the plan, and shown to the professional as
+   unverified.
+
+   Only one thing still refuses, and only the offending leaf, never the
+   turn: an enum written without its item-sibling requires (no_default
+   classification, e.g. debts.items[].type before purpose and borrower).
+   Dotted requires (offset balance before the offset question, living
+   costs before includes_housing) no longer block; they flag
+   "needs:<field>" until the prerequisite is present.
+
+   Returns { ok, errors, strip, flags }:
+     errors  human-readable hard errors (the refused leaves)
+     strip   [{ domain, key, itemRef, field }] the leaves to remove from the
+             patch before merging (itemRef is the patch item object)
+     flags   [{ field, item_id, confidence, floor, reason }] verification
+             entries this write raises (reason below_floor | needs:<id>)
+     clears  [{ field, item_id }] entries this write satisfies
+   Confidence is read from the array item's own _confidence when present,
+   else the domain's. A missing confidence ranks below everything and is
+   recorded as "unrecorded". validRefusals is accepted for compatibility:
+   a refused-then-given figure flags as "declined_source". */
 
 function resolveEntry(entry, item) {
   if (!entry || !entry.retrieval_by_type) return entry;
@@ -275,35 +291,36 @@ function resolveEntry(entry, item) {
   const byType = t && entry.retrieval_by_type[t];
   return byType ? { ...entry, ...byType } : { ...entry, retrieval: "required" }; // unknown type: strictest
 }
+export { resolveEntry };
 
-function leafWrites(domains) {
+export function leafWrites(domains) {
   const out = [];
   for (const [domainKey, domainVal] of Object.entries(domains || {})) {
-    if (!domainVal || typeof domainVal !== "object") continue;
+    if (!domainVal || typeof domainVal !== "object" || Array.isArray(domainVal)) continue;
     for (const [k, v] of Object.entries(domainVal)) {
       if (k.startsWith("_") || v === null || v === undefined) continue;
       if (Array.isArray(v)) {
         for (const item of v) {
           if (!item || typeof item !== "object") continue;
           for (const [ik, iv] of Object.entries(item)) {
-            if (ik.startsWith("_") || iv === null || iv === undefined) continue;
-            out.push({ id: `${domainKey}.${k}[].${ik}`, domain: domainKey, item });
+            if (ik.startsWith("_") || ik === "id" || iv === null || iv === undefined) continue;
+            out.push({ id: `${domainKey}.${k}[].${ik}`, domain: domainKey, key: k, sub: ik, item });
           }
         }
       } else if (typeof v === "object") {
         for (const [ik, iv] of Object.entries(v)) {
           if (ik.startsWith("_") || iv === null || iv === undefined) continue;
-          out.push({ id: `${domainKey}.${k}.${ik}`, domain: domainKey });
+          out.push({ id: `${domainKey}.${k}.${ik}`, domain: domainKey, key: k, sub: ik });
         }
       } else {
-        out.push({ id: `${domainKey}.${k}`, domain: domainKey });
+        out.push({ id: `${domainKey}.${k}`, domain: domainKey, key: k });
       }
     }
   }
   return out;
 }
 
-function presentInMerged(merged, fieldId) {
+export function presentInMerged(merged, fieldId) {
   const parts = fieldId.split(".");
   let node = merged || {};
   for (let i = 0; i < parts.length; i++) {
@@ -322,33 +339,52 @@ function presentInMerged(merged, fieldId) {
 
 export function persistenceGate(patchDomains, mergedDomains, validRefusals) {
   const errors = [];
-  const refuse = validRefusals instanceof Set ? validRefusals : new Set(validRefusals || []);
+  const strip = [];
+  const flags = [];
+  const clears = [];
+  const refused = validRefusals instanceof Set ? validRefusals : new Set(validRefusals || []);
   for (const w of leafWrites(patchDomains)) {
     const entry = resolveEntry(FIELD_REGISTRY[w.id], w.item);
     if (!entry || entry.never_asked) continue;
-    if (entry.retrieval === "required") {
-      const conf = (patchDomains[w.domain] || {})._confidence;
-      const rank = CONFIDENCE_RANK[conf] ?? 0;
-      const floor = CONFIDENCE_RANK[entry.confidence_floor];
-      // A sighted value satisfies a document floor only while no working
-      // upload path exists for that field (the capability flag lives in
-      // code, above — not in the registry).
-      const sightedOk = conf === "sighted" && entry.confidence_floor === "document" && !uploadWorks(w.id);
-      if (floor !== undefined && rank < floor && !sightedOk && !refuse.has(w.id)) {
-        errors.push(`gate: ${w.id} committed at "${conf ?? "no confidence"}" below floor "${entry.confidence_floor}" with no valid refusal record`);
+    const itemId = w.item && typeof w.item.id === "string" ? w.item.id : null;
+
+    // Hard: classification without its item-sibling requires.
+    let hard = false;
+    for (const req of entry.requires || []) {
+      if (req.includes(".")) continue;
+      const sib = w.item ? w.item[req] : undefined;
+      if (sib === null || sib === undefined) {
+        errors.push(`gate: ${w.id} written before required field ${req} is present on the item`);
+        hard = true;
       }
     }
+    if (hard) { strip.push({ domain: w.domain, key: w.key, sub: w.sub, itemRef: w.item, field: w.id }); continue; }
+
+    // Soft: dotted requires flag until the prerequisite lands.
     for (const req of entry.requires || []) {
-      if (!req.includes(".")) {
-        // Item-sibling require: must be present on the same array item.
-        const sib = w.item ? w.item[req] : undefined;
-        if (sib === null || sib === undefined) {
-          errors.push(`gate: ${w.id} written before required field ${req} is present on the item`);
-        }
-      } else if (!presentInMerged(mergedDomains, req)) {
-        errors.push(`gate: ${w.id} written before required field ${req} is present`);
+      if (!req.includes(".")) continue;
+      if (!presentInMerged(mergedDomains, req)) {
+        flags.push({ field: w.id, item_id: itemId, confidence: null, floor: null, reason: "needs:" + req });
       }
+    }
+
+    // Verification status against the evidence floor.
+    const floorName = entry.confidence_floor;
+    const floor = CONFIDENCE_RANK[floorName];
+    if (floor === undefined) continue;
+    const conf = (w.item && typeof w.item._confidence === "string")
+      ? w.item._confidence
+      : (patchDomains[w.domain] || {})._confidence;
+    const rank = CONFIDENCE_RANK[conf] ?? 0;
+    const sightedOk = conf === "sighted" && floorName === "document" && !uploadWorks(w.id);
+    if (rank >= floor || sightedOk) {
+      clears.push({ field: w.id, item_id: itemId });
+    } else {
+      flags.push({
+        field: w.id, item_id: itemId, confidence: conf || "unrecorded", floor: floorName,
+        reason: refused.has(w.id) ? "declined_source" : "below_floor",
+      });
     }
   }
-  return { ok: errors.length === 0, errors };
+  return { ok: errors.length === 0, errors, strip, flags, clears };
 }

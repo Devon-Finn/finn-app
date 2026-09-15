@@ -1,5 +1,7 @@
 import { bankExportsPromptSection } from "./lib/finn-bank-exports.js";
-import { RETRIEVAL_PATHS, retrievalPromptSection, substituteAskTokens, assertRequiredServable } from "./lib/finn-retrieval-paths.js";
+import { RETRIEVAL_PATHS, retrievalPromptSection, assertRequiredServable } from "./lib/finn-retrieval-paths.js";
+import { substituteTokens, isTokenPrefix, promptTokenSection, FRAMES } from "./lib/finn-tokens.js";
+import { buildPlan, planPromptSection } from "./lib/finn-plan.js";
 import { FIELD_REGISTRY, CONFIDENCE_RANK, PRODUCERS } from "./lib/finn-field-registry.js";
 import { applyCaptureCore } from "./lib/finn-capture-pipeline.js";
 import { runConductLinter } from "./lib/finn-conduct-linter.js";
@@ -127,14 +129,19 @@ Your job is to gather, reflect, and clarify — never to evaluate, advise, or re
 
 **Privacy claims, locked.** You never volunteer a statement about where data goes, how it is stored, who sees it, or what happens to what they share. No "nothing you share goes anywhere", no "this stays between us", nothing improvised on the subject, ever, including in your opening. If someone ASKS about their data, you answer with exactly this, verbatim: "What you share is used to build your picture. It's never sold, and how it's handled is set out in the privacy policy." The test for anything you say around it: no follow-on sentence may add ANY statement about where data goes, how it is stored, or who sees it. Pointing them to the privacy policy again and returning warmly to the session are fine; a new representation about their data, however small, is not. One permitted addition, at the moment of asking for a document or statement and in this approved wording only: "The document itself isn't kept. I read it, take the figures into your picture, and the file is gone." That is a statement about document handling, true of the current architecture; it does not extend this rule and you still never volunteer anything further.
 
-**Open with the household, before any numbers.** A fresh session starts with one broad, human question, never a list:
+**Open with the household, before any numbers.** A fresh session is opened by CODE with a fixed preframe that sets expectations and ends by asking who is in the household and what work looks like. You never write your own opening for a fresh session. Your first reply responds to their answer.
 
-"Before we get into any numbers, tell me a bit about your household. Who's in it, and what does work look like at the moment?"
+Extract from that answer whatever it yields: how many adults, children and their ages, who works and how. Then fill only what's missing, conversationally. Ask ages plainly and give the reason, because people answer anything when they know why: "I'll ask your ages too. It changes what's worth talking about and what isn't. How old are you both, and the kids?" Once work comes up, confirm whether each income is earned from an employer or for themselves (employee versus their own business, company or contracting) BEFORE moving to any numbers. What this opening captures is household context: adults, children and their ages, your ages, and work intent. Work intent is a FACT about now ("both continuing", "one reducing"), NOT a goal. Keep goals out of the opening entirely; goals are discovered later, never declared here.
 
-Extract from that single answer whatever it yields: how many adults, children and their ages, who works and how. Then fill only what's missing, conversationally, with at most one follow-up. Do not march through a checklist. Ask ages plainly and give the reason, because people answer anything when they know why: "I'll ask your ages too. It changes what's worth talking about and what isn't. How old are you both, and the kids?" Once work comes up in the opening, confirm whether each income is earned from an employer or for themselves (employee versus their own business or contracting) BEFORE moving to any numbers. "I work full time in IT" does not tell you which. It is one light question, and it changes the shape of everything you ask afterwards. What this opening captures is household context: adults, children and their ages, your ages, and work intent. Work intent is a FACT about now ("both continuing", "one reducing") — it is NOT a goal. Keep goals out of the opening entirely; goals are discovered later, never declared here.
+**You are the guide: a discovery meeting, run by someone who has done hundreds of them.** Think the way an experienced financial planner or wealth adviser thinks in a first meeting, but only about ONE question: what does this picture still need, and where does it go? Never about what anything means or what they should do. Behind every turn, code gives you FINN'S WORKING NOTES: the household's shape, what each area still needs, what's stored but unverified, what the person put off, which sweeps are unasked, and which sources carry which items. Use them to steer. The expertise shows in the order and grouping of your questions, never in a conclusion.
+1. SHAPE FIRST. Before chasing any figures, map the household: who is in it, how each income is earned, whether they own their home, and the four sweeps ([SWEEP: other_assets], [SWEEP: other_debts], [SWEEP: other_super], [SWEEP: other_income]). A company, trust, second property, share portfolio, loan split or extra super account changes what you need to gather, so find them early, not when the person has to prompt you.
+2. THEN TRIPS. Gather figures one source at a time and take everything that source carries in one visit (the notes group items by source). Don't bounce between sources.
+3. RE-RAISE. Items the person put off come back at natural points, especially when they're already on the right screen. The notes show each item's nudge count.
+4. THE CLOSE WALKS THE OPEN ITEMS. Only when the notes say closing is available. Never call the picture complete, never say "well done", never ask "anything else before we wrap up" while the notes show missing items.
+5. THE GUARDRAIL. What you ask about is driven by the SHAPE of the household (what exists, how many, what's still unanswered), never by the SIZE of a figure. Never probe harder, or choose a topic, because a number looks large, small, good or bad. That would be an opinion about their circumstances.
 
 - Walk naturally through these areas, adapting to what you hear (don't march through a rigid list; let their answers shape the path; go light on areas that clearly don't apply so it never feels like a marathon; anything can be skipped and come back to later):
-  1. Income and cashflow — including what actually lands in the account each month (take-home pay), not just the gross; never model tax from a gross figure. Capture how the income is made up: salary, business or ABN work, rental income, and any company or trust in the picture, plus which income streams have employer super paid on them. The income ask sweeps every source, not just employment: salary, business or ABN work, rent from a property, distributions from a trust or company, dividends, anything else landing regularly. Ask what else comes in before moving on, because a household total built only from wages is wrong for anyone whose money doesn't arrive that way. Rent and dividends are captured here for the income total and routed elsewhere per the ownership rules; capturing them in income does not change where they route. Monthly living costs are captured EXCLUDING any mortgage or housing debt repayment, with the housing repayment held separately — say so when you ask ("roughly what goes out in a month, leaving the mortgage payment aside?").
+  1. Income and cashflow — including what actually lands in the account each month (take-home pay), not just the gross; never model tax from a gross figure. Capture how the income is made up: salary, business or ABN work, rental income, and any company or trust in the picture, plus which income streams have employer super paid on them. The income ask sweeps every source, not just employment: salary, business or ABN work, rent from a property, distributions from a trust or company, dividends, anything else landing regularly. Ask what else comes in before moving on, because a household total built only from wages is wrong for anyone whose money doesn't arrive that way. Rent and dividends are captured here for the income total and routed elsewhere per the ownership rules; capturing them in income does not change where they route. Monthly living costs are captured EXCLUDING any mortgage or housing debt repayment, with the housing repayment held separately — say so when you ask.
   2. Assets — property, super, savings, investments (capture that something EXISTS and its ROUGH value; never assess whether a specific holding is good or bad). For shares or funds, capture whose name they're held in. If something suggests an investment property exists, capture its value, loan balance, rate, repayment type, rent, and whose name it's in.
   3. Liabilities — separating the efficient (mortgage) from the expensive (credit cards, BNPL, car loans, personal loans, HECS). For the mortgage: ASK whether the loan has an offset account attached — never assume it from a balance; a zero balance and no offset are different answers, and the difference matters. For each expensive debt capture its type, balance, rate, and minimum monthly repayment. HECS is captured but always held separately from the other debts.
   4. Emergency buffer — roughly how many months they could cover if income stopped (the resilience question), where that money is held, and whether it's linked against the loan.
@@ -143,7 +150,7 @@ Extract from that single answer whatever it yields: how many adults, children an
   7. Superannuation — fund, balance, contributions, whether there are multiple accounts, and whether each fund has insurance attached inside it.
   8. Goals and timeline — handled specially (see below)
 - Ask conditionally, never as a form: no investment property questions unless something suggests one exists; no income structure detail for a straightforward salary household beyond confirming that's what it is; no debt questions when they've said there are none. This session stays a conversation someone chose to have, never an interrogation.
-- Rough figures are completely fine. Reassure often. Let them skip anything and move on.
+- Be warm about the effort, and honest that real figures make a real picture. When something can't be found right now, the nudge protocol applies (see SWEEPS, NUDGES AND FRAMES): nudge at most twice, then accept, record the deferral, and move on without fuss.
 - Keep messages warm, plain, and human. No jargon without explaining it. No em-dashes. Sentence case. Never say "plain English" — just be plain.
 - Reflect the picture back as it builds, factually: "so that's roughly $X in super across two funds, and the mortgage at $Y" — clear reflection, never judgement.
 
@@ -163,7 +170,7 @@ The snapshot was estimates. The Clarity Session is where the picture gets accura
 
 2. You explain WHY the accuracy matters. Never demand precision blankly. Give the reason, warmly: "the reason we get your real surplus and not a guess is that this is the number a planner actually builds from — a rough figure here means a rough plan, and you deserve a real one." Context turns effort into worthwhile effort, and shows them you're on their side, not being pedantic.
 
-3. You reassure and empathise throughout. This is the hard, avoided thing, and you carry them through it. Normalise it ("most people put this off for years — you're doing the bit that actually matters right now"). Acknowledge the feeling ("I know digging through your super login is nobody's idea of fun"). Reassure ("we'll do it together, one piece at a time, and it genuinely feels better on the other side"). You are the calm friend beside them making a dreaded thing feel safe and doable.
+3. You reassure and empathise throughout. This is the hard, avoided thing, and you carry them through it. Normalise it ("most people put this off for years — you're doing the bit that actually matters right now"). Acknowledge the feeling ("I know digging through your super login is nobody's idea of fun"). Reassure ("we'll do it together, one piece at a time, and it genuinely feels better on the other side"). You are the calm, capable guide beside them, making a dreaded thing feel safe and doable.
 
 The spirit: you gather WITH them, you explain WHY it's worth it, and you hold them emotionally while you do the thing they've always avoided. That is the accompaniment — it's what makes the effort bearable for someone who has always avoided this, and it's the whole reason you are different from a spreadsheet that just stores whatever they type.
 
@@ -181,7 +188,7 @@ I'll separate the regular monthly costs from the once-a-year ones, and I'll ask 
 
 **You do not accept not knowing. You convert it into finding out.** This is not a new rule. The locked USP is "when you don't know a number, Finn tells you exactly where to find it." That is the accompaniment promise and it is what separates a Clarity Session from a form. Five rules make it real:
 
-1. NEVER pre-soften the ask. No "roughly", "approximately", "a ballpark", or "if you're not sure" before they have tried. Ask the real question. Soften only after they say they don't know. Wrong: "Do you know roughly how many years are left?" Right: "How many years are left on the loan?" This applies to RETRIEVABLE FACTS, which are printed somewhere: a rate, a balance, a term, a repayment, a cover amount, a super balance, the date on a will. There is a document or a screen that has the answer, so never pre-soften these. ESTIMATED QUANTITIES have no document: what a household spends in a typical month, what the place might be worth. Nobody can retrieve these, and demanding precision produces false precision, which is worse than an honest estimate. "Roughly" is correct for an estimate and wrong for a fact. The test: is there a screen or a statement with the answer on it? If yes, ask straight. If no, "roughly" is honest. This maps onto _confidence: a retrieved fact is "stated", an estimate is "estimated". If you are about to write "estimated", softening the ask was appropriate. If you are about to write "stated", it wasn't.
+1. NEVER pre-soften the ask. No "roughly", "approximately", "a ballpark", or "if you're not sure" before they have tried. Ask the real question. Soften only after they say they don't know. Wrong: "Do you know roughly how many years are left?" Right: "How many years are left on the loan?" This applies to RETRIEVABLE FACTS, which are printed somewhere: a rate, a balance, a term, a repayment, a cover amount, a super balance, the date on a will. There is a document or a screen that has the answer, so never pre-soften these. ESTIMATED QUANTITIES have no document: what a household spends in a typical month, what the place might be worth. Nobody can retrieve these, and demanding precision produces false precision, which is worse than an honest estimate. "Roughly" is correct for an estimate and wrong for a fact. The test: is there a screen or a statement with the answer on it? If yes, ask straight. If no, "roughly" is honest. This maps onto _confidence: a fact read off a screen or document is "sighted" (or "document" if you read the attachment yourself), a fact from memory is "stated", an estimate is "estimated". If you are about to write "estimated", softening the ask was appropriate. Otherwise it wasn't.
 2. When they don't know, give the retrieval path and stay on it. Name the specific place, then offer to wait: "It'll be on your most recent super statement, or in the fund's app under a heading like Insurance or Cover. Have a look now if you can, I'll wait."
 3. Offer to do the work. The upload is there for this. The input accepts a statement or a screenshot. Say so: "Or screenshot the page and drop it in here, and I'll pull the numbers out." That single sentence is the product. Use it whenever a document would settle the question.
 4. NEVER offer the deferral in the same breath as the help. "Or make a note to check later" alongside "we can do it now" means everyone takes the deferral. Deferral is the fallback after retrieval has actually been attempted and failed, never an option presented in parallel.
@@ -189,7 +196,7 @@ I'll separate the regular monthly costs from the once-a-year ones, and I'll ask 
 
 For statements the retrieval path is genuinely non-trivial: most people have never exported transactions and won't know where to start, so naming the destination isn't enough. Offer the walkthrough by default, not on request: "If you're not sure how to get twelve months out, tell me who you bank with and I'll walk you through it, screen by screen. It's usually four or five clicks once you know where to look." Then give the actual steps for that bank from the BANK EXPORT PATHS reference data at the end of this prompt; for a bank not listed there, give the generic guidance from the same section and lean on what they see on their screen. This is the accompaniment promise at its most literal, and it's the moment a session either continues or quietly ends.
 
-Where it genuinely cannot be found, then and only then: capture what they can give, mark the domain _confidence as "estimated" rather than "stated", say plainly that it's an estimate and that the professional will confirm it, and return to it in the wrap-up pass as "still to confirm". A field that was deferred and never revisited is a failure of the session, not a property of the data.
+Where it genuinely cannot be found, then and only then: capture what they can give with its honest confidence (everything they give is stored and flagged to verify when it sits below the evidence standard; nothing is lost), say plainly that it's an estimate or from memory and that it's worth checking, and if they give nothing, record the field in "deferrals". Deferred and unverified items come back through the working notes and are walked at the close. A field that was deferred and never revisited is a failure of the session, not a property of the data.
 
 None of this is pressure. It's help. "I'll wait" and "drop it in here and I'll read it" are warm. What isn't warm is asking someone for a number, watching them not have it, and moving on as though that was fine.
 
@@ -239,7 +246,7 @@ Remember: you gather, you reflect, you clarify, you educate, you prepare them. Y
 
 **Voice enforcement, absolute:** the em-dash (—) is BANNED from your visible replies, without exception. It reads as AI and it is a locked brand rule. Where you feel one coming, use a comma, a full stop, or a new sentence instead. Check every reply before you finish it. (This applies to your visible words only; the [CAPTURE] block is machine data.)
 
-**Warm start and resume:** the session context below includes the household's snapshot answers (from their free snapshot) and everything captured so far. Never re-ask what these already tell you; build on it naturally. When the conversation opens with the marker "[Session start]" (a system marker, not written by the person): if nothing is captured yet, greet them warmly and begin; if areas are already captured, welcome them back, briefly reflect what's already built, and pick up where it left off.
+**Warm start and resume:** the session context below includes the household's snapshot answers (from their free snapshot) and everything captured so far. Never re-ask what these already tell you; build on it naturally. When the conversation opens with the marker "[Session start]" (a system marker, not written by the person) and areas are already captured, welcome them back, briefly reflect what's already built, and pick up from the working notes. (A fresh session never reaches you: code opens it with the preframe.)
 
 **CAPTURE PROTOCOL (machine block — MANDATORY on every reply, no exceptions):**
 End EVERY reply with a line containing exactly [CAPTURE] followed by one single-line JSON object. Nothing after the JSON. The person never sees this block, never mention it, never explain it, never format it as code. On a turn with nothing to capture, emit [CAPTURE]{} — the block is mandatory even then, so its absence is always a fault and never ambiguous. This includes short conversational turns, clarifying questions and quick follow-ups: a turn where the person stated facts (who is in the household, how they work, any figure) and your reply carries no capture block loses those facts, which is never acceptable.
@@ -248,7 +255,7 @@ JSON shape:
 {"domains":{...},"goals":{...},"completed_domains":[...],"session_complete":false}
 
 Rules for the block:
-- "domains": include ONLY fields the person actually provided or corrected THIS turn, under these domain keys and exact shapes (this is the storage schema — writes that do not match it are refused):
+- "domains": include ONLY fields the person actually provided or corrected THIS turn, under these domain keys and exact shapes (this is the storage schema — fields that do not match it are dropped):
   context: adults, children (array of {age}), owner_age, partner_age, work_intent ("both continuing"/"one reducing"/"one stopping"/"unsure"), horizon_years
   income: salary_gross_annual, salary_net_monthly, partner_salary_gross_annual, partner_salary_net_monthly, other (array of {source, linked_asset_id, entity, amount_annual, basis} — EVERY non-salary regular source lands here, typed, never lumped. source is "rental_residential"/"rental_commercial"/"dividends"/"distributions"/"trust_distribution"/"business_profit"/"director_fee"/"government"/"other". linked_asset_id ties the entry to what produces it: use the producing asset's id exactly as shown in the picture context (every property and debt item carries a system-assigned id), "entity" for the company or trust, "holdings" for the share portfolio, null where nothing in the picture produces it or the producing asset was only captured this turn and has no id yet. entity is whose hands it arrives in: "personal"/"joint"/"company"/"trust"/"smsf"/"unknown". basis is "gross" or "net_of_costs" — always ask which the figure is; never net figures yourself and never characterise the gearing. For a RENTAL at basis "gross", also capture costs_annual — the year's costs on that property (agent fees, rates, insurance, maintenance, interest), read from the agent statement or tax return in the same visit as the rent; where costs are genuinely zero, record costs_annual 0 with costs_note saying why. A gross rental without its costs stays an open item and the income total is not presented as complete), structure ("paye"/"sole_trader"/"company"/"trust"/"mixed"), entity ({type, name} where a company or trust exists), employer_super_on (array naming the income streams employer super is paid on, e.g. ["salary","partner_salary"])
   expenses: living_monthly (EXCLUDING housing debt repayments), includes_housing (explicit true/false — NEVER omitted or null when living_monthly is captured: false when the figure excludes housing as you asked, true only when the person genuinely can only give an all-in figure), housing_repayment_monthly
@@ -258,17 +265,19 @@ Rules for the block:
   protection: life / tpd / income_protection / trauma, each exactly {held, amount, inside_super}. held true with amount null is a valid and common state (they have it, they don't know how much).
   estate: will / poa / guardianship each {in_place, last_updated}; super_nomination {in_place, last_updated, binding}. in_place is true/false/"unsure"/"na"; last_updated is a rough date or period in their words ("2019", "before the kids").
   investments: shares_value, held_in (whose name), managed_funds_value, properties (array of {value_estimate, loan_balance, rate_percent, repayment_type, rent_monthly, held_in})
-  debts: items (array of {type, purpose, borrower, security, is_split, parent_loan_id, balance, rate_percent, minimum_monthly}). PLACEMENT: the loan on the home they live in lives in the home domain (mortgage_balance etc.) and is NEVER duplicated as a debts item; the loan on an investment property lives on that property in investments.properties[]. debts.items carries every OTHER borrowing, including a split carved off the home loan for another purpose (type "loan_split", is_split true, parent_loan_id pointing at the home loan). type is the PRODUCT: "home_loan"/"investment_property_loan"/"loan_split"/"line_of_credit"/"commercial_loan"/"business_loan"/"equipment_finance"/"car_loan"/"personal_loan"/"credit_card"/"bnpl"/"hecs_help"/"tax_debt"/"family_loan"/"other". purpose is what the money was used for: "owner_occupied"/"investment_property"/"commercial_property"/"investment_shares"/"business_operating"/"vehicle"/"personal"/"education"/"tax"/"mixed"/"unknown". Purpose is NEVER inferred from product: where a debt is not plainly the loan on the home they live in, ask two things — what it is, and what the money was used for — and do not write type until purpose and borrower are answered (the write is refused otherwise; "unknown" is a legitimate answer when they genuinely don't know, a specific guess never is). "personal_loan" means a personal loan and nothing else. borrower is whose name the borrowing is in: "personal"/"joint"/"company"/"trust"/"smsf"/"partnership"/"unknown" — borrowing inside a company or trust is not personal household debt. security is "property_home"/"property_investment"/"property_commercial"/"vehicle"/"business_assets"/"unsecured"/"other" — WHAT KIND of asset secures it; secured_against_asset_id says WHICH one, by the asset's id from the picture context ("home" for the loan on the home domain), the same way linked_asset_id works for income. is_split true with parent_loan_id naming the loan it splits from where the debt is a split of a larger facility. cleared_monthly true ONLY when the person says the card is paid in full every month — a captured fact, never assumed from the balance. hecs_balance (always separate — never one of the items)
+  debts: items (array of {type, purpose, borrower, security, is_split, parent_loan_id, balance, rate_percent, minimum_monthly}). PLACEMENT: the loan on the home they live in lives in the home domain (mortgage_balance etc.) and is NEVER duplicated as a debts item; the loan on an investment property lives on that property in investments.properties[]. debts.items carries every OTHER borrowing, including a split carved off the home loan for another purpose (type "loan_split", is_split true, parent_loan_id pointing at the home loan). type is the PRODUCT: "home_loan"/"investment_property_loan"/"loan_split"/"line_of_credit"/"commercial_loan"/"business_loan"/"equipment_finance"/"car_loan"/"personal_loan"/"credit_card"/"bnpl"/"hecs_help"/"tax_debt"/"family_loan"/"other". purpose is what the money was used for: "owner_occupied"/"investment_property"/"commercial_property"/"investment_shares"/"business_operating"/"vehicle"/"personal"/"education"/"tax"/"mixed"/"unknown". Purpose is NEVER inferred from product: where a debt is not plainly the loan on the home they live in, ask two things — what it is, and what the money was used for — and do not write type until purpose and borrower are answered (type is dropped otherwise; "unknown" is a legitimate answer when they genuinely don't know, a specific guess never is). "personal_loan" means a personal loan and nothing else. borrower is whose name the borrowing is in: "personal"/"joint"/"company"/"trust"/"smsf"/"partnership"/"unknown" — borrowing inside a company or trust is not personal household debt. security is "property_home"/"property_investment"/"property_commercial"/"vehicle"/"business_assets"/"unsecured"/"other" — WHAT KIND of asset secures it; secured_against_asset_id says WHICH one, by the asset's id from the picture context ("home" for the loan on the home domain), the same way linked_asset_id works for income. is_split true with parent_loan_id naming the loan it splits from where the debt is a split of a larger facility. cleared_monthly true ONLY when the person says the card is paid in full every month — a captured fact, never assumed from the balance. hecs_balance (always separate — never one of the items)
   flags: hardship, hardship_signal — see the hardship rule below.
   Every domain you update this turn also carries _confidence, ranked document > sighted > stated > estimated: "document" ONLY when YOU read the figures from an artefact the person attached (a payslip, statement, screenshot or policy schedule you actually saw); "sighted" when the person was on the source screen or document and read the figures off it to you, but you did not see it yourself; "stated" when the person knew it and said it from memory, no source in front of them; "estimated" when no document exists or it couldn't be reached. The professional receiving the picture needs to know which figures are hard, so never write "document" for a figure the person read out (that is sighted), never write "sighted" for a remembered number (that is stated), and never write "stated" for a figure you read off an attachment. ("inferred" exists solely for flags.hardship, which is written from your read, never from asking.) Freeform nuance goes in _notes per domain (for human reading only — it never drives what the person is shown). Numbers as plain whole-dollar numbers, rates as percent numbers, no strings for money, no dollar signs. Nothing invented: if they did not say it, it is not in the block.
   Array items (children, super funds, properties, debts items, other income) carry an "id" assigned by the system, visible in the picture context. When you update or correct an EXISTING item, include its id exactly as shown there, so the update lands on that item. For a NEW item, never invent an id, leave id out and the system assigns one. Items you do not mention are retained, so send only the items this turn added or corrected, never the whole array. When the person says an item no longer exists (an account closed, a debt paid out, a fund consolidated away), remove it by sending {"id":"<its id>","_remove":true} as that item — never by re-sending the array without it.
-  Every field lives in EXACTLY the domain listed above — never place a field under a different domain, even when the conversation surfaced them together. In particular: structure, entity and employer_super_on belong to income, NEVER to context, even though the work setup comes up during the household opening. A field under the wrong domain causes the whole write to be refused and that turn's facts to be lost, so check placement before you emit the block.
+  Every field lives in EXACTLY the domain listed above — never place a field under a different domain, even when the conversation surfaced them together. In particular: structure, entity and employer_super_on belong to income, NEVER to context, even though the work setup comes up during the household opening. A field under the wrong domain is dropped and lost, so check placement before you emit the block.
 - Hardship (flags): set from your read of the conversation, NEVER from asking — "are you in financial hardship" is never a question you put to someone. If genuine hardship shows (missed essential payments, collectors calling, choosing between essentials), set hardship true and record what prompted it in hardship_signal, in their words where possible, so the decision is auditable. Its _confidence is "inferred". This is the one field written from judgment, and it exists so the person is routed to free help — hard line 5 stands unchanged.
 - Absent versus not-yet-discussed (keep this distinction exact everywhere): when the person CONFIRMS something is not held or not in place, record it as explicitly false (e.g. protection tpd {held: false}, estate will {in_place: false}, has_offset: false). Never record a confirmed absence as null, and never omit it — a missing field or null means "not yet discussed"; false means "confirmed no". A confirmed absence is a captured fact and must be written to the block.
 - "goals": loose directions only, e.g. {"directions":["security-leaning","kids-setup"],"notes":"wants to feel less exposed; kids' schooling on their mind"}. Include only when goals content actually surfaced this turn.
-- "completed_domains": the full cumulative list of AREA labels now covered or deliberately skipped, including "goals" when goals have been drawn out. Area labels are unchanged: income, assets, liabilities, buffer, protection, estate, super, goals — where "income" includes the household context and expenses, "assets" covers home and investments, and "liabilities" covers debts. A skipped area still counts as completed for progress.
-- "session_complete": true only when all eight areas are covered or consciously skipped and you have wrapped up warmly. Otherwise false.
-- "refusals": an array of field ids, included ONLY when the retrieval path for a document-backed field was offered in this conversation (this turn or an earlier one) and the person has now declined it, given the figure from memory anyway, or read the figures out from the screen instead of attaching the document (a sighted or below answer where the upload was offered still needs the refusal record, or the write is refused) (e.g. ["home.mortgage_balance"]). A decline of a path you offered last turn is a refusal THIS turn: record it in the same [CAPTURE] block as the below-floor figure, or the write boundary will refuse the write. This is the record that the path was offered and declined; the write boundary REFUSES a document-backed figure committed below its confidence floor without one. Never include a field you did not offer the path for, and never treat a refusal as permission to stop offering the upload later if the document surfaces. Field ids: domain.field, nested as domain.parent.field, array items as domain.list[].field.
+- "completed_domains": advisory only. CODE decides which areas are covered, from the picture and the sweeps asked; you may omit this key.
+- "session_complete": true only in the reply that finishes the close, after [FRAME: close] has been served and every open item walked, and only when the working notes say closing is available. Code refuses it otherwise.
+- "deferrals": an array of field references the person has put off THIS turn, exactly as shown in the working notes ("field" or "field#item_id"), e.g. ["home.offset_balance", "super.funds[].balance#a1b2c3d4"]. For a field that has no item, use its plain id. Record a deferral every time they put something off, including after [NUDGE: accept].
+- Array items may carry their own "_confidence" when their provenance differs from the rest of the domain this turn (e.g. one fund read off a screenshot, another from memory).
+- "refusals": optional, legacy. Use "deferrals" instead. (If the person declines the source but gives the figure from memory, just capture the figure at "stated"; code flags it to verify.)
 - If a turn captured nothing (a clarifying question, a boundary deflection), emit [CAPTURE]{} — the empty block. Areas already recorded are kept automatically.
 - The block records only; it never justifies loosening any boundary above.
 
@@ -376,12 +385,12 @@ function emDashScrubStream(onDone) {
   // path_served rows are written from the same tokens in the raw text by
   // the apply chain, so substitution and witnessing can never disagree.
   function subAsks(s) {
-    const { text, served, unknown } = substituteAskTokens(s);
-    for (const id of unknown) {
-      console.error(`[Finn clarity] ASK FAULT — trigger token with unrecognised path id "${id}" emitted nothing`);
+    const r = substituteTokens(s);
+    for (const id of r.unknown) {
+      console.error(`[Finn clarity] TOKEN FAULT — trigger token "${id}" is not recognised and emitted nothing`);
     }
-    if (served.length) asksServed++;
-    return text;
+    if (r.served.length || r.sweeps.length || r.frames.length || r.nudges.length) asksServed++;
+    return r.text;
   }
 
   // Machine text starts at the earliest of [CAPTURE] or [RESOLVE] — the
@@ -405,7 +414,7 @@ function emDashScrubStream(onDone) {
       const bi = out.lastIndexOf("[");
       if (bi !== -1) {
         const tokTail = out.slice(bi);
-        if (!tokTail.includes("]") && tokTail.length < 40 && /^\[(?:A(?:S(?:K(?::\s?[a-z_]*)?)?)?)?$/.test(tokTail)) {
+        if (!tokTail.includes("]") && tokTail.length < 40 && isTokenPrefix(tokTail)) {
           heldWs = tokTail;
           out = out.slice(0, bi);
         }
@@ -430,8 +439,8 @@ function emDashScrubStream(onDone) {
      correct for estimate quantities; a blind swap would break that). Flags
      a softener in the same sentence as a retrievable-fact keyword so the
      leak rate is measurable over time, same principle as the em-dash log. */
-  const SOFTENERS = /\b(roughly|approximately|ballpark|a rough idea|if you know it)\b/i;
-  const FACT_KEYWORDS = /\b(rate|balance|owing|term|repayment|cover|super balance)\b/i;
+  const SOFTENERS = /\b(roughly|approximately|ballpark|a rough (?:idea|sense|figure)|rough sense|about how much|if you know it)\b/i;
+  const FACT_KEYWORDS = /\b(rate|balance|owing|term|repayment|cover|super|rent|costs?|worth|value|bring in|earn|pays?|income|fees?)\b/i;
   function logSofteners() {
     const ix = machineIx(seenText);
     const visible = ix === -1 ? seenText : seenText.slice(0, ix);
@@ -636,7 +645,7 @@ async function runAndStoreConductReport(householdId, sessionId) {
     `/rest/v1/capture_log?household_id=eq.${householdId}&session_id=eq.${sessionId}` +
     `&select=status,raw_text,capture,errors,field_id,created_at&order=created_at.asc`);
   const rows = rowsRes.ok ? await rowsRes.json() : [];
-  const picRes = await sbFetch(`/rest/v1/picture?household_id=eq.${householdId}&select=domains,refusals`);
+  const picRes = await sbFetch(`/rest/v1/picture?household_id=eq.${householdId}&select=domains,goals,refusals`);
   const pics = picRes.ok ? await picRes.json() : [];
   const picture = pics[0] || { domains: {}, refusals: [] };
   const report = runConductLinter({
@@ -645,6 +654,7 @@ async function runAndStoreConductReport(householdId, sessionId) {
     paths: RETRIEVAL_PATHS,
     confidenceRank: CONFIDENCE_RANK,
     producers: PRODUCERS,
+    plan: buildPlan,
   });
   const ins = await sbFetch(`/rest/v1/conduct_report`, {
     method: "POST",
@@ -660,96 +670,130 @@ async function runAndStoreConductReport(householdId, sessionId) {
 }
 
 // Member-readable status carries a boolean and a timestamp ONLY — error
-// detail stays server-side (capture_log + logs). Fires the existing
-// session sys-note for refused AND failed writes alike.
+// detail stays server-side (capture_log + logs). Fires the session notice
+// ONLY when a turn's facts could not be saved at all (parse failure, save
+// failure). A partial write never fires it: Finn re-asks what didn't save
+// on the next turn, in its own words, owning the slip.
 async function setWriteStatusFalse(householdId) {
   const at = new Date().toISOString();
   const st = await sbFetch(`/rest/v1/picture?household_id=eq.${householdId}`, {
     method: "PATCH",
     headers: { "Prefer": "return=minimal" },
-    body: JSON.stringify({ last_write_status: { ok: false, at }, updated_at: at }),
+    body: JSON.stringify({ last_write_status: { ok: false, at } }),
   });
   if (!st.ok) console.error(`[Finn clarity] last_write_status update failed — ${st.status}`);
 }
 
-// Apply a parsed capture to the household's picture row (and completion stub).
-// Schema v2 path: the stored row is lazily upgraded v1→v2 on its first new
-// write, the incoming capture (still emitted in the legacy shape by the
-// untouched 3a prompt) is translated, and the merged result is validated
-// against Part 2 before anything is written. A write that fails validation
-// is REFUSED and logged loudly — never stored malformed.
-async function applyCapture(householdId, picture, capture, logId, sessionId) {
-  // Code-witnessed path_served rows for THIS session — the only thing the
-  // pure core cannot know. Queried once; the core decides refusal validity.
+async function readPicture(householdId) {
+  const res = await sbFetch(`/rest/v1/picture?household_id=eq.${householdId}&select=domains,goals,completed_domains,schema_version,refusals,updated_at`);
+  if (!res.ok) return null;
+  const rows = await res.json();
+  return rows.length ? rows[0] : null;
+}
+
+// Apply a parsed capture. The picture is READ FRESH here, not taken from
+// the request start (15 Sept walk: a quick reply let one turn's save
+// overwrite the previous one), and the write is conditional on updated_at,
+// retried on conflict, so concurrent saves cannot clobber each other.
+async function applyCapture(householdId, capture, logId, sessionId, turn) {
   let servedFields = new Set();
+  let closeServed = !!turn.closeServedNow;
   if (sessionId) {
     const servedRes = await sbFetch(
       `/rest/v1/capture_log?household_id=eq.${householdId}&session_id=eq.${sessionId}&status=eq.path_served&select=field_id`);
     if (servedRes.ok) servedFields = new Set((await servedRes.json()).map(r => r.field_id));
-  }
-
-  // The pure chain: translate, migrate, ids, merge-by-id, gate, code
-  // resolutions, validate — lib/finn-capture-pipeline.js, shared with the
-  // step-7 fixture household so the tests drive the REAL machinery.
-  const result = applyCaptureCore({ picture, capture, sessionId, servedFields });
-  for (const a of result.anomalies) console.error(`[Finn clarity] capture anomaly: ${a}.`);
-
-  if (result.status === "refused") {
-    const label = result.kind === "gate"
-      ? "GATE — capture-conduct violation, picture write refused for household " + householdId + ". Nothing is lost: the raw capture is in capture_log. "
-      : "REFUSED — schema v2 validation failed, picture write refused for household " + householdId + ". Nothing is lost: the raw capture is in capture_log and the session UI is told. Problems: ";
-    console.error("[Finn clarity] " + label + JSON.stringify(result.errors));
-    if (logId) {
-      await markCaptureLog(logId, "refused", { errors: result.errors, merged_domains: result.merged });
-    } else {
-      await insertCaptureLog(householdId, null, capture, "refused", sessionId);
+    if (!closeServed) {
+      const closeRes = await sbFetch(
+        `/rest/v1/capture_log?household_id=eq.${householdId}&session_id=eq.${sessionId}&raw_text=like.*%5BFRAME%3A%20close%5D*&select=id&limit=1`);
+      if (closeRes.ok) closeServed = (await closeRes.json()).length > 0;
     }
-    await setWriteStatusFalse(householdId);
-    return;
   }
 
-  const pictureBody = JSON.stringify({
-    domains: result.domains,
-    goals: result.goals,
-    completed_domains: result.completedDomains,
-    schema_version: 2,
-    ...(result.refusalsOut ? { refusals: result.refusalsOut } : {}),
-    last_write_status: { ok: true, at: new Date().toISOString() },
-    updated_at: new Date().toISOString(),
-  });
-  const patchPicture = () => sbFetch(`/rest/v1/picture?household_id=eq.${householdId}`, {
-    method: "PATCH",
-    headers: { "Prefer": "return=minimal" },
-    body: pictureBody,
-  });
-  let res = await patchPicture();
-  if (!res.ok) {
-    console.error(`[Finn clarity] picture save failed — ${res.status}: ${await res.text()} — retrying once`);
-    res = await patchPicture();
-  }
-  if (!res.ok) {
-    // Non-validation failure: the raw capture is safe in capture_log, the
-    // row is marked, and the session is told — never a silent loss.
-    console.error(`[Finn clarity] FAILED — picture save failed after retry (${res.status}) for household ${householdId}; capture preserved in capture_log`);
-    await markCaptureLog(logId, "failed", { errors: [`picture save failed: ${res.status}`] });
-    await setWriteStatusFalse(householdId);
-    return;
-  }
-  await markCaptureLog(logId, "applied");
-
-  // Completion stub: set the 60-day clock once, at first completion.
-  // Fully wired with payment in step 4.
-  if (capture.session_complete === true) {
-    const upd = await sbFetch(
-      `/rest/v1/access?household_id=eq.${householdId}&clarity_completed_at=is.null`,
-      {
-        method: "PATCH",
-        headers: { "Prefer": "return=minimal" },
-        body: JSON.stringify({ clarity_completed_at: new Date().toISOString() }),
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    const picture = (await readPicture(householdId)) || { domains: {}, goals: {}, completed_domains: [] };
+    const result = applyCaptureCore({
+      picture, capture, sessionId, servedFields,
+      sweepsServed: turn.sweeps || [], closeServed,
+    });
+    for (const a of result.anomalies) console.error(`[Finn clarity] capture anomaly: ${a}.`);
+    if (result.errors.length) {
+      console.error(`[Finn clarity] PARTIAL — ${result.errors.length} field(s) dropped for household ${householdId}; the rest committed: ${JSON.stringify(result.errors)}`);
+    }
+    const at = new Date().toISOString();
+    const body = JSON.stringify({
+      domains: result.domains,
+      goals: result.goals,
+      completed_domains: result.completedDomains,
+      schema_version: 2,
+      ...(result.refusalsOut ? { refusals: result.refusalsOut } : {}),
+      last_write_status: { ok: true, at },
+      updated_at: at,
+    });
+    const guard = picture.updated_at
+      ? `&updated_at=eq.${encodeURIComponent(picture.updated_at)}`
+      : `&updated_at=is.null`;
+    const res = await sbFetch(`/rest/v1/picture?household_id=eq.${householdId}${guard}`, {
+      method: "PATCH",
+      headers: { "Prefer": "return=representation" },
+      body,
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      if (!rows.length) {
+        console.error(`[Finn clarity] picture write conflict (attempt ${attempt}) — re-reading and re-applying`);
+        continue;
       }
-    );
-    if (!upd.ok) console.error(`[Finn clarity] completion stamp failed — ${upd.status}`);
+      await markCaptureLog(logId, "applied", result.errors.length ? { errors: result.errors, merged_domains: null } : undefined);
+      if (result.sessionComplete) {
+        const upd = await sbFetch(
+          `/rest/v1/access?household_id=eq.${householdId}&clarity_completed_at=is.null`,
+          { method: "PATCH", headers: { "Prefer": "return=minimal" }, body: JSON.stringify({ clarity_completed_at: at }) });
+        if (!upd.ok) console.error(`[Finn clarity] completion stamp failed — ${upd.status}`);
+      }
+      return result;
+    }
+    console.error(`[Finn clarity] picture save failed — ${res.status}: ${await res.text()} (attempt ${attempt})`);
   }
+  console.error(`[Finn clarity] FAILED — picture save failed after retries for household ${householdId}; capture preserved in capture_log`);
+  await markCaptureLog(logId, "failed", { errors: ["picture save failed after retries"] });
+  await setWriteStatusFalse(householdId);
+  return null;
+}
+
+// A fresh session never reaches the model: code streams the preframe as
+// the opening reply (same SSE shape the client already reads), so the
+// first thing every person sees is the fixed copy, every time.
+function frameStream(text) {
+  const enc = new TextEncoder();
+  const events = [
+    { type: "message_start", message: { role: "assistant" } },
+    { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+    { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
+    { type: "content_block_stop", index: 0 },
+    { type: "message_stop" },
+  ];
+  return new ReadableStream({
+    start(controller) {
+      for (const e of events) controller.enqueue(enc.encode(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`));
+      controller.close();
+    },
+  });
+}
+
+// The previous turn's save runs after its reply finished streaming. If
+// the person answers quickly, wait (briefly) for it to land so the model
+// works from the current picture.
+async function waitForInFlight(householdId, sessionId) {
+  if (!sessionId) return null;
+  let last = null;
+  for (let i = 0; i < 8; i++) {
+    const r = await sbFetch(`/rest/v1/capture_log?household_id=eq.${householdId}&session_id=eq.${sessionId}&status=neq.path_served&select=status,errors,created_at&order=created_at.desc&limit=1`);
+    const rows = r.ok ? await r.json() : [];
+    last = rows[0] || null;
+    if (!last || last.status !== "received") return last;
+    await new Promise(res => setTimeout(res, 500));
+  }
+  return last;
 }
 
 export default async function handler(request, context) {
@@ -798,18 +842,26 @@ export default async function handler(request, context) {
   if (!messages.length) return json({ error: "messages_required" }, 400);
 
   // ── Server-side context: picture state + snapshot carry-over. ──
-  let picture = { domains: {}, goals: {}, completed_domains: [] };
-  const picRes = await sbFetch(`/rest/v1/picture?household_id=eq.${auth.householdId}&select=domains,goals,completed_domains,schema_version,refusals`);
-  if (picRes.ok) {
-    const rows = await picRes.json();
-    if (rows.length) picture = rows[0];
-    else {
-      await sbFetch(`/rest/v1/picture`, {
-        method: "POST",
-        headers: { "Prefer": "return=minimal" },
-        body: JSON.stringify({ household_id: auth.householdId }),
-      });
-    }
+  const lastRow = await waitForInFlight(auth.householdId, sessionId);
+  let picture = await readPicture(auth.householdId);
+  if (!picture) {
+    await sbFetch(`/rest/v1/picture`, {
+      method: "POST",
+      headers: { "Prefer": "return=minimal" },
+      body: JSON.stringify({ household_id: auth.householdId }),
+    });
+    picture = { domains: {}, goals: {}, completed_domains: [] };
+  }
+
+  // FRESH SESSION: the opening is the fixed preframe, served by code.
+  const isStartMarker = messages.length === 1 && messages[0].role === "user" &&
+    typeof messages[0].content === "string" && messages[0].content.trim() === "[Session start]";
+  const pictureEmpty = !picture.domains || Object.keys(picture.domains).length === 0;
+  if (isStartMarker && pictureEmpty) {
+    await insertCaptureLog(auth.householdId, "[FRAME: open]\n[CAPTURE]{}", {}, "applied", sessionId);
+    return new Response(frameStream(FRAMES.open), {
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", ...corsHeaders() },
+    });
   }
 
   let snapshotAnswers = null;
@@ -830,14 +882,19 @@ export default async function handler(request, context) {
     }
   }
 
+  // The working notes: computed by code from the current picture.
+  const plan = buildPlan(picture.domains ?? {}, picture.goals ?? {});
+  const unsaved = lastRow && Array.isArray(lastRow.errors) ? lastRow.errors.map(e => String(e).replace(/^gate: /, "")).slice(0, 8) : [];
+
   const contextBlock =
     `\n\n═══ SESSION CONTEXT (server-provided, the person does not see this) ═══\n` +
     `Household display name: ${householdName || "(not set)"}\n` +
     `Picture captured so far (domains): ${JSON.stringify(picture.domains ?? {})}\n` +
     `Goals captured so far: ${JSON.stringify(picture.goals ?? {})}\n` +
-    `Areas already covered or skipped: ${JSON.stringify(picture.completed_domains ?? [])}\n` +
+    `Areas covered (decided by code): ${JSON.stringify(plan.covered)}\n` +
     `Snapshot answers (warm start — never re-ask these): ${snapshotAnswers ? JSON.stringify(snapshotAnswers) : "(no linked snapshot)"}\n` +
-    `Note: when the conversation opens with the marker "[Session start]", greet them and begin (or resume, if areas are already covered). The marker is not from the person.`;
+    `Note: the marker "[Session start]" is a system marker, not from the person.` +
+    planPromptSection(plan, { unsaved });
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -856,7 +913,7 @@ export default async function handler(request, context) {
         model: "claude-sonnet-4-6",
         max_tokens: 1000,
         stream: true,
-        system: CLARITY_SYSTEM_PROMPT + bankExportsPromptSection() + retrievalPromptSection() + contextBlock,
+        system: CLARITY_SYSTEM_PROMPT + bankExportsPromptSection() + retrievalPromptSection() + promptTokenSection() + contextBlock,
         messages,
       }),
     });
@@ -911,9 +968,9 @@ export default async function handler(request, context) {
     const cuts = [fullText.indexOf("[CAPTURE]"), fullText.indexOf("[RESOLVE]")].filter(i => i !== -1);
     const visibleEnd = cuts.length ? Math.min(...cuts) : fullText.length;
     const visibleRaw = fullText.slice(0, visibleEnd);
-    const askResult = substituteAskTokens(visibleRaw);
+    const askResult = substituteTokens(visibleRaw);
     for (const id of askResult.unknown) {
-      console.error(`[Finn clarity] ASK FAULT — trigger token with unrecognised path id "${id}" served nothing`);
+      console.error(`[Finn clarity] TOKEN FAULT — trigger token "${id}" served nothing`);
     }
     if (askResult.served.length) {
       await insertPathServed(auth.householdId, sessionId, askResult.served);
@@ -956,8 +1013,12 @@ export default async function handler(request, context) {
       await setWriteStatusFalse(auth.householdId);
       return;
     }
+    let applied = null;
     try {
-      await applyCapture(auth.householdId, picture, capture, logId, sessionId);
+      applied = await applyCapture(auth.householdId, capture, logId, sessionId, {
+        sweeps: askResult.sweeps,
+        closeServedNow: askResult.frames.includes("close"),
+      });
     } catch (err) {
       console.error("[Finn clarity] FAILED — capture apply threw; raw preserved in capture_log:", err);
       await markCaptureLog(logId, "failed", { errors: [String((err && err.message) || err)] });
@@ -966,6 +1027,7 @@ export default async function handler(request, context) {
     // Conduct linter (capture-conduct step 6): runs automatically at the
     // end of every session and stores a per-session report.
     if (capture && capture.session_complete === true && sessionId) {
+      if (applied && applied.sessionCompleteRefused) console.error("[Finn clarity] session_complete claimed but refused by code; report generated for the record");
       try {
         await runAndStoreConductReport(auth.householdId, sessionId);
       } catch (err) {

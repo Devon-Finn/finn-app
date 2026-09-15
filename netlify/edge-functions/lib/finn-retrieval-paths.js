@@ -132,7 +132,7 @@ export const RETRIEVAL_PATHS = {
     where: "The fullest honest read of what goes out comes from a transaction export covering the last twelve months, and I can walk you through getting one from your bank.",
     look_for: "Once the file lands here, code does the arithmetic across the whole year, so one-off months do not distort the figure.",
     honest: "A guessed monthly figure is usually well under the real one, which is why the export is worth the two minutes.",
-    offer: "Attach the file here when you have it, and I will read it straight away.",
+    offer: "Attach the file here when you have it, and I will read it straight away. If an export isn't possible right now, tell me what you think goes out in a typical month, leaving the mortgage aside, and I'll note it as an estimate to firm up.",
     satisfies: ["expenses.living_monthly"],
   },
   hecs: {
@@ -162,7 +162,7 @@ export function retrievalPromptSection() {
     .map(([id, p]) => "- [ASK: " + id + "] — " + p.name)
     .join("\n");
   return "\n\n═══ RETRIEVAL PATHS (code authors the asks) ═══\n\n" +
-    "You decide WHAT to ask about next; code decides how the ask for a document-backed figure is worded. When you decide to ask for document-backed figures, emit the matching trigger token below on its own line, exactly as written, where the ask should appear in your reply. The system replaces the token with the full ask text before the person sees it, so never write retrieval instructions in your own words, never describe where a document lives or what to look for on it, and never guess a path id that is not on this list. Warmth around the token, before or after, is yours. Never offer to skip, defer or come back later alongside an ask; if the person declines, record the refusal in the [CAPTURE] block and move on without suggesting deferral yourself.\n" +
+    "You decide WHAT to ask about next; code decides how the ask for a document-backed figure is worded. When you decide to ask for document-backed figures, emit the matching trigger token below on its own line, exactly as written, where the ask should appear in your reply. The system replaces the token with the full ask text before the person sees it, so never write retrieval instructions in your own words, never describe where a document lives or what to look for on it, and never guess a path id that is not on this list. Warmth around the token, before or after, is yours. Never offer to skip, defer or come back later alongside an ask. If the person can't or won't get to the source, follow the nudge protocol ([NUDGE: first], then [NUDGE: accept]) and record the field in \"deferrals\"; if they give a figure from memory instead, capture it at \"stated\" and code flags it to verify.\n" +
     "One visit covers everything its screen shows: each token's ask gathers every figure that source carries, so emit a token once and take everything it returns rather than sending the person back later.\n" +
     "Confidence after the visit: a file they attach and you read is \"document\". Figures they read off their screen and type to you are \"sighted\", never \"document\". Figures from memory stay \"stated\".\n\n" +
     "The tokens:\n" + entries;
