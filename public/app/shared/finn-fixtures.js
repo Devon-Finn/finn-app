@@ -95,6 +95,34 @@
       visibleTiles: [2, 3, 4, 5, 6, 8, 9],
     },
     {
+      name: 'E-cleared — only debt is a cleared-monthly card: neither 8.1 fires',
+      domains: {
+        home: { owns_home: false, _confidence: 'stated' },
+        debts: { items: [ { type: 'credit_card', purpose: 'personal', borrower: 'personal', cleared_monthly: true, balance: 1800, rate_percent: 19.99, minimum_monthly: 36 } ], _confidence: 'stated' },
+        flags: { hardship: false },
+        estate: { ...estateQuiet, _confidence: 'stated' },
+      },
+      expect: [],
+      mustNotFire: ['8.1a', '8.1b', 'hardship'],
+      visibleTiles: [2, 3, 4, 5, 6, 8, 9],
+    },
+    {
+      name: '8.1-consumer-scope — loan split, family loan, company-borrowed personal loan, with a mortgage: neither 8.1 fires',
+      domains: {
+        home: { owns_home: true, mortgage_balance: 500000, _confidence: 'stated' },
+        debts: { items: [
+          { type: 'loan_split', purpose: 'investment_shares', borrower: 'joint', security: 'property_home', is_split: true, parent_loan_id: 'home', balance: 90000, rate_percent: 5.84, minimum_monthly: 550 },
+          { type: 'family_loan', purpose: 'personal', borrower: 'personal', security: 'unsecured', balance: 15000, rate_percent: 0, minimum_monthly: 0 },
+          { type: 'personal_loan', borrower: 'company', balance: 30000, rate_percent: 9.9, minimum_monthly: 640 },
+        ], _confidence: 'stated' },
+        flags: { hardship: false },
+        estate: { ...estateQuiet, _confidence: 'stated' },
+      },
+      expect: ['1.1'],
+      mustNotFire: ['8.1a', '8.1b', 'hardship'],
+      visibleTiles: [1, 2, 3, 4, 5, 6, 8, 9],
+    },
+    {
       name: 'F — consumer debts, hardship true',
       domains: {
         home: { owns_home: false, _confidence: 'stated' },

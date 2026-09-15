@@ -130,8 +130,26 @@
     fires['7.1'] = arr(inv.properties).length > 0;
     fires['7.2'] = pos(inv.shares_value) || pos(inv.managed_funds_value);
 
-    fires['8.1a'] = debtItems.length > 0 && hasMortgage && !hardship;
-    fires['8.1b'] = debtItems.length > 0 && !hasMortgage && !hardship;
+    // 8.1a/8.1b fire only on CONSUMER debt (Devon, 15 Sept 2026). An item
+    // counts only when its type is credit_card, personal_loan, car_loan,
+    // bnpl or other; a credit card with cleared_monthly true is paid in
+    // full every month and does not count; and the borrower is not a
+    // company, trust, smsf or partnership. 8.1 carries consumer-
+    // consolidation copy and a broker referral: loan splits belong to
+    // Tile 7 and entity debt to Tile 9, and manufacturing a reason to refer
+    // is what the independence position prevents. So loan splits,
+    // investment/commercial/business loans, lines of credit, equipment
+    // finance, family loans, tax debt, HECS and untyped open items fire
+    // neither (field-spec 3.3). Every item still renders — this is a
+    // trigger exclusion, not a display one.
+    const CONSUMER_DEBT_TYPES = ['credit_card', 'personal_loan', 'car_loan', 'bnpl', 'other'];
+    const ENTITY_BORROWERS = ['company', 'trust', 'smsf', 'partnership'];
+    const routableDebtItems = debtItems.filter(it => it
+      && CONSUMER_DEBT_TYPES.includes(it.type)
+      && !(it.type === 'credit_card' && it.cleared_monthly === true)
+      && !ENTITY_BORROWERS.includes(it.borrower));
+    fires['8.1a'] = routableDebtItems.length > 0 && hasMortgage && !hardship;
+    fires['8.1b'] = routableDebtItems.length > 0 && !hasMortgage && !hardship;
 
     // 9.1 — structural complexity only. A null structure is "not yet asked"
     // and never fires; rental/dividend income alone never fires (Tile 7 owns

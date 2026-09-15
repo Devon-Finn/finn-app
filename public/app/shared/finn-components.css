@@ -32,6 +32,9 @@
 .fc-calc .cv.missing { color: var(--fc-light); font-weight: 400; }
 .fc-calc .crule { grid-column: 1 / -1; border-bottom: 1px solid var(--fc-rule); margin: 4px 0; }
 .fc-calc .result .cl, .fc-calc .result .cv { color: var(--fc-forest); font-weight: 600; font-size: 15px; }
+/* Subtotal (ledger): the same arithmetic grammar with NO colour and NO
+   emphasis — a subtotal is arithmetic, not an evaluation. */
+.fc-calc .subtotal .cl, .fc-calc .subtotal .cv { color: var(--fc-dark); font-weight: 400; font-size: 13.5px; }
 .fc-calc .indent .cl { padding-left: 16px; }
 /* grid children wrappers: rows are display:contents so the grid governs */
 .fc-calc .crow { display: contents; }
@@ -49,6 +52,28 @@ button.fc-term:focus-visible { outline: 2px solid var(--fc-forest); outline-offs
 .fc-propbar .seg { display: flex; align-items: center; padding: 0 8px; font-size: 11.5px; white-space: nowrap; overflow: hidden; }
 .fc-propbar .seg.a { background: var(--fc-forest); color: #fff; }
 .fc-propbar .seg.b { background: var(--fc-forest-light); color: var(--fc-forest-deep); }
+
+/* ── 2.7 Item row (ledger) ── hairline-separated, never boxed
+   individually, never striped. Chip right-aligned, factual only. ──── */
+.fc-itemrow { display: flex; align-items: baseline; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--fc-rule-soft); }
+.fc-itemrow:last-child { border-bottom: none; }
+.fc-itemrow .irmain { flex: 1; min-width: 0; }
+.fc-itemrow .irname { font-size: 13.5px; font-weight: 600; color: var(--fc-dark); }
+.fc-itemrow .irline { font-size: 12.5px; color: var(--fc-mid); margin-top: 1px; }
+.fc-itemrow .irfigs { display: flex; gap: 16px; flex-shrink: 0; }
+.fc-itemrow .irfig { display: flex; flex-direction: column; align-items: flex-end; }
+.fc-itemrow .irfl { font-size: 10.5px; color: var(--fc-light); }
+.fc-itemrow .irfv { font-size: 13.5px; color: var(--fc-dark); font-variant-numeric: tabular-nums; }
+.fc-itemrow .irfv.missing { color: var(--fc-light); }
+.fc-itemrow .irchip { flex-shrink: 0; align-self: center; font-size: 11px; color: var(--fc-mid); border: 1px solid var(--fc-rule); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+
+/* ── 2.8 Item group (ledger) ── rows of one kind under a quiet label,
+   closed by a subtotal in the calc grammar. ─────────────────────────── */
+.fc-group { margin-top: 6px; }
+.fc-group .iglabel { font-size: 11.5px; letter-spacing: .04em; color: var(--fc-light); margin-bottom: 2px; }
+.fc-group .igrows { border-top: 1px solid var(--fc-rule-soft); }
+.fc-group .igsub { margin-top: 6px; }
+.fc-group + .fc-group { margin-top: 16px; }
 
 /* ── 2.5 Reference block ────────────────────────────────────────────── */
 .fc-ref { border: 1px solid var(--fc-rule); border-radius: 10px; background: var(--fc-surface); }
@@ -136,6 +161,13 @@ button.fc-term:focus-visible { outline: 2px solid var(--fc-forest); outline-offs
       Teaching calcs get real headings in ink at 16px, as plain questions,
       never small grey uppercase category labels. */
 .fp-teach { margin-top: 20px; }
+/* Density (ledger): section B behind a quiet affordance. Sentence case,
+   no marker triangle, rule colour only. */
+details.fp-b > summary.fp-howthis { cursor: pointer; list-style: none; font-size: 12.5px; color: var(--fc-mid, #5c5a55); }
+details.fp-b > summary.fp-howthis::-webkit-details-marker { display: none; }
+details.fp-b > summary.fp-howthis::after { content: ''; display: inline-block; width: 7px; height: 7px; margin-left: 7px; border-right: 1.5px solid var(--fc-rule, #e6e0d6); border-bottom: 1.5px solid var(--fc-rule, #e6e0d6); transform: rotate(45deg) translateY(-2px); }
+details.fp-b[open] > summary.fp-howthis::after { transform: rotate(225deg) translateY(-1px); }
+details.fp-b[open] > summary.fp-howthis { margin-bottom: 8px; }
 .fp-calchead { font-size: 16px; font-weight: 600; color: var(--fc-dark, #1c1917); margin: 0 0 8px; }
 .fp-section { margin-top: 20px; }
 .fp-b p { font-size: 13.5px; line-height: 1.6; color: var(--fc-mid, #5c5a55); margin: 0; }

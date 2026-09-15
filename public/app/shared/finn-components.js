@@ -46,8 +46,10 @@
     let html = '<div class="fc fc-calc">';
     for (const r of rows) {
       if (r.op && !OPS.includes(r.op)) throw new Error('calcBlock: operator "' + r.op + '" is not in the grammar');
-      if (r.result) html += '<div class="crule"></div>';
-      html += '<div class="crow' + (r.result ? ' result' : '') + (r.indent ? ' indent' : '') + '">' +
+      if (r.result || r.subtotal) html += '<div class="crule"></div>';
+      // subtotal (ledger, Sept 2026): the calc grammar with NO colour and
+      // NO emphasis — a subtotal is arithmetic, not an evaluation.
+      html += '<div class="crow' + (r.result ? ' result' : '') + (r.subtotal ? ' subtotal' : '') + (r.indent ? ' indent' : '') + '">' +
         '<span class="cl">' + esc(r.label) + '</span>' +
         '<span class="co">' + esc(r.op || '') + '</span>' +
         '<span class="cv' + (r.missing ? ' missing' : '') + '">' + (r.missing ? 'none recorded' : esc(r.value)) + '</span>' +
@@ -152,6 +154,39 @@
     return html + '</div>';
   }
 
+  /* ── 2.7 Item row (ledger, Sept 2026) ── one asset or one liability: a
+        name, one line saying what it is, the two figures that matter, and
+        a right-aligned chip only where the chip is FACTUAL ("Fixed until
+        Jun 2027", "Offset linked"). Rows are separated by a hairline
+        rule, never boxed individually, never striped. */
+  function itemRow(opts) {
+    let html = '<div class="fc-itemrow">' +
+      '<div class="irmain"><div class="irname">' + esc(opts.name) + '</div>' +
+      (opts.line ? '<div class="irline">' + renderCopyInline(opts.line) + '</div>' : '') + '</div>';
+    html += '<div class="irfigs">';
+    for (const f of (opts.figures || []).slice(0, 2)) {
+      html += '<div class="irfig"><span class="irfl">' + esc(f.label) + '</span>' +
+        '<span class="irfv' + (f.missing ? ' missing' : '') + '">' + (f.missing ? 'none recorded' : esc(f.value)) + '</span></div>';
+    }
+    html += '</div>';
+    if (opts.chip) html += '<span class="irchip">' + esc(opts.chip) + '</span>';
+    return html + '</div>';
+  }
+
+  /* ── 2.8 Item group (ledger, Sept 2026) ── rows of one kind under a
+        quiet label, closed by a subtotal in the calc block's arithmetic
+        style. A subtotal is arithmetic: no colour, no emphasis, not an
+        evaluation (calcBlock's `subtotal` rows). */
+  function itemGroup(label, rowsHtml, subtotalRows) {
+    let html = '<div class="fc fc-group">';
+    if (label) html += '<div class="iglabel">' + esc(label) + '</div>';
+    html += '<div class="igrows">' + rowsHtml.join('') + '</div>';
+    if (subtotalRows && subtotalRows.length) {
+      html += '<div class="igsub">' + calcBlock(subtotalRows.map(r => ({ ...r, subtotal: true, result: false }))) + '</div>';
+    }
+    return html + '</div>';
+  }
+
   /* ── 3.7 Repeating item card + aggregate ── each item its own calc, the
         aggregate beneath in the same grammar. The insight still fires once
         regardless of item count — that lives in the trigger engine. */
@@ -191,6 +226,7 @@
   window.finnComponents = {
     renderCopy, renderCopyInline, termAffordance,
     calcBlock, handoverLine, proportionBar, referenceBlock, costPill, costLine,
+    itemRow, itemGroup,
     figureHero, gapCard, eduBlock, stepRail, promiseBlock, actionZone,
     calmBlock, repeatingItems, professionalCard, professionalItem, trustBanner,
   };

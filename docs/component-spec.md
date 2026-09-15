@@ -168,6 +168,16 @@ Sets fee expectation. One per professional.
 
 Never states an amount. States how the professional is paid and who pays them.
 
+## 2.7 Item row
+
+One asset or one liability: a name, one line saying what it is, the two figures that matter, and a right-aligned chip only where the chip is factual (Fixed until Jun 2027, Offset linked). Rows separated by a hairline rule. Never boxed individually, never striped.
+
+## 2.8 Item group
+
+Rows of one kind under a quiet label, closed by a subtotal in the calc block's arithmetic style. A subtotal is arithmetic: no colour, no emphasis, not an evaluation.
+
+**Panel switch.** One item on a tile renders hero figure then calc block, exactly as approved. Two or more renders groups and rows first, then the subtotal, then the calc block operating on that subtotal, then the insights. Cardinality may drive layout. Magnitude may not.
+
 ---
 
 # PART THREE — BLOCKS
@@ -293,6 +303,8 @@ Insights — step rail if 2+, bare card if 1, calm block if 0
 **Everywhere else it survives**, because the mechanic is about what a product does rather than how numbers relate — how credit card minimums work on Tile 8, that super fees come out of the balance on Tile 4, the deductibility asymmetry on Tile 7, employer versus self-employed treatment on Tile 9, what a buffer counts on Tile 3, and the product mechanics on Protection and Estate.
 
 **Absent by design: Tiles 1 and 2 only.**
+
+**Density.** The section B mechanic collapses behind a quiet "how this works" affordance, open by default only on a tile's first visit, remembered per household in `household_ui_state`. The copy is unchanged, only its default state. Nothing is ever collapsed or expanded because of what the person's number is.
 
 ## 4.2 Calm state
 

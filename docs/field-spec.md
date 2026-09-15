@@ -304,6 +304,8 @@ debts.items[]:
   secured_against_asset_id: <id>
   is_split:  true | false
   parent_loan_id: <id>
+  cleared_monthly: true | false     // credit cards: paid in full every month.
+                                    // A captured fact, never assumed.
 ```
 
 The `security` enum says what **kind** of asset secures a debt; `secured_against_asset_id` says **which one**, by stable asset id (`"home"` for the loan in the home domain) — the same pattern as `linked_asset_id` for income. Property equity derives from it, so a loan's dollars live once, as the debts item.
@@ -392,11 +394,14 @@ A visible tile with no firing insight is a valid and intended state. It shows th
 | 6.1 | Will and legal basics | Any of the four `in_place = false`, OR `will.last_updated` older than 5 years | `estate.*`, `context.children` | Estate lawyer |
 | 7.1 | Investment property | `investments.properties[]` non-empty | property fields, `rental_income_annual` | Broker / planner / accountant |
 | 7.2 | Investments and how they fit | `shares_value > 0` OR `managed_funds_value > 0` | `shares_value`, `held_in` | Planner |
-| 8.1a | Other debts — has mortgage | `debts.items[]` non-empty AND `mortgage_balance > 0` AND NOT `hardship` | `debts.items[]` | Mortgage broker |
-| 8.1b | Other debts — no mortgage | `debts.items[]` non-empty AND `mortgage_balance = 0` AND NOT `hardship` | `debts.items[]` | **No paid referral.** Education plus National Debt Helpline. |
+| 8.1a | Other debts — has mortgage | `debts.items[]` holds at least one **consumer** item AND `mortgage_balance > 0` AND NOT `hardship`. A consumer item: `type` is `credit_card`, `personal_loan`, `car_loan`, `bnpl` or `other`; a credit card with `cleared_monthly: true` does not count; `borrower` is not `company`, `trust`, `smsf` or `partnership` | `debts.items[]` | Mortgage broker |
+| 8.1b | Other debts — no mortgage | `debts.items[]` holds at least one **consumer** item AND `mortgage_balance = 0` AND NOT `hardship` — same consumer-item scope as 8.1a | `debts.items[]` | **No paid referral.** Education plus National Debt Helpline. |
 | 9.1 | Income structure | `structure ≠ paye` OR `business_income_annual > 0` OR `entity ≠ null` | `structure`, `entity`, `employer_super_on` | Accountant |
 
 ### Explicit non-triggers
+
+- **A household whose only debt items are cleared-monthly credit cards fires neither 8.1a nor 8.1b.** A card paid in full every month costs nothing and routes to no one; it still renders as an item, because the exclusion is a trigger rule, not a display one.
+- **8.1a and 8.1b fire only on consumer debt.** Loan splits, investment, commercial and business loans, lines of credit, equipment finance, family loans, tax debt, HECS, untyped open items, and any item whose borrower is a company, trust, SMSF or partnership fire neither. 8.1 carries consumer-consolidation copy and a broker referral; splits belong to Tile 7 and entity debt to Tile 9, and manufacturing a reason to refer is what the independence position prevents. Every item still renders on Tile 8; this too is a trigger rule, not a display one.
 
 Recorded because a lawyer will ask, and because they are easy to reintroduce by accident:
 

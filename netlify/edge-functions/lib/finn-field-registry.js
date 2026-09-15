@@ -210,6 +210,10 @@ export const FIELD_REGISTRY = {
      pattern as linked_asset_id for income. Property equity derives from
      it, so the loan's dollars live once, as the debts item. */
   "debts.items[].secured_against_asset_id": { label: "which asset it's secured against", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
+  /* A credit card cleared every month is not revolving debt; without this
+     field the schema cannot tell them apart and 8.1a/8.1b fire on a card
+     that costs nothing. Captured fact, never assumed. */
+  "debts.items[].cleared_monthly": { label: "whether it's paid in full every month", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "debts.items[].is_split": { label: "whether it's a split of a larger loan", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "debts.items[].parent_loan_id": { label: "which loan it's a split of", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   /* The money fields are required off the loan screen for every product

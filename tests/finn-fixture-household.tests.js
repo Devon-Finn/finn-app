@@ -34,8 +34,11 @@
      debts_total_by_entity  personal 107400 · company 380000
 
    Insights that fire (of the fourteen), fixed order:
-     1.1 1.2 1.3 2.1 3.1 3.2a 4.1 5.1 6.1 7.1 7.2 8.1a 9.1
-   Not firing: 2.2, 3.2b, 8.1b, hardship.
+     1.1 1.2 1.3 2.1 3.1 3.2a 4.1 5.1 6.1 7.1 7.2 9.1
+   Not firing: 2.2, 3.2b, 8.1a, 8.1b, hardship. 8.1 fires only on
+   consumer debt and none of these items is: the loan split is Tile 7's,
+   a family loan is not a consumer type, the card is cleared monthly and
+   the commercial loan is the company's.
 
    Run in the Browser pane: blob-import the pipeline, registry, paths,
    merge and linter libs plus finn-derived.js and finn-triggers.js (the
@@ -251,7 +254,9 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
       // property, by id); the property's equity derives from this link,
       // so the loan's dollars live once, as the company's debts item.
       { type: 'commercial_loan', purpose: 'commercial_property', borrower: 'company', security: 'property_commercial', secured_against_asset_id: propCommId, is_split: false, parent_loan_id: null, balance: 380000, rate_percent: 6.9, minimum_monthly: 2185 },
-      { type: 'credit_card', purpose: 'personal', borrower: 'personal', balance: 2400, rate_percent: 19.99, minimum_monthly: 48 },
+      // The card is cleared every month: a captured fact, and under the
+      // field-spec 3.3 exclusion it contributes nothing to 8.1a/8.1b.
+      { type: 'credit_card', purpose: 'personal', borrower: 'personal', cleared_monthly: true, balance: 2400, rate_percent: 19.99, minimum_monthly: 48 },
     ], hecs_balance: 12400, _confidence: 'document' },
     }, completed_domains: ['income', 'assets', 'liabilities', 'buffer', 'protection', 'estate', 'super'],
   });
@@ -288,10 +293,36 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
     Object.keys(der.debts_total_by_entity).length === 2);
 
   /* ── the insights ── */
-  const EXPECTED_INSIGHTS = ['1.1', '1.2', '1.3', '2.1', '3.1', '3.2a', '4.1', '5.1', '6.1', '7.1', '7.2', '8.1a', '9.1'];
+  // Hand-written, not generated: 8.1a is absent because no debt item here
+  // is consumer debt (loan split, family loan, cleared-monthly card,
+  // company-borrowed commercial loan), so the mortgage alone routes nothing.
+  const EXPECTED_INSIGHTS = ['1.1', '1.2', '1.3', '2.1', '3.1', '3.2a', '4.1', '5.1', '6.1', '7.1', '7.2', '9.1'];
   const ev = evaluate(D, { yearNow: YEAR_NOW, derived: der });
   t('insights-exact', JSON.stringify(ev.insight_ids) === JSON.stringify(EXPECTED_INSIGHTS));
   t('no-hardship', ev.hardship === false);
+  // A household whose only debt item is a cleared-monthly card fires
+  // neither 8.1a nor 8.1b.
+  const onlyClearedCard = {
+    debts: { items: [{ id: 'cc1', type: 'credit_card', purpose: 'personal', borrower: 'personal', cleared_monthly: true, balance: 2400, rate_percent: 19.99, minimum_monthly: 48 }], _confidence: 'stated' },
+  };
+  const evNoMortgage = evaluate({ ...onlyClearedCard, home: { owns_home: false } }, { yearNow: YEAR_NOW });
+  t('cleared-card-only-no-81b', !evNoMortgage.insight_ids.includes('8.1b') && !evNoMortgage.insight_ids.includes('8.1a'));
+  const evWithMortgage = evaluate({ ...onlyClearedCard, home: { owns_home: true, mortgage_balance: 540000 } }, { yearNow: YEAR_NOW });
+  t('cleared-card-only-no-81a', !evWithMortgage.insight_ids.includes('8.1a') && !evWithMortgage.insight_ids.includes('8.1b'));
+  // Consumer-debt scope (Devon, 15 Sept 2026): 8.1 fires only on consumer
+  // debt. "Fires neither" is checked with and without a mortgage.
+  const evalDebts = (items, home) => evaluate({ home, debts: { items, _confidence: 'stated' } }, { yearNow: YEAR_NOW });
+  const has81 = ev => ev.insight_ids.includes('8.1a') || ev.insight_ids.includes('8.1b');
+  const mortgaged = { owns_home: true, mortgage_balance: 540000 };
+  const renting = { owns_home: false };
+  const personalLoan = [{ id: 'pl1', type: 'personal_loan', purpose: 'personal', borrower: 'personal', balance: 12000, rate_percent: 11.5, minimum_monthly: 390 }];
+  const evPersonalLoan = evalDebts(personalLoan, mortgaged);
+  t('personal-loan-held-personally-with-mortgage-fires-81a',
+    evPersonalLoan.insight_ids.includes('8.1a') && !evPersonalLoan.insight_ids.includes('8.1b'));
+  const splitOnly = [{ id: 'ls1', type: 'loan_split', purpose: 'investment_shares', borrower: 'joint', security: 'property_home', is_split: true, parent_loan_id: 'home', balance: 90000, rate_percent: 5.84, minimum_monthly: 550 }];
+  t('loan-split-alone-fires-neither', !has81(evalDebts(splitOnly, mortgaged)) && !has81(evalDebts(splitOnly, renting)));
+  const companyLoan = [{ id: 'pl2', type: 'personal_loan', borrower: 'company', balance: 30000, rate_percent: 9.9, minimum_monthly: 640 }];
+  t('company-borrower-personal-loan-fires-neither', !has81(evalDebts(companyLoan, mortgaged)) && !has81(evalDebts(companyLoan, renting)));
   t('lender-note-once-on-tile-1', ev.tiles[0].lender_paid_note_once === true);
   t('ownership-block-stands-down',
     ev.tiles[6].insights.find(i => i.id === '7.2').ownership_block_suppressed === true);
@@ -390,7 +421,7 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
 
   return {
     pass: failures.length === 0,
-    total: 76,
+    total: 81,
     failures,
     hand_computed: {
       home_equity: 410000, lvr_percent: 56.8, surplus_monthly: 3402, buffer_months: 2.6,

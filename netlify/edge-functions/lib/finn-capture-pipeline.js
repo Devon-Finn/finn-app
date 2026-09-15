@@ -80,7 +80,7 @@ const V2_SCHEMA = {
   protection: { life: { object: COVER }, tpd: { object: COVER }, income_protection: { object: COVER }, trauma: { object: COVER } },
   estate: { will: { object: ESTATE_DOC }, poa: { object: ESTATE_DOC }, guardianship: { object: ESTATE_DOC }, super_nomination: { object: { ...ESTATE_DOC, binding: BOOL } } },
   investments: { shares_value: MONEY, held_in: STR, managed_funds_value: MONEY, properties: { array: { id: STR, value_estimate: MONEY, loan_balance: MONEY, rate_percent: RATE, repayment_type: STR, rent_monthly: MONEY, held_in: STR, use: { enum: "property_use" } } } },
-  debts: { items: { array: { id: STR, type: { enum: "debt_type" }, purpose: { enum: "debt_purpose" }, borrower: { enum: "debt_borrower" }, security: { enum: "debt_security" }, secured_against_asset_id: STR, is_split: BOOL, parent_loan_id: STR, balance: MONEY, rate_percent: RATE, minimum_monthly: MONEY } }, hecs_balance: MONEY },
+  debts: { items: { array: { id: STR, type: { enum: "debt_type" }, purpose: { enum: "debt_purpose" }, borrower: { enum: "debt_borrower" }, security: { enum: "debt_security" }, secured_against_asset_id: STR, is_split: BOOL, parent_loan_id: STR, cleared_monthly: BOOL, balance: MONEY, rate_percent: RATE, minimum_monthly: MONEY } }, hecs_balance: MONEY },
   flags: { hardship: BOOL, hardship_signal: STR, income_unreconciled: { array: STR } },
 };
 

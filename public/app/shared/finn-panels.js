@@ -172,7 +172,8 @@
       buffer_months: num(der.buffer_months),
       accessible_savings: money(buf.accessible_savings),
       where_held: text(buf.where_held) && esc(text(buf.where_held)),
-      owner_display: multiOwner ? (multiOwner[0] === 'you' ? 'You' : esc(multiOwner[0])) : null,
+      // Carries the verb, so the template reads for "you" and a name alike.
+      owner_display: multiOwner ? (multiOwner[0] === 'you' ? 'You hold' : esc(multiOwner[0]) + ' holds') : null,
       fund_count_display: multiOwner ? String(multiOwner[1]) : null,
       life_display: coverDisplay(prot.life) ?? undefined,
       ip_display: coverDisplay(prot.income_protection) ?? undefined,
@@ -196,7 +197,14 @@
       investments_total_display: invParts.length ? money(invParts.reduce((a, b) => a + b, 0)) : null,
       held_in: text(inv.held_in) && esc(text(inv.held_in)),
       debts_total: money(der.debts_total),
-      debt_count_display: arr(debts.items).length > 0 ? String(debts.items.length) : null,
+      // Counts exactly the items debts_total sums (entity borrowing and
+      // HECS excluded), so the sentence's two numbers describe one set.
+      // Carries the noun: "1 item" / "N items".
+      debt_count_display: (function () {
+        const n = arr(debts.items).filter(it => it && it.type !== 'hecs_help' &&
+          !['company', 'trust', 'smsf', 'partnership'].includes(it.borrower)).length;
+        return n > 0 ? (n === 1 ? '1 item' : n + ' items') : null;
+      })(),
       structure_display: (function () {
         const base = inc.structure != null ? STRUCTURE_LABELS[inc.structure] || esc(inc.structure) : null;
         if (base === null) return null;
@@ -318,23 +326,40 @@
     }
 
     else if (tileNo === 4) {
-      if (money(der.super_total)) {
+      const funds = arr(sup.funds);
+      // Panel switch: at two or more items the groups lead, so no hero.
+      if (funds.length < 2 && money(der.super_total)) {
         html += C().figureHero(money(der.super_total), 'is in super across the', 'household.');
       }
-      const funds = arr(sup.funds);
-      if (funds.length) {
-        const items = funds.map((f, i) => ({
-          title: (text(f && f.fund) && f.fund !== 'unknown' ? f.fund : 'Fund ' + (i + 1)) +
-            (text(f && f.owner) ? ' · ' + (String(f.owner).toLowerCase() === 'you' ? 'yours' : String(f.owner).toLowerCase() === 'partner' ? 'partner’s' : f.owner) : ''),
-          rows: [
-            { label: conf(sup, 'Balance'), op: '', value: money(f && f.balance), missing: money(f && f.balance) === null },
-            { label: 'Insurance inside', op: '', value: f && f.has_insurance === true ? 'yes' : f && f.has_insurance === false ? 'no' : null, missing: !(f && typeof f.has_insurance === 'boolean') },
-          ],
+      // Panel switch (ledger, Sept 2026): one item renders exactly as
+      // approved; two or more render as an item group of rows closed by a
+      // subtotal. Cardinality drives the layout. Magnitude never does.
+      if (funds.length >= 2) {
+        const rows = funds.map((f, i) => C().itemRow({
+          name: text(f && f.fund) && f.fund !== 'unknown' ? f.fund : 'Fund ' + (i + 1),
+          line: text(f && f.owner)
+            ? (String(f.owner).toLowerCase() === 'you' ? 'your account'
+              : String(f.owner).toLowerCase() === 'partner' ? 'your partner’s account'
+              : f.owner + '’s account')
+            : null,
+          figures: [{ label: conf(sup, 'Balance'), value: money(f && f.balance), missing: money(f && f.balance) === null }],
+          chip: f && f.has_insurance === true ? 'Insurance inside' : null,
         }));
         html += '<div class="fp-teach"><h4 class="fp-calchead">What’s in super</h4>' +
-          C().repeatingItems(items, [
-            { label: 'Total across accounts', op: '=', value: money(der.super_total), missing: money(der.super_total) === null, result: true },
+          C().itemGroup('Super accounts', rows, [
+            { label: 'Across the accounts', op: '=', value: money(der.super_total), missing: money(der.super_total) === null },
           ]) + '</div>';
+      } else if (funds.length === 1) {
+        const f = funds[0];
+        html += '<div class="fp-teach"><h4 class="fp-calchead">What’s in super</h4>' +
+          C().repeatingItems([{
+            title: (text(f && f.fund) && f.fund !== 'unknown' ? f.fund : 'Fund 1') +
+              (text(f && f.owner) ? ' · ' + (String(f.owner).toLowerCase() === 'you' ? 'yours' : String(f.owner).toLowerCase() === 'partner' ? 'partner’s' : f.owner) : ''),
+            rows: [
+              { label: conf(sup, 'Balance'), op: '', value: money(f && f.balance), missing: money(f && f.balance) === null },
+              { label: 'Insurance inside', op: '', value: f && f.has_insurance === true ? 'yes' : f && f.has_insurance === false ? 'no' : null, missing: !(f && typeof f.has_insurance === 'boolean') },
+            ],
+          }], []) + '</div>';
       } else if (sup.multiple_accounts === true) {
         html += statusList([['Super accounts', 'more than one account mentioned, details not yet gathered']]);
       } else {
@@ -384,26 +409,57 @@
       const props = arr(inv.properties);
       const invParts = [inv.shares_value, inv.managed_funds_value].filter(v => num(v) !== null);
       const propEquityKnown = (der.property_equity || []).filter(v => num(v) !== null);
-      if (propEquityKnown.length) {
+      if (props.length >= 2) {
+        // Panel switch: at two or more properties the groups lead, so no hero.
+      } else if (propEquityKnown.length) {
         html += C().figureHero(money(propEquityKnown.reduce((a, b) => a + b, 0)), 'is the equity across your investment', props.length === 1 ? 'property.' : 'properties.');
       } else if (invParts.length) {
         html += C().figureHero(money(invParts.reduce((a, b) => a + b, 0)), 'is held in shares and', 'funds.');
       }
-      if (props.length) {
-        const items = props.map((p, i) => ({
-          title: text(p && p.held_in) ? 'Investment property' + (props.length > 1 ? ' ' + (i + 1) : '') + ' · held in ' + p.held_in : 'Investment property' + (props.length > 1 ? ' ' + (i + 1) : ''),
+      // The loan against a property lives once: on the property, or as a
+      // debts item secured against it. Read it back from the derived
+      // equity so both homes for the figure display identically.
+      const loanAgainst = (p, i) => {
+        if (num(p && p.loan_balance) !== null) return p.loan_balance;
+        const eq = num(der.property_equity && der.property_equity[i]);
+        const v = num(p && p.value_estimate);
+        return (eq !== null && v !== null) ? v - eq : null;
+      };
+      const USE_LINES = { investment: 'an investment property', holiday: 'a holiday place', other: 'held for another purpose' };
+      // Panel switch (ledger): one property renders exactly as approved;
+      // two or more render as rows in a group, closed by a subtotal, then
+      // the calc block operating on that subtotal.
+      if (props.length >= 2) {
+        const rows = props.map((p, i) => C().itemRow({
+          name: 'Investment property ' + (i + 1),
+          line: [USE_LINES[p && p.use] || null, text(p && p.held_in) ? (String(p.held_in).toLowerCase() === 'joint' ? 'held jointly' : 'held in ' + p.held_in) : null].filter(Boolean).join(', ') || null,
+          figures: [
+            { label: conf(inv, 'Value'), value: money(p && p.value_estimate), missing: money(p && p.value_estimate) === null },
+            { label: 'Loan against it', value: money(loanAgainst(p, i)), missing: money(loanAgainst(p, i)) === null },
+          ],
+          chip: text(p && p.repayment_type) ? String(p.repayment_type).replace(/_/g, ' ').replace(/^./, c => c.toUpperCase()) : null,
+        }));
+        const totVal = props.map(p => num(p && p.value_estimate)).filter(v => v !== null);
+        const totLend = props.map((p, i) => num(loanAgainst(p, i))).filter(v => v !== null);
+        html += '<div class="fp-teach"><h4 class="fp-calchead">What each property is worth to you</h4>' +
+          C().itemGroup('Investment properties', rows, [
+            { label: 'Total value', op: '=', value: totVal.length ? money(totVal.reduce((a, b) => a + b, 0)) : null, missing: !totVal.length },
+          ]) +
+          C().calcBlock([
+            { label: 'Total value', op: '', value: totVal.length ? money(totVal.reduce((a, b) => a + b, 0)) : null, missing: !totVal.length },
+            { label: 'Total lending', op: '−', value: totLend.length ? money(totLend.reduce((a, b) => a + b, 0)) : null, missing: !totLend.length },
+            { label: 'Total equity', op: '=', value: propEquityKnown.length ? money(propEquityKnown.reduce((a, b) => a + b, 0)) : null, missing: !propEquityKnown.length, result: true },
+          ]) + '</div>';
+      } else if (props.length === 1) {
+        const p = props[0];
+        html += '<div class="fp-teach"><h4 class="fp-calchead">What the property is worth to you</h4>' + C().repeatingItems([{
+          title: text(p && p.held_in) ? 'Investment property · held in ' + p.held_in : 'Investment property',
           rows: [
             { label: conf(inv, 'Value'), op: '', value: money(p && p.value_estimate), missing: money(p && p.value_estimate) === null },
-            { label: conf(inv, 'Loan against it'), op: '−', value: money(p && p.loan_balance), missing: money(p && p.loan_balance) === null },
-            { label: 'Equity', op: '=', value: num(der.property_equity && der.property_equity[i]) !== null ? money(der.property_equity[i]) : null, missing: num(der.property_equity && der.property_equity[i]) === null, result: true },
+            { label: 'Loan against it', op: '−', value: money(loanAgainst(p, 0)), missing: money(loanAgainst(p, 0)) === null },
+            { label: 'Equity', op: '=', value: num(der.property_equity && der.property_equity[0]) !== null ? money(der.property_equity[0]) : null, missing: num(der.property_equity && der.property_equity[0]) === null, result: true },
           ],
-        }));
-        const aggRows = props.length > 1 ? [
-          { label: 'Total value', op: '', value: money(props.map(p => num(p && p.value_estimate)).filter(v => v !== null).reduce((a, b) => a + b, 0)) },
-          { label: 'Total lending', op: '−', value: money(props.map(p => num(p && p.loan_balance)).filter(v => v !== null).reduce((a, b) => a + b, 0)) },
-          { label: 'Total equity', op: '=', value: propEquityKnown.length ? money(propEquityKnown.reduce((a, b) => a + b, 0)) : null, missing: !propEquityKnown.length, result: true },
-        ] : [];
-        html += '<div class="fp-teach"><h4 class="fp-calchead">What each property is worth to you</h4>' + C().repeatingItems(items, aggRows) + '</div>';
+        }], []) + '</div>';
       }
       html += '<div class="fp-teach"><h4 class="fp-calchead">Held outside property</h4>' + statusList([
         [conf(inv, 'Shares and ETFs'), money(inv.shares_value) ? money(inv.shares_value) + (text(inv.held_in) ? ' · held in ' + text(inv.held_in) : '') : null],
@@ -418,23 +474,67 @@
     }
 
     else if (tileNo === 8) {
-      if (money(der.debts_total)) {
+      const items = arr(debts.items);
+      // Panel switch: at two or more items the groups lead, so no hero.
+      if (items.length < 2 && money(der.debts_total)) {
         html += C().figureHero(money(der.debts_total), 'is owed outside the', 'mortgage.');
       }
-      const items = arr(debts.items);
-      const TYPE_LABELS = { credit_card: 'Credit card', personal_loan: 'Personal loan', car_loan: 'Car loan', bnpl: 'Buy now pay later', tax_debt: 'Tax debt', other: 'Other debt' };
-      if (items.length) {
-        const cards = items.map(it => ({
+      const TYPE_LABELS = {
+        home_loan: 'Home loan', investment_property_loan: 'Investment property loan', loan_split: 'Loan split',
+        line_of_credit: 'Line of credit', commercial_loan: 'Commercial loan', business_loan: 'Business loan',
+        equipment_finance: 'Equipment finance', car_loan: 'Car loan', personal_loan: 'Personal loan',
+        credit_card: 'Credit card', bnpl: 'Buy now pay later', hecs_help: 'HECS', tax_debt: 'Tax debt',
+        family_loan: 'Family loan', other: 'Other debt',
+      };
+      const PURPOSE_LINES = {
+        owner_occupied: 'the loan on the home', investment_property: 'used for an investment property',
+        commercial_property: 'used for a commercial property', investment_shares: 'used to buy shares',
+        business_operating: 'used in the business', vehicle: 'used for the car', personal: 'personal spending',
+        education: 'used for education', tax: 'a tax debt', mixed: 'mixed use', unknown: 'use not yet recorded',
+      };
+      const ENTITY_GROUP_LABELS = { company: 'In the company', trust: 'In the trust', smsf: 'In the SMSF', partnership: 'In the partnership' };
+      const debtChip = it => it && it.type === 'credit_card' && it.cleared_monthly === true ? 'Cleared monthly'
+        : it && it.is_split === true ? 'Split of the home loan' : null;
+      const debtRow = it => C().itemRow({
+        name: TYPE_LABELS[it && it.type] || 'Debt',
+        line: PURPOSE_LINES[it && it.purpose] || null,
+        figures: [
+          { label: conf(debts, 'Balance'), value: money(it && it.balance), missing: money(it && it.balance) === null },
+          { label: 'Rate', value: rate(it && it.rate_percent), missing: rate(it && it.rate_percent) === null },
+        ],
+        chip: debtChip(it),
+      });
+      // Panel switch (ledger): one item renders exactly as approved; two
+      // or more render as groups of rows — personal and joint borrowing
+      // apart from borrowing inside an entity — each closed by its
+      // subtotal in the calc grammar.
+      if (items.length >= 2) {
+        const ENTITY_B = ['company', 'trust', 'smsf', 'partnership'];
+        const personal = items.filter(it => it && !ENTITY_B.includes(it.borrower));
+        if (personal.length) {
+          html += '<div class="fp-teach"><h4 class="fp-calchead">What each one is costing</h4>' +
+            C().itemGroup('Yours and joint', personal.map(debtRow), [
+              { label: 'Owing, yours and joint', op: '=', value: money(der.debts_total), missing: money(der.debts_total) === null },
+            ]) + '</div>';
+        }
+        for (const eb of ENTITY_B) {
+          const group = items.filter(it => it && it.borrower === eb);
+          if (!group.length) continue;
+          const ebTotal = der.debts_total_by_entity && num(der.debts_total_by_entity[eb]) !== null ? der.debts_total_by_entity[eb] : null;
+          html += '<div class="fp-teach">' + C().itemGroup(ENTITY_GROUP_LABELS[eb], group.map(debtRow), [
+            { label: 'Owing, ' + ENTITY_GROUP_LABELS[eb].toLowerCase(), op: '=', value: money(ebTotal), missing: money(ebTotal) === null },
+          ]) + '</div>';
+        }
+      } else if (items.length === 1) {
+        const it = items[0];
+        html += '<div class="fp-teach"><h4 class="fp-calchead">What it is costing</h4>' + C().repeatingItems([{
           title: TYPE_LABELS[it && it.type] || 'Debt',
           rows: [
             { label: conf(debts, 'Balance'), op: '', value: money(it && it.balance), missing: money(it && it.balance) === null },
             { label: 'Rate', op: '', value: rate(it && it.rate_percent), missing: rate(it && it.rate_percent) === null },
             { label: 'Minimum repayment', op: '', value: money(it && it.minimum_monthly) ? money(it.minimum_monthly) + '/month' : null, missing: money(it && it.minimum_monthly) === null },
           ],
-        }));
-        html += '<div class="fp-teach"><h4 class="fp-calchead">What each one is costing</h4>' + C().repeatingItems(cards, [
-          { label: 'Total owing', op: '=', value: money(der.debts_total), missing: money(der.debts_total) === null, result: true },
-        ]) + '</div>';
+        }], []) + '</div>';
       }
       html += refBlock('Held separately', [
         [conf(debts, 'HECS'), money(debts.hecs_balance)],
@@ -679,8 +779,16 @@
     let html = '<article class="fc fp-tile" data-tile="' + tileNo + '"><h3>' + esc(title) + '</h3>';
     html += tilePosition(tileNo, domains || {}, derived || {}, o.terms);
     // section_b: absent on tiles 1 and 2 by design; renders where present.
+    // Density (ledger, Sept 2026): the mechanic collapses behind a quiet
+    // "How this works" affordance, open by default only on a tile's FIRST
+    // visit, remembered per household in household_ui_state (the host page
+    // passes opts.sectionBOpen). The copy is unchanged, only its default
+    // state — and nothing is ever collapsed or expanded because of what
+    // the person's number is.
     if (tileMeta && tileMeta.section_b && !isPlaceholder(tileMeta.section_b)) {
-      html += '<div class="fp-section fp-b"><h4 class="fp-calchead">What these products actually do</h4><p>' + esc(tileMeta.section_b) + '</p></div>';
+      const openAttr = o.sectionBOpen === false ? '' : ' open';
+      html += '<details class="fp-section fp-b"' + openAttr + '><summary class="fp-howthis">How this works</summary>' +
+        '<div class="fp-bbody"><h4 class="fp-calchead">What these products actually do</h4><p>' + esc(tileMeta.section_b) + '</p></div></details>';
     }
     html += insightsSection(tileResult, domains, derived, library);
     html += calmSection(tileNo, tileResult, domains, library);

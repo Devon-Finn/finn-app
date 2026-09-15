@@ -719,6 +719,20 @@ function setDashView(v) {
 
 /* ══════════ DETAIL PANEL (sections A/B/C from the library) ══════════ */
 
+// Density (ledger, Sept 2026): section B is open by default only on a
+// tile's FIRST visit, remembered per household in household_ui_state.
+// Never driven by what any number is — only by whether they've been here.
+let sectionBSeen = {};
+let uiHouseholdId = null;
+function markSectionBSeen(tileNo) {
+  if (sectionBSeen[String(tileNo)]) return;
+  sectionBSeen[String(tileNo)] = true;
+  if (!uiHouseholdId) return;
+  finnSupabase.from('household_ui_state')
+    .upsert({ household_id: uiHouseholdId, section_b_seen: sectionBSeen, updated_at: new Date().toISOString() })
+    .then(() => {}, err => console.error('[Finn ui] section B state save failed (harmless: it opens again next visit):', err));
+}
+
 function openDetail(tileNo) {
   if (!FINN_LIBRARY || !lastTriggers) return;
   const d = lastPicture.domains || {};
@@ -734,8 +748,12 @@ function openDetail(tileNo) {
   badge.className = 'dp-badge badge ' + state;
   badge.innerHTML = '<span class="d"></span>' + BADGE_LABEL[state];
 
+  const firstVisit = !sectionBSeen[String(tileNo)];
   let html = '<div class="dp-inner">' +
-    window.finnPanels.renderTile(tileNo, d, derived, tileResult, FINN_LIBRARY, { terms: window.finnTerms });
+    window.finnPanels.renderTile(tileNo, d, derived, tileResult, FINN_LIBRARY, { terms: window.finnTerms, sectionBOpen: firstVisit });
+  if (tileMeta && typeof tileMeta.section_b === 'string' && !tileMeta.section_b.startsWith('[Not provided')) {
+    markSectionBSeen(tileNo);
+  }
   if (state === 'building') {
     html += '<div class="dp-section"><div class="dp-building">This area is still building — the figures fill in as the conversation covers it.</div></div>';
   }
@@ -960,9 +978,11 @@ async function main() {
     const termsData = await (await fetch('/app/shared/finn-terms.json')).json();
     const [{ data: hh }, { data: ui }] = await Promise.all([
       finnSupabase.from('households').select('id').limit(1),
-      finnSupabase.from('household_ui_state').select('terms_handed').limit(1),
+      finnSupabase.from('household_ui_state').select('terms_handed,section_b_seen').limit(1),
     ]);
     const householdId = hh && hh[0] && hh[0].id;
+    uiHouseholdId = householdId || null;
+    sectionBSeen = (ui && ui[0] && ui[0].section_b_seen) || {};
     finnTerms.init({
       terms: termsData.terms,
       handed: (ui && ui[0] && ui[0].terms_handed) || {},

@@ -287,7 +287,7 @@
       "route_primary": "financial_planner",
       "route_also": [],
       "position_line": {
-        "template": "{owner_display} holds {fund_count_display} super accounts.",
+        "template": "{owner_display} {fund_count_display} super accounts.",
         "fields": ["super.funds"]
       },
       "blocks": {
@@ -388,7 +388,7 @@
       "route_primary": "mortgage_broker",
       "route_also": [],
       "position_line": {
-        "template": "Debts outside the mortgage total {debts_total}, across {debt_count_display} items.",
+        "template": "Debts outside the mortgage total {debts_total}, across {debt_count_display}.",
         "fields": ["debts.items", "derived.debts_total"]
       },
       "blocks": {
@@ -409,7 +409,7 @@
       "route_primary": null,
       "route_also": [],
       "position_line": {
-        "template": "Debts total {debts_total}, across {debt_count_display} items.",
+        "template": "Debts total {debts_total}, across {debt_count_display}.",
         "fields": ["debts.items", "derived.debts_total"]
       },
       "block_style": "inline_headings",
@@ -453,7 +453,7 @@
       "route_primary": "financial_counsellor",
       "route_also": [],
       "position_line": {
-        "template": "Debts total {debts_total}, across {debt_count_display} items.",
+        "template": "Debts total {debts_total}, across {debt_count_display}.",
         "fields": ["debts.items", "derived.debts_total"]
       },
       "block_style": "single",
