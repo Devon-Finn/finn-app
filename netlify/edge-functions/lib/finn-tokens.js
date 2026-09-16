@@ -56,14 +56,15 @@ export function parseTokens(text) {
 
 /* Replace every token in a COMPLETE string. Returns
    { text, served, sweeps, frames, nudges, unknown }. */
-export function substituteTokens(text) {
+export function substituteTokens(text, ctx = {}) {
   const served = new Set();
   const sweeps = new Set();
   const frames = [];
   const nudges = [];
   const unknown = [];
   const out = String(text || "").replace(TOKEN, (whole, kind, id) => {
-    const copy = textFor(kind, id);
+    let copy = textFor(kind, id);
+    if (copy && kind === "FRAME" && id === "close" && ctx.closeList) copy = copy + "\n\n" + ctx.closeList;
     if (copy === null || copy === undefined) { unknown.push(kind + ":" + id); return ""; }
     if (kind === "ASK") for (const f of RETRIEVAL_PATHS[id].satisfies) served.add(f);
     if (kind === "SWEEP") sweeps.add(id);
@@ -92,5 +93,5 @@ export function promptTokenSection() {
     Object.entries(SWEEPS).map(([id, s]) => "- [SWEEP: " + id + "]: the \"anything else?\" question for " + s.area + ". An area does not count as covered until its sweep has been asked.").join("\n") +
     "\n- [NUDGE: first]: the first time the person wants to skip a document-backed or important item. Emit it and wait for their answer.\n" +
     "- [NUDGE: accept]: when they still want to skip it. Emit it, record the field in \"deferrals\", and move on. Never nudge an item more than twice in total across the session; the working notes show each item's count.\n" +
-    "- [FRAME: close]: opens the close. Only when the working notes say closing is available.";
+    "- [FRAME: close]: opens the close, and code appends the list of open items after it (don't restate or add to that list). Only when the working notes say closing is available. Until then, never say goodbye, never summarise the picture as finished, and never ask whether there's anything else before wrapping up.";
 }

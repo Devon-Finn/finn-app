@@ -28,12 +28,12 @@ const FACT_KEYWORDS = /\b(rate|balance|owing|term|repayment|cover|super|rent|cos
 // value with no document yet are estimates. A sentence naming only those
 // is exempt.
 const ESTIMATE_OK = /\b(spend|spending|goes out|living costs?|typical month)\b/i;
-const CLOSE_CLAIM = /\b(complete picture|picture (?:is )?complete|genuinely complete|well done|you're all done|that's everything|that covers everything)\b/i;
+const CLOSE_CLAIM = /\b(complete picture|picture (?:is )?complete|genuinely complete|very complete|well done|you're all done|that's everything|that covers everything|take care)\b/i;
 // Composed "anything else?" questions (the stand-in run): a sweep asked in
 // the model's own words never counts.
 const COMPOSED_SWEEP = /\b(any other (?:assets|debts|borrowing|super(?: accounts| funds)?|income)|anything else (?:owing|you own|coming in)|how many super funds|any (?:other )?debts or borrowings)\b/i;
 // Appraisals of figures or choices seen in live runs.
-const APPRAISAL = /\b(reasonable working figure|solid (?:start|foundation|starting point|position)|decent (?:runway|buffer|position)|doing double duty|doing quiet work|healthy (?:buffer|position|balance)|a good position|in good shape)\b/i;
+const APPRAISAL = /\b(reasonable working figure|solid (?:start|foundation|starting point|position)|decent (?:runway|buffer|position)|doing double duty|doing quiet work|healthy (?:buffer|position|balance)|a good position|in good shape|well set up|well placed|reassuring|very complete|looking (?:pretty )?(?:full|complete))\b/i;
 const RECORDER_TAG = /^\[RECORDER\]/;
 const SELF_INTRO = /\bI'?m Finn\b/;
 // Retrieval-instruction prose. CSV/export sentences are exempt: the bank
@@ -360,6 +360,9 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
       for (const w of leafWrites(capDomains)) {
         if (seen.has(w.id)) continue;
         seen.add(w.id);
+        // Only registered fields count: an invented field was never a fact
+        // the picture could hold.
+        if (!registry || !registry[w.id]) continue;
         // A field the pipeline re-homed to its owning domain counts where it landed.
         const rest = w.id.slice(w.id.indexOf(".") + 1);
         const landed = present(w.id) || Object.keys(domains).some(d => d !== w.domain && present(d + "." + rest));
@@ -446,8 +449,12 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
   {
     const d1 = [], d2 = [];
     for (const r of captureRows) {
-      for (const snt of sentences(visibleOf(r.raw_text))) {
-        if (COMPOSED_SWEEP.test(snt) && !snt.includes("[SWEEP:")) d1.push(`"${snt.slice(0, 140)}"`);
+      const vis = visibleOf(r.raw_text);
+      // A composed question in the same reply as the sweep token was
+      // dropped from view by the stream; it is not a leak.
+      const hasSweep = vis.includes("[SWEEP:");
+      for (const snt of sentences(vis)) {
+        if (COMPOSED_SWEEP.test(snt) && !hasSweep) d1.push(`"${snt.slice(0, 140)}"`);
         const m = snt.match(APPRAISAL);
         if (m) d2.push(`"${m[0]}": ${snt.slice(0, 120)}`);
       }

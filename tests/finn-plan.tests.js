@@ -180,5 +180,33 @@ export function runPlanTests({ plan, pipeline, tokens }) {
   t('token-prefix-holds-partials', isTokenPrefix('[SW') && isTokenPrefix('[SWEEP: other_') && isTokenPrefix('[N') && isTokenPrefix('[FRAME:'));
   t('token-prefix-ignores-machine-markers', !isTokenPrefix('[C') && !isTokenPrefix('[CAPTURE') && !isTokenPrefix('[R'));
 
-  return { pass: failures.length === 0, total: 42, failures };
+  /* ── stand-in run 2 fixes ── */
+  const sig = fullHousehold();
+  sig.domains.flags.to_verify = [{ field: 'home.mortgage_balance', item_id: null, confidence: 'sighted', floor: 'document', reason: 'below_floor' }];
+  t('sighted-not-raised-again', buildPlan(sig.domains, sig.goals).to_verify.length === 0);
+  const entDef = fullHousehold();
+  entDef.domains.income.other = [entDef.domains.income.other[0], entDef.domains.income.other[1], { id: 'i9', source: 'distributions', entity: 'company' }];
+  entDef.domains.flags.to_verify = [{ field: 'income.other[].amount_annual', item_id: 'i9', reason: 'deferred', nudges: 1 }];
+  const ed = buildPlan(entDef.domains, entDef.goals);
+  t('put-off-company-income-covers-entity', ed.covered.includes('income') && ed.deferred.some(d => d.field === 'income.other.entity'));
+  t('close-list-written-by-code', plan.closeListText(ed).includes('not gathered yet') && !plan.closeListText(ed).includes('—'));
+  t('notes-next-move-close', planPromptSection(full).includes('NEXT MOVE: close'));
+  t('notes-next-move-missing-item', (() => {
+    const x = fullHousehold(); delete x.domains.investments.properties[0].use;
+    const txt = planPromptSection(buildPlan(x.domains, x.goals));
+    return txt.includes('NEXT MOVE: gather') && txt.includes('investments.properties[].use#p1');
+  })());
+  const E2 = { domains: {}, goals: {}, completed_domains: [], refusals: [], schema_version: 2 };
+  const hecs = pipeline.applyCaptureCore({ picture: E2, capture: { domains: { debts: { items: [{ type: 'hecs_help', purpose: 'education', borrower: 'personal', balance: 9000 }], _confidence: 'estimated' } } }, sessionId: 's', servedFields: new Set() });
+  t('hecs-item-folded', hecs.domains.debts.hecs_balance === 9000 && !(hecs.domains.debts.items || []).length);
+  const nomPic = { ...E2, domains: { estate: { super_nomination: { in_place: true, binding: true, last_updated: '2021' }, _confidence: 'sighted' } } };
+  const nom = pipeline.applyCaptureCore({ picture: nomPic, capture: { domains: { estate: { super_nomination: { in_place: false }, _confidence: 'sighted' } } }, sessionId: 's', servedFields: new Set() });
+  t('nomination-not-switched-off', nom.domains.estate.super_nomination.in_place === true && nom.domains.estate.super_nomination.binding === true);
+  const cardPic = { ...E2, domains: { debts: { items: [{ id: 'c1', type: 'credit_card', purpose: 'unknown', borrower: 'joint' }], _confidence: 'stated' } } };
+  const card = pipeline.applyCaptureCore({ picture: cardPic, capture: { domains: { debts: { items: [{ type: 'credit_card', purpose: 'personal', borrower: 'joint', balance: 2300 }], _confidence: 'sighted' } } }, sessionId: 's', servedFields: new Set() });
+  t('unknown-is-wildcard-no-duplicate-card', card.domains.debts.items.length === 1 && card.domains.debts.items[0].balance === 2300 && card.domains.debts.items[0].purpose === 'personal');
+  const owner = pipeline.applyCaptureCore({ picture: E2, capture: { domains: { home: { owns_home: true, value_estimate: 850000, value_source: 'owner estimate', _confidence: 'estimated' } } }, sessionId: 's', servedFields: new Set() });
+  t('owner-guess-home-value-to-verify', owner.domains.flags.to_verify.some(e => e.field === 'home.value_estimate' && e.confidence === 'estimated'));
+
+  return { pass: failures.length === 0, total: 52, failures };
 }

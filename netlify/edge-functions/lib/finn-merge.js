@@ -159,18 +159,21 @@ export function resolveSecurity(domains) {
 function normName(s) {
   return String(s || "").toLowerCase().replace(/\bsuper(annuation)?\b/g, "").replace(/[^a-z0-9]/g, "");
 }
+// "unknown" is a placeholder, never a distinguishing value; dividends and
+// distributions are the same family for matching.
+const same = (a, b) => !a || !b || a === b || a === "unknown" || b === "unknown";
+const sourceFamily = v => (v === "dividends" || v === "distributions") ? "div" : v;
 const NATURAL_KEYS = {
   "super.funds": (b, p) => p.fund && b.fund && normName(b.fund) === normName(p.fund)
     && (!p.owner || !b.owner || String(b.owner).toLowerCase() === String(p.owner).toLowerCase()),
   "debts.items": (b, p) => p.type && b.type === p.type
-    && (!p.borrower || !b.borrower || b.borrower === p.borrower)
-    && (!p.purpose || !b.purpose || b.purpose === p.purpose),
+    && same(b.borrower, p.borrower) && same(b.purpose, p.purpose),
   "investments.properties": (b, p) => (p.held_in && b.held_in && String(b.held_in).toLowerCase() === String(p.held_in).toLowerCase()
     && (!p.use || !b.use || b.use === p.use))
     || (typeof p.value_estimate === "number" && b.value_estimate === p.value_estimate),
-  "income.other": (b, p) => p.source && b.source === p.source
+  "income.other": (b, p) => p.source && sourceFamily(b.source) === sourceFamily(p.source)
     && (!p.linked_asset_id || !b.linked_asset_id || b.linked_asset_id === p.linked_asset_id)
-    && (!p.entity || !b.entity || b.entity === p.entity),
+    && same(b.entity, p.entity),
   "context.children": (b, p) => typeof p.age === "number" && b.age === p.age,
 };
 export function adoptNaturalIds(base, patch) {

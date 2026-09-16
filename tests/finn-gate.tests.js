@@ -24,8 +24,12 @@ export function runGateTests(mod) {
   t('required-stated-stores-and-flags', stated.ok && stated.strip.length === 0 && flagged(stated, 'home.mortgage_balance', 'below_floor'));
   const doc = G({ home: { mortgage_balance: 512000, _confidence: 'document' } }, { home: {} });
   t('required-document-clears', doc.ok && cleared(doc, 'home.mortgage_balance') && doc.flags.length === 0);
-  t('floor-estimated-passes-estimated',
-    cleared(G({ home: { value_estimate: 900000, _confidence: 'estimated' } }, { home: {} }), 'home.value_estimate'));
+  // A home value guessed by the owner is stored and flagged to verify
+  // (floor "stated" since 16 Sept); a valuation read off a source clears.
+  t('owner-guess-home-value-flagged',
+    flagged(G({ home: { value_estimate: 900000, _confidence: 'estimated' } }, { home: {} }), 'home.value_estimate', 'below_floor'));
+  t('sighted-home-value-clears',
+    cleared(G({ home: { value_estimate: 900000, _confidence: 'sighted' } }, { home: {} }), 'home.value_estimate'));
   const noConf = G({ home: { mortgage_balance: 512000 } }, { home: { mortgage_balance: 512000 } });
   t('missing-confidence-stores-flagged-unrecorded', noConf.ok && noConf.flags.some(f => f.field === 'home.mortgage_balance' && f.confidence === 'unrecorded'));
   t('offered-stated-clears',
@@ -82,8 +86,10 @@ export function runGateTests(mod) {
   const entries = Object.entries(FIELD_REGISTRY);
   t('all-entries-have-retrieval-state',
     entries.every(([id, e]) => e.retrieval_by_type || ['required', 'offered', 'none'].includes(e.retrieval)));
-  t('no-required-with-stated-floor-noop',
-    entries.filter(([, e]) => e.retrieval === 'required').every(([, e]) => e.confidence_floor !== 'stated'));
+  // A stated floor on a required field is meaningful only where estimates
+  // are the thing being filtered: the valuation fields.
+  t('required-stated-floor-only-on-valuations',
+    entries.filter(([, e]) => e.retrieval === 'required' && e.confidence_floor === 'stated').every(([, e]) => e.range_permitted === true));
   t('debts-item-subfields-individually-registered',
     ['type', 'purpose', 'borrower', 'security', 'is_split', 'parent_loan_id', 'balance', 'rate_percent', 'minimum_monthly']
       .every(f => FIELD_REGISTRY['debts.items[].' + f]));
@@ -136,7 +142,7 @@ export function runGateTests(mod) {
     mod.PRODUCERS.some(p => p.key === 'investments.holdings') &&
     mod.PRODUCERS.some(p => p.key === 'income.structure:sole_trader'));
 
-  return { pass: failures.length === 0, total: 44, failures };
+  return { pass: failures.length === 0, total: 45, failures };
 }
 
 /* ── capture-conduct steps 3-4: the retrieval path file and the

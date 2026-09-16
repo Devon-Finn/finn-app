@@ -497,7 +497,9 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
     t('walk-completion-code-derived', !w.picture().completed_domains.includes('income'));
     const wr = lint(w.rows(), w.picture());
     const lost = wr.checks.find(c => c.id === 'lost_fact');
-    t('walk-lost-facts-only-the-bad-field', lost.status === 'fail' && lost.details.length === 1 && lost.details[0].includes('not_a_field'));
+    // An invented field is reported as dropped, not as a lost fact.
+    t('walk-no-lost-facts-invented-field-reported', lost.status === 'pass'
+      && wr.checks.find(c => c.id === 'partial_writes').details.some(d => d.includes('not_a_field')));
     const closeTry = w.reply('Here is everything.', { session_complete: true });
     t('walk-close-refused-with-open-items', closeTry.sessionCompleteRefused === true && closeTry.sessionComplete === false);
   }

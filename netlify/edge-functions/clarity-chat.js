@@ -1,7 +1,7 @@
 import { bankExportsPromptSection } from "./lib/finn-bank-exports.js";
 import { RETRIEVAL_PATHS, retrievalPromptSection, assertRequiredServable } from "./lib/finn-retrieval-paths.js";
-import { substituteTokens, isTokenPrefix, promptTokenSection, FRAMES } from "./lib/finn-tokens.js";
-import { buildPlan, planPromptSection } from "./lib/finn-plan.js";
+import { substituteTokens, promptTokenSection, FRAMES, NUDGES } from "./lib/finn-tokens.js";
+import { buildPlan, planPromptSection, closeListText } from "./lib/finn-plan.js";
 import { FIELD_REGISTRY, CONFIDENCE_RANK, PRODUCERS } from "./lib/finn-field-registry.js";
 import { applyCaptureCore } from "./lib/finn-capture-pipeline.js";
 import { runConductLinter } from "./lib/finn-conduct-linter.js";
@@ -137,7 +137,7 @@ Extract from that answer whatever it yields: how many adults, children and their
 1. SHAPE FIRST. Before chasing any figures, map the household: who is in it, how each income is earned, whether they own their home, and the four sweeps ([SWEEP: other_assets], [SWEEP: other_debts], [SWEEP: other_super], [SWEEP: other_income]). A company, trust, second property, share portfolio, loan split or extra super account changes what you need to gather, so find them early, not when the person has to prompt you.
 2. THEN TRIPS. Gather figures one source at a time and take everything that source carries in one visit (the notes group items by source). Don't bounce between sources.
 3. RE-RAISE. Items the person put off come back at natural points, especially when they're already on the right screen. The notes show each item's nudge count.
-4. THE CLOSE WALKS THE OPEN ITEMS. Only when the notes say closing is available. Never call the picture complete, never say "well done", never ask "anything else before we wrap up" while the notes show missing items.
+4. THE CLOSE. Only when the notes say closing is available: emit [FRAME: close] (code appends the open items and where each lives), add one warm line and what happens next, and set session_complete. Never call the picture complete, never say "well done" or "you're well set up", never say goodbye, and never ask "anything else before we wrap up" while the notes show missing items. If the person says "that's everything" early, tell them plainly a few things are still to cover, and carry on with the NEXT MOVE.
 5. THE GUARDRAIL. What you ask about is driven by the SHAPE of the household (what exists, how many, what's still unanswered), never by the SIZE of a figure. Never probe harder, or choose a topic, because a number looks large, small, good or bad. That would be an opinion about their circumstances.
 
 - Walk naturally through these areas, adapting to what you hear (don't march through a rigid list; let their answers shape the path; go light on areas that clearly don't apply so it never feels like a marathon; anything can be skipped and come back to later):
@@ -362,84 +362,90 @@ function parseCapture(fullText) {
    days are legitimate. Every substitution is counted and logged so the
    leak rate stays visible over time instead of being silently papered
    over. */
-function emDashScrubStream(onDone) {
+function emDashScrubStream(onDone, ctx = {}) {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   let lineBuf = "";
-  let seenText = ""; // cumulative model text, to locate the [CAPTURE] boundary
+  let seenText = "";      // cumulative raw model text (visible + machine)
+  let pending = "";       // visible text not yet emitted (incomplete paragraph)
+  let heldQ = null;       // a finished question paragraph, held one step
+  let machineBuf = "";    // [CAPTURE]/[RESOLVE] text, held until flush
+  let inMachine = false;
   let substitutions = 0;
   let asksServed = 0;
-  // Trailing whitespace of each visible delta is held back and prepended to
-  // the next one, so a dash whose leading space arrived in the previous
-  // chunk still scrubs to "word, next" rather than "word , next". The same
-  // hold carries a partial [ASK: token split across deltas, so the token
-  // substitutes as one.
-  let heldWs = "";
+  let droppedQ = 0;
+  let sawNudge = false;
+  let emittedAny = false;
 
   function scrub(s) {
     return s.replace(/\s*—\s*/g, () => { substitutions++; return ", "; });
   }
-
-  // CODE EMITS THE ASKS (Devon, Sept 2026): [ASK: path_id] tokens in the
-  // visible stream are replaced with the exact ask text from the path
-  // file. An unrecognised id is a fault, logged, and emits nothing. The
-  // path_served rows are written from the same tokens in the raw text by
-  // the apply chain, so substitution and witnessing can never disagree.
-  function subAsks(s) {
-    const r = substituteTokens(s);
+  function sub(s) {
+    const r = substituteTokens(s, { closeList: ctx.closeList });
     for (const id of r.unknown) {
       console.error(`[Finn clarity] TOKEN FAULT — trigger token "${id}" is not recognised and emitted nothing`);
     }
+    if (r.nudges.length) sawNudge = true;
     if (r.served.length || r.sweeps.length || r.frames.length || r.nudges.length) asksServed++;
     return r.text;
   }
-
-  // Machine text starts at the earliest of [CAPTURE] or [RESOLVE] — the
-  // resolve block is JSON too and must never be scrubbed.
+  const HAS_TOKEN = /\[(ASK|SWEEP|NUDGE):\s*[a-z_]+\s*\]/;
+  // Paragraph discipline (stand-in run 2): a question paragraph written by
+  // the model immediately before a code-emitted ask, sweep or nudge is the
+  // model asking the same thing twice, or asking something new before a
+  // nudge. It is held one paragraph and dropped when a token follows.
+  function para(p) {
+    let out = "";
+    const sep = () => (emittedAny || out ? "\n\n" : "");
+    const emit = (t) => { if (!t.trim()) return; out += sep() + t; };
+    if (HAS_TOKEN.test(p)) {
+      if (heldQ !== null) { droppedQ++; heldQ = null; }
+      emit(sub(scrub(p)));
+    } else if (/\?\s*$/.test(p.trim())) {
+      if (heldQ !== null) emit(heldQ);
+      heldQ = sub(scrub(p));
+    } else {
+      if (heldQ !== null) { emit(heldQ); heldQ = null; }
+      emit(sub(scrub(p)));
+    }
+    if (out) emittedAny = true;
+    return out;
+  }
+  function flushHeld() {
+    if (heldQ === null) return "";
+    const t = (emittedAny ? "\n\n" : "") + heldQ;
+    heldQ = null; emittedAny = true;
+    return t;
+  }
   function machineIx(s) {
     const cuts = [s.indexOf("[CAPTURE]"), s.indexOf("[RESOLVE]")].filter(i => i !== -1);
     return cuts.length ? Math.min(...cuts) : -1;
   }
 
-  function scrubDelta(text) {
-    const full = seenText + text;
-    const markerIx = machineIx(full);
-    let out;
-    if (markerIx === -1) {
-      out = subAsks(scrub(heldWs + text));
-      heldWs = "";
-      // Hold back a trailing partial [ASK: token (bounded, and only text
-      // that can still grow into one) so a token split across deltas
-      // substitutes as a whole. "[C"/"[R" prefixes never match, so the
-      // machine markers are unaffected.
-      const bi = out.lastIndexOf("[");
-      if (bi !== -1) {
-        const tokTail = out.slice(bi);
-        if (!tokTail.includes("]") && tokTail.length < 40 && isTokenPrefix(tokTail)) {
-          heldWs = tokTail;
-          out = out.slice(0, bi);
-        }
-      }
-      const tail = out.match(/\s+$/);
-      if (tail) { heldWs = tail[0] + heldWs; out = out.slice(0, out.length - tail[0].length); }
-    } else {
-      const boundary = markerIx - seenText.length;
-      if (boundary <= 0) {
-        out = heldWs + text;
-        heldWs = "";
-      } else {
-        out = subAsks(scrub(heldWs + text.slice(0, boundary))) + text.slice(boundary);
-        heldWs = "";
-      }
+  function onText(text) {
+    seenText += text;
+    if (inMachine) { machineBuf += text; return ""; }
+    pending += text;
+    let out = "";
+    const mi = machineIx(pending);
+    if (mi !== -1) {
+      const vis = pending.slice(0, mi);
+      machineBuf += pending.slice(mi);
+      pending = "";
+      inMachine = true;
+      for (const p of vis.split(/\n{2,}/)) if (p.trim()) out += para(p.trim());
+      // A held question waits for flush: the auto-nudge may supersede it.
+      return out;
     }
-    seenText = full;
+    // Emit complete paragraphs; keep the tail (it may still grow, and it
+    // may be the start of a machine marker).
+    const parts = pending.split(/\n{2,}/);
+    pending = parts.pop();
+    for (const p of parts) if (p.trim()) out += para(p.trim());
     return out;
   }
 
-  /* Rule-1 softener detector — LOG ONLY, never substitute ("roughly" is
-     correct for estimate quantities; a blind swap would break that). Flags
-     a softener in the same sentence as a retrievable-fact keyword so the
-     leak rate is measurable over time, same principle as the em-dash log. */
+  /* Rule-1 softener detector — LOG ONLY. */
   const SOFTENERS = /\b(roughly|approximately|ballpark|a rough (?:idea|sense|figure)|rough sense|about how much|if you know it)\b/i;
   const FACT_KEYWORDS = /\b(rate|balance|owing|term|repayment|cover|super|rent|costs?|worth|value|bring in|earn|pays?|income|fees?)\b/i;
   function logSofteners() {
@@ -451,6 +457,7 @@ function emDashScrubStream(onDone) {
       }
     }
   }
+  const deltaLine = (text) => "data: " + JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text } }) + "\n";
 
   return new TransformStream({
     transform(chunk, controller) {
@@ -465,7 +472,7 @@ function emDashScrubStream(onDone) {
             try {
               const evt = JSON.parse(raw);
               if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
-                evt.delta.text = scrubDelta(evt.delta.text);
+                evt.delta.text = onText(evt.delta.text);
                 outLine = "data: " + JSON.stringify(evt);
               }
             } catch {}
@@ -476,16 +483,35 @@ function emDashScrubStream(onDone) {
     },
     async flush(controller) {
       if (lineBuf) controller.enqueue(encoder.encode(lineBuf));
-      if (substitutions > 0) {
-        console.log(`[Finn clarity] em-dash substitutions in visible reply: ${substitutions}`);
+      let tail = "";
+      if (!inMachine) {
+        for (const p of pending.split(/\n{2,}/)) if (p.trim()) tail += para(p.trim());
+        pending = "";
       }
-      if (asksServed > 0) {
-        console.log(`[Finn clarity] ask tokens substituted in visible reply: ${asksServed}`);
+      // Auto-nudge: the person put something off for the first time and the
+      // model accepted it without the nudge. Code adds it (and a question
+      // the model tacked on is dropped: one thread at a time).
+      let nudged = false;
+      try {
+        const cap = parseCapture(machineBuf);
+        const defs = cap && Array.isArray(cap.deferrals) ? cap.deferrals : [];
+        if (!sawNudge && defs.length && typeof ctx.isFirstDeferral === "function"
+            && defs.some(d => ctx.isFirstDeferral(typeof d === "string" ? d.split("#")[0] : d && d.field))) {
+          if (heldQ !== null) { heldQ = null; droppedQ++; }
+          tail += (emittedAny || tail ? "\n\n" : "") + NUDGES.first;
+          nudged = true;
+          console.log("[Finn clarity] auto-nudge added for a first-time deferral");
+        }
+      } catch (err) {
+        console.error("[Finn clarity] auto-nudge check failed:", err);
       }
+      if (!nudged) tail += flushHeld();
+      if (tail) controller.enqueue(encoder.encode(deltaLine(tail)));
+      if (machineBuf) controller.enqueue(encoder.encode(deltaLine("\n\n" + machineBuf)));
+      if (substitutions > 0) console.log(`[Finn clarity] em-dash substitutions in visible reply: ${substitutions}`);
+      if (asksServed > 0) console.log(`[Finn clarity] token substitutions in visible reply: ${asksServed}`);
+      if (droppedQ > 0) console.log(`[Finn clarity] dropped ${droppedQ} model question paragraph(s) superseded by a code-emitted ask`);
       logSofteners();
-      // WRITE-AHEAD: awaited here, in the request path, so the stream does
-      // not close until the raw capture is on disk. A few milliseconds of
-      // tail latency buys a capture that can never vanish.
       if (typeof onDone === "function") {
         try {
           await onDone(seenText);
@@ -995,6 +1021,9 @@ export default async function handler(request, context) {
     // capture parser finds its block by marker either way.
     const logId = await insertCaptureLog(auth.householdId, fullText, capture, "received", sessionId);
     resolveWriteAhead({ logId, capture, hasMarker: true });
+  }, {
+    closeList: closeListText(plan),
+    isFirstDeferral: (field) => !(plan.ledger || []).some(e => e && e.field === field && (e.nudges || 0) >= 1),
   }));
 
   context.waitUntil((async () => {
@@ -1105,3 +1134,6 @@ export default async function handler(request, context) {
     },
   });
 }
+
+// Exposed for the local stream test only (tests/finn-stream.tests.js).
+export { emDashScrubStream as __streamForTests };

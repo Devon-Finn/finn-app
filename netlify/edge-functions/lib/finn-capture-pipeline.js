@@ -584,6 +584,26 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
   for (const k of Object.keys(patch)) {
     if (!(k in V2_SCHEMA)) { errors.push(k + ": unknown domain (dropped)"); delete patch[k]; }
   }
+  // HECS is held separately, never as a debts item (stand-in run 2: the
+  // recorder created a hecs_help item alongside hecs_balance).
+  if (patch.debts && Array.isArray(patch.debts.items)) {
+    const hecs = patch.debts.items.filter(it => it && it.type === "hecs_help");
+    if (hecs.length) {
+      const bal = hecs.map(h => h.balance).find(v => typeof v === "number");
+      if (typeof bal === "number" && (patch.debts.hecs_balance === undefined || patch.debts.hecs_balance === null)) patch.debts.hecs_balance = bal;
+      patch.debts.items = patch.debts.items.filter(it => !(it && it.type === "hecs_help"));
+      anomalies.push("hecs_help item folded into debts.hecs_balance");
+    }
+  }
+  // A household-level nomination already in place is never switched off by
+  // a later answer about a different fund (stand-in run 2: "REST has no
+  // nomination" erased the AustralianSuper binding nomination).
+  const priorNom = picture.domains && picture.domains.estate && picture.domains.estate.super_nomination;
+  if (priorNom && priorNom.in_place === true && patch.estate && patch.estate.super_nomination && patch.estate.super_nomination.in_place === false) {
+    delete patch.estate.super_nomination.in_place;
+    for (const k of ["binding", "last_updated"]) delete patch.estate.super_nomination[k];
+    anomalies.push("super_nomination in_place true kept; a later 'none' for another fund does not switch it off");
+  }
   // Id-less re-sends of an existing item update it rather than duplicate
   // it; genuinely new items get their ids now, so the ledger can key them.
   patch = assignAssetIds(adoptNaturalIds(baseDomains, patch));

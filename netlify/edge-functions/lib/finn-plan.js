@@ -158,7 +158,9 @@ export function buildPlan(domains, goals, opts = {}) {
     };
     areas[area].required.push(rec);
     if (present) {
-      if (entry && entry.reason !== "deferred") areas[area].to_verify.push({ ...rec, reason: entry.reason, confidence: entry.confidence });
+      // A figure read straight off its source ("sighted") is not raised
+      // again in conversation; it stays in the ledger for the professional.
+      if (entry && entry.reason !== "deferred" && entry.confidence !== "sighted") areas[area].to_verify.push({ ...rec, reason: entry.reason, confidence: entry.confidence });
       return;
     }
     if (entry && entry.reason === "deferred") { areas[area].deferred.push({ ...rec, nudges: entry.nudges || 1 }); return; }
@@ -204,7 +206,17 @@ export function buildPlan(domains, goals, opts = {}) {
   }
   if (hasEntity) {
     const ent = other.find(o => o.linked_asset_id === "entity" || ["trust_distribution", "business_profit", "director_fee"].includes(o.source));
-    need("income", "income.other.entity", !!(ent && has(ent.amount_annual)));
+    // Also satisfied by an entity-held entry (not a rental) that has an
+    // amount or that the person put off.
+    const entHeld = other.filter(o => ["company", "trust"].includes(o.entity) && !["rental_residential", "rental_commercial"].includes(o.source));
+    const entDeferred = entHeld.some(o => { const e = ledger.get("income.other[].amount_annual|" + o.id); return e && e.reason === "deferred"; })
+      || (ent && (() => { const e = ledger.get("income.other[].amount_annual|" + ent.id); return e && e.reason === "deferred"; })());
+    if (entDeferred) {
+      areas.income.required.push({ field: "income.other.entity", item_id: null, label: labelFor("income.other.entity"), trip: "business_income" });
+      areas.income.deferred.push({ field: "income.other.entity", item_id: null, label: labelFor("income.other.entity"), trip: "business_income", nudges: 1 });
+    } else {
+      need("income", "income.other.entity", !!(ent && has(ent.amount_annual)) || entHeld.some(o => has(o.amount_annual)));
+    }
   }
   if (hasHoldings) {
     const div = other.find(o => o.linked_asset_id === "holdings" || ["dividends", "distributions"].includes(o.source));
@@ -368,6 +380,19 @@ export function buildPlan(domains, goals, opts = {}) {
   };
 }
 
+/* The close list, written by code: every item stored from memory or as an
+   estimate, and every item the person put off, with where it lives. */
+export function closeListText(plan) {
+  const where = t => TRIP_LABELS[t] || "a conversation";
+  const lines = [];
+  for (const d of plan.deferred) lines.push("- " + d.label + ": not gathered yet, it lives in " + where(d.trip) + ".");
+  for (const v of plan.to_verify) {
+    const how = v.confidence === "estimated" ? "an estimate" : "from memory";
+    lines.push("- " + v.label + ": noted " + how + ", it can be confirmed from " + where(v.trip) + ".");
+  }
+  return lines.length ? lines.join("\n") : "- Nothing is waiting on you. Every figure came from its source.";
+}
+
 /* The plan as the model's working notes. Compact, factual, no figures. */
 export function planPromptSection(plan, opts = {}) {
   const L = [];
@@ -407,6 +432,20 @@ export function planPromptSection(plan, opts = {}) {
   const basicsKnown = !plan.shapeOpen.some(x => !x.startsWith("[SWEEP"));
   if (plan.phase === "shape" && basicsKnown && plan.sweeps_pending.length) {
     L.push("NEXT MOVE: your one question in this reply is [SWEEP: " + plan.sweeps_pending.find(x => ["other_assets", "other_debts", "other_super", "other_income"].includes(x)) + "], emitted as the token. Writing your own version of an 'anything else?' question does NOT count: the area stays uncovered and you will have to ask it again.");
+  }
+  if (plan.phase === "trips") {
+    const firstMissing = plan.trips.map(t => ({ t, m: t.items.find(i => i.status === "missing") })).find(x => x.m);
+    const servedSet = new Set(opts.servedPaths || []);
+    const memory = plan.to_verify.find(v => ["stated", "estimated", "unrecorded"].includes(v.confidence) && v.trip !== "conversation" && !servedSet.has(v.trip));
+    if (firstMissing) {
+      L.push("NEXT MOVE: gather " + firstMissing.m.label + " {" + firstMissing.m.field + (firstMissing.m.item_id ? "#" + firstMissing.m.item_id : "") + "}" +
+        (firstMissing.t.id !== "conversation" && !servedSet.has(firstMissing.t.id) ? ", opening with [ASK: " + firstMissing.t.id + "] so everything on that source comes in one visit" : "") +
+        ". If the person says that's everything or wants to finish, do NOT wrap up: tell them plainly there are a few things still to cover, and carry on.");
+    } else if (memory) {
+      L.push("NEXT MOVE: " + memory.label + " came from memory; offer the source once with [ASK: " + memory.trip + "]. If they decline, record it in deferrals and move on.");
+    } else if (plan.can_close) {
+      L.push("NEXT MOVE: close. Emit [FRAME: close] on its own line; code appends the list of open items after it. Add one short warm line, say what happens next in one sentence (their picture is saved and they can come back to any open item), and set session_complete true. No verdicts, no 'well set up', no 'complete'.");
+    }
   }
   if (opts.servedPaths && opts.servedPaths.length) {
     L.push("Sources already walked through this session (do not emit these [ASK] tokens again; if the person is stuck on one, help with the specific screen or menu in your own words): " + opts.servedPaths.join(", ") + ".");
