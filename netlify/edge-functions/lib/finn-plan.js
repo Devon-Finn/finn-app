@@ -385,10 +385,12 @@ export function buildPlan(domains, goals, opts = {}) {
 export function closeListText(plan) {
   const where = t => TRIP_LABELS[t] || "a conversation";
   const lines = [];
-  for (const d of plan.deferred) lines.push("- " + d.label + ": not gathered yet, it lives in " + where(d.trip) + ".");
+  // "label, item" reads better as "Item: label".
+  const nice = l => { const i = l.lastIndexOf(", "); if (i === -1) return l.charAt(0).toUpperCase() + l.slice(1); const item = l.slice(i + 2); return item.charAt(0).toUpperCase() + item.slice(1) + ": " + l.slice(0, i); };
+  for (const d of plan.deferred) lines.push("- " + nice(d.label) + ". Not gathered yet; it lives in " + where(d.trip) + ".");
   for (const v of plan.to_verify) {
     const how = v.confidence === "estimated" ? "an estimate" : "from memory";
-    lines.push("- " + v.label + ": noted " + how + ", it can be confirmed from " + where(v.trip) + ".");
+    lines.push("- " + nice(v.label) + ". Noted as " + how + "; it can be confirmed from " + where(v.trip) + ".");
   }
   return lines.length ? lines.join("\n") : "- Nothing is waiting on you. Every figure came from its source.";
 }

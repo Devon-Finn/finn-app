@@ -52,5 +52,8 @@ export async function runStreamTests(chat, tokens) {
   const e = await run(f, ["First.\n\nIs it joint?\n\nThanks for that.\n\n[CAPTURE]{}"], {});
   t('question-not-before-token-kept', e.txt.startsWith('First.\n\nIs it joint?\n\nThanks for that.'));
 
-  return { pass: failures.length === 0, total: 12, failures };
+  const g = await run(f, ["Wrapping up.\n\n[FRAME: close]\n\n[CAPTURE]{}"], { closeList: "- x", canClose: false });
+  t('close-frame-refused-when-plan-open', !g.txt.includes(FRAMES.close) && !g.txt.includes('[FRAME'));
+
+  return { pass: failures.length === 0, total: 13, failures };
 }

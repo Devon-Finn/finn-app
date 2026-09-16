@@ -584,6 +584,45 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
   for (const k of Object.keys(patch)) {
     if (!(k in V2_SCHEMA)) { errors.push(k + ": unknown domain (dropped)"); delete patch[k]; }
   }
+  // Pay given in the person's own period: code converts, deterministically.
+  if (patch.income && typeof patch.income === "object") {
+    const PER = { weekly: 52, fortnightly: 26, monthly: 12, annual: 1 };
+    for (const k of Object.keys(patch.income)) {
+      const m = /^(partner_)?salary_(gross|net)_(weekly|fortnightly|monthly|annual)$/.exec(k);
+      if (!m) continue;
+      const target = (m[1] || "") + "salary_" + m[2] + "_" + (m[2] === "gross" ? "annual" : "monthly");
+      if (k === target) continue;
+      const v = patch.income[k];
+      delete patch.income[k];
+      if (typeof v !== "number") continue;
+      const perYear = v * PER[m[3]];
+      if (patch.income[target] === undefined || patch.income[target] === null) {
+        patch.income[target] = Math.round(m[2] === "gross" ? perYear : perYear / 12);
+        anomalies.push(`${k} converted to ${target}`);
+      }
+    }
+  }
+  // null means "not yet asked": it never erases a value already held
+  // (stand-in run 3: a null net pay wiped the figure).
+  {
+    const base = picture.domains || {};
+    for (const [dk, body] of Object.entries(patch)) {
+      if (!body || typeof body !== "object" || Array.isArray(body) || !base[dk]) continue;
+      for (const [k, v] of Object.entries(body)) {
+        if (v === null && base[dk][k] !== null && base[dk][k] !== undefined) { delete body[k]; }
+        else if (v && typeof v === "object" && !Array.isArray(v) && base[dk][k] && typeof base[dk][k] === "object") {
+          for (const [ik, iv] of Object.entries(v)) if (iv === null && base[dk][k][ik] !== null && base[dk][k][ik] !== undefined) delete v[ik];
+        } else if (Array.isArray(v) && Array.isArray(base[dk][k])) {
+          for (const item of v) {
+            if (!item || typeof item !== "object" || !item.id) continue;
+            const b = base[dk][k].find(x => x && x.id === item.id);
+            if (!b) continue;
+            for (const [ik, iv] of Object.entries(item)) if (iv === null && b[ik] !== null && b[ik] !== undefined) delete item[ik];
+          }
+        }
+      }
+    }
+  }
   // HECS is held separately, never as a debts item (stand-in run 2: the
   // recorder created a hecs_help item alongside hecs_balance).
   if (patch.debts && Array.isArray(patch.debts.items)) {
@@ -626,6 +665,19 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
     merged = mergeDomainsById(baseDomains, patch);
   }
   merged = resolveSecurity(assignAssetIds(merged));
+  // A property loan recorded as a debt item links to its property when
+  // there is exactly one candidate (same holder, or the only property).
+  if (merged.debts && Array.isArray(merged.debts.items) && merged.investments && Array.isArray(merged.investments.properties)) {
+    const props = merged.investments.properties.filter(p => p && p.id);
+    merged = { ...merged, debts: { ...merged.debts, items: merged.debts.items.map(it => {
+      if (!it || it.secured_against_asset_id || !["property_commercial", "property_investment"].includes(it.security)) return it;
+      const holderMatch = props.filter(p => String(p.held_in || "").toLowerCase() === String(it.borrower || "").toLowerCase());
+      const cands = holderMatch.length ? holderMatch : props;
+      if (cands.length !== 1) return it;
+      anomalies.push(`debt ${it.id} linked to property ${cands[0].id}`);
+      return { ...it, secured_against_asset_id: cands[0].id };
+    }) } };
+  }
 
   // Validation: invalid leaves drop, valid ones commit.
   const check = validateDomainsV2(merged);

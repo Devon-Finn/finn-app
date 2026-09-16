@@ -189,7 +189,7 @@ export function runPlanTests({ plan, pipeline, tokens }) {
   entDef.domains.flags.to_verify = [{ field: 'income.other[].amount_annual', item_id: 'i9', reason: 'deferred', nudges: 1 }];
   const ed = buildPlan(entDef.domains, entDef.goals);
   t('put-off-company-income-covers-entity', ed.covered.includes('income') && ed.deferred.some(d => d.field === 'income.other.entity'));
-  t('close-list-written-by-code', plan.closeListText(ed).includes('not gathered yet') && !plan.closeListText(ed).includes('—'));
+  t('close-list-written-by-code', plan.closeListText(ed).includes('Not gathered yet') && !plan.closeListText(ed).includes('—'));
   t('notes-next-move-close', planPromptSection(full).includes('NEXT MOVE: close'));
   t('notes-next-move-missing-item', (() => {
     const x = fullHousehold(); delete x.domains.investments.properties[0].use;
@@ -208,5 +208,18 @@ export function runPlanTests({ plan, pipeline, tokens }) {
   const owner = pipeline.applyCaptureCore({ picture: E2, capture: { domains: { home: { owns_home: true, value_estimate: 850000, value_source: 'owner estimate', _confidence: 'estimated' } } }, sessionId: 's', servedFields: new Set() });
   t('owner-guess-home-value-to-verify', owner.domains.flags.to_verify.some(e => e.field === 'home.value_estimate' && e.confidence === 'estimated'));
 
-  return { pass: failures.length === 0, total: 52, failures };
+  /* ── stand-in run 3 fixes ── */
+  const pay = pipeline.applyCaptureCore({ picture: E2, capture: { domains: { income: { structure: 'paye', salary_net_fortnightly: 3360, partner_salary_gross_fortnightly: 2769, _confidence: 'sighted' } } }, sessionId: 's', servedFields: new Set() });
+  t('fortnightly-net-converted-by-code', pay.domains.income.salary_net_monthly === 7280);
+  t('fortnightly-gross-converted-by-code', pay.domains.income.partner_salary_gross_annual === 71994);
+  const nulPic = { ...E2, domains: { income: { salary_net_monthly: 7280, _confidence: 'sighted' }, super: { funds: [{ id: 'r1', fund: 'REST', balance: 7400 }], _confidence: 'sighted' } } };
+  const nul = pipeline.applyCaptureCore({ picture: nulPic, capture: { domains: { income: { salary_net_monthly: null }, super: { funds: [{ id: 'r1', balance: null }] } } }, sessionId: 's', servedFields: new Set() });
+  t('null-never-erases-scalar', nul.domains.income.salary_net_monthly === 7280);
+  t('null-never-erases-item-field', nul.domains.super.funds[0].balance === 7400);
+  const linkPic = { ...E2, domains: { investments: { properties: [{ id: 'w1', held_in: 'company', value_estimate: 640000 }], _confidence: 'sighted' } } };
+  const link = pipeline.applyCaptureCore({ picture: linkPic, capture: { domains: { debts: { items: [{ type: 'commercial_loan', purpose: 'commercial_property', borrower: 'company', security: 'property_commercial', balance: 380000 }], _confidence: 'sighted' } } }, sessionId: 's', servedFields: new Set() });
+  t('property-loan-auto-linked', link.domains.debts.items[0].secured_against_asset_id === 'w1');
+  t('close-list-item-first', plan.closeListText(buildPlan((() => { const x = fullHousehold(); x.domains.flags.to_verify = [{ field: 'super.funds[].balance', item_id: 's2', confidence: 'stated', floor: 'document', reason: 'below_floor' }]; return x.domains; })(), F.goals)).includes('- Hostplus (partner): the balance in that fund. Noted as from memory'));
+
+  return { pass: failures.length === 0, total: 59, failures };
 }

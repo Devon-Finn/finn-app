@@ -257,7 +257,7 @@ JSON shape:
 Rules for the block:
 - "domains": include ONLY fields the person actually provided or corrected THIS turn, under these domain keys and exact shapes (this is the storage schema — fields that do not match it are dropped):
   context: adults, children (array of {age}), owner_age, partner_age, work_intent ("both continuing"/"one reducing"/"one stopping"/"unsure"), horizon_years
-  income: salary_gross_annual, salary_net_monthly, partner_salary_gross_annual, partner_salary_net_monthly, other (array of {source, linked_asset_id, entity, amount_annual, basis} — EVERY non-salary regular source lands here, typed, never lumped. source is "rental_residential"/"rental_commercial"/"dividends"/"distributions"/"trust_distribution"/"business_profit"/"director_fee"/"government"/"other". linked_asset_id ties the entry to what produces it: use the producing asset's id exactly as shown in the picture context (every property and debt item carries a system-assigned id), "entity" for the company or trust, "holdings" for the share portfolio, null where nothing in the picture produces it or the producing asset was only captured this turn and has no id yet. entity is whose hands it arrives in: "personal"/"joint"/"company"/"trust"/"smsf"/"unknown". basis is "gross" or "net_of_costs" — always ask which the figure is; never net figures yourself and never characterise the gearing. For a RENTAL at basis "gross", also capture costs_annual — the year's costs on that property (agent fees, rates, insurance, maintenance, interest), read from the agent statement or tax return in the same visit as the rent; where costs are genuinely zero, record costs_annual 0 with costs_note saying why. A gross rental without its costs stays an open item and the income total is not presented as complete), structure ("paye"/"sole_trader"/"company"/"trust"/"mixed"), entity ({type, name} where a company or trust exists), employer_super_on (array naming the income streams employer super is paid on, e.g. ["salary","partner_salary"])
+  income: salary_gross_annual, salary_net_monthly, partner_salary_gross_annual, partner_salary_net_monthly (pay may instead be given in the period the person used, e.g. salary_net_fortnightly, partner_salary_gross_fortnightly, salary_net_weekly; code converts, never convert it yourself), other (array of {source, linked_asset_id, entity, amount_annual, basis} — EVERY non-salary regular source lands here, typed, never lumped. source is "rental_residential"/"rental_commercial"/"dividends"/"distributions"/"trust_distribution"/"business_profit"/"director_fee"/"government"/"other". linked_asset_id ties the entry to what produces it: use the producing asset's id exactly as shown in the picture context (every property and debt item carries a system-assigned id), "entity" for the company or trust, "holdings" for the share portfolio, null where nothing in the picture produces it or the producing asset was only captured this turn and has no id yet. entity is whose hands it arrives in: "personal"/"joint"/"company"/"trust"/"smsf"/"unknown". basis is "gross" or "net_of_costs" — always ask which the figure is; never net figures yourself and never characterise the gearing. For a RENTAL at basis "gross", also capture costs_annual — the year's costs on that property (agent fees, rates, insurance, maintenance, interest), read from the agent statement or tax return in the same visit as the rent; where costs are genuinely zero, record costs_annual 0 with costs_note saying why. A gross rental without its costs stays an open item and the income total is not presented as complete), structure ("paye"/"sole_trader"/"company"/"trust"/"mixed"), entity ({type, name} where a company or trust exists), employer_super_on (array naming the income streams employer super is paid on, e.g. ["salary","partner_salary"])
   expenses: living_monthly (EXCLUDING housing debt repayments), includes_housing (explicit true/false — NEVER omitted or null when living_monthly is captured: false when the figure excludes housing as you asked, true only when the person genuinely can only give an all-in figure), housing_repayment_monthly
   home: owns_home, value_estimate, value_source, mortgage_balance, rate_percent, rate_type, lender, with_lender_since, repayment_monthly, term_remaining_years, has_offset (ONLY ever from asking the offset question — never inferred from any balance), offset_balance, package_fee_annual
   buffer: accessible_savings, where_held, linked_to_loan, counts_credit_as_buffer
@@ -381,7 +381,7 @@ function emDashScrubStream(onDone, ctx = {}) {
     return s.replace(/\s*—\s*/g, () => { substitutions++; return ", "; });
   }
   function sub(s) {
-    const r = substituteTokens(s, { closeList: ctx.closeList });
+    const r = substituteTokens(s, { closeList: ctx.closeList, canClose: ctx.canClose });
     for (const id of r.unknown) {
       console.error(`[Finn clarity] TOKEN FAULT — trigger token "${id}" is not recognised and emitted nothing`);
     }
@@ -603,7 +603,7 @@ async function reExtractCapture(apiKey, messages, visibleReply, pictureDomains, 
   const recorder = mode === "recorder";
   const system = recorder
     ? "You are the RECORDER for Finn's Clarity Session. The conversation model often acknowledges facts without recording them, so you record them independently. Read ONLY the person's latest message (and, for context, Finn's reply before it and the picture so far). Emit one [CAPTURE] line holding EVERY fact the PERSON stated or confirmed in that message, following the protocol exactly.\n" +
-      "Rules: (1) Facts only from the person. Something Finn said counts only if the person's message confirms it (\"yes that's right\" confirms Finn's restatement). (2) Record EXISTENCE as soon as something is mentioned, even with no figures: a debt becomes a debts item with the type, purpose and borrower you can tell; a property becomes an investments.properties item with held_in; a super fund becomes a super.funds item with fund and owner; a cover becomes protection.<type> {held:true, inside_super:...}. (3) Every figure goes in its exact schema home: rent and costs of a property go in income.other (source rental_residential/rental_commercial, amount_annual, basis, costs_annual); dividends/distributions go in income.other; never invent fields. (4) For an item already in the picture, echo its id exactly so it updates; for a new item leave id out. (5) _confidence per domain: \"sighted\" when the person is reading the figure off a screen, statement, app or payslip; \"stated\" when from memory or a plain fact; \"estimated\" when they say about/roughly/I think/I reckon; \"document\" ONLY if a file was attached this turn. Items may carry their own _confidence. (6) No arithmetic except converting the person's own period (fortnightly x 26 / 12 for monthly, monthly x 12 for annual). (7) Nothing invented. If the message holds no facts, emit [CAPTURE]{}. Output ONLY the [CAPTURE] line.\n\n" + protocol
+      "Rules: (1) Facts only from the person. Something Finn said counts only if the person's message confirms it (\"yes that's right\" confirms Finn's restatement). (2) Record EXISTENCE as soon as something is mentioned, even with no figures: a debt becomes a debts item with the type, purpose and borrower you can tell; a property becomes an investments.properties item with held_in; a super fund becomes a super.funds item with fund and owner; a cover becomes protection.<type> {held:true, inside_super:...}. (3) Every figure goes in its exact schema home: rent and costs of a property go in income.other (source rental_residential/rental_commercial, amount_annual, basis, costs_annual); dividends/distributions go in income.other; never invent fields. (4) For an item already in the picture, echo its id exactly so it updates; for a new item leave id out. (5) _confidence per domain: \"sighted\" when the person is reading the figure off a screen, statement, app or payslip; \"stated\" when from memory or a plain fact; \"estimated\" when they say about/roughly/I think/I reckon; \"document\" ONLY if a file was attached this turn. Items may carry their own _confidence. (6) No arithmetic: give pay in the period the person used (salary_net_fortnightly, partner_salary_gross_fortnightly, salary_net_weekly, and so on); code converts. (6b) If the person puts something off (\"skip that\", \"I'd have to ask the accountant\", \"note it\"), add \"deferrals\": [the field ids from the picture, e.g. \"super.funds[].has_insurance#<id>\", \"income.other.entity\"]. (7) Nothing invented. If the message holds no facts, emit [CAPTURE]{}. Output ONLY the [CAPTURE] line.\n\n" + protocol
     : "You are the capture extractor for Finn's Clarity Session. A reply was produced without its mandatory capture block. Read the single conversation turn below and emit the capture block that reply SHOULD have ended with, following the protocol exactly. Output ONLY the [CAPTURE] line, nothing before or after it. Facts come only from what the person actually said this turn; nothing invented, and [CAPTURE]{} if the turn genuinely captured nothing.\n\n" + protocol;
   const lastAssistantBefore = (() => {
     const ix = messages.map(m => m.role).lastIndexOf("user");
@@ -1023,6 +1023,7 @@ export default async function handler(request, context) {
     resolveWriteAhead({ logId, capture, hasMarker: true });
   }, {
     closeList: closeListText(plan),
+    canClose: plan.can_close,
     isFirstDeferral: (field) => !(plan.ledger || []).some(e => e && e.field === field && (e.nudges || 0) >= 1),
   }));
 
@@ -1101,12 +1102,18 @@ export default async function handler(request, context) {
       }
     }
     if (!hadAttachment) { clampDocument(capture); if (recorder) clampDocument(recorder); }
+    // The model sometimes accepts a skip without recording it; the
+    // recorder's deferrals stand in when the model recorded none.
+    if (capture && recorder && Array.isArray(recorder.deferrals) && recorder.deferrals.length
+        && !(Array.isArray(capture.deferrals) && capture.deferrals.length)) {
+      capture.deferrals = recorder.deferrals;
+    }
     let applied = null;
     try {
       applied = await applyCapture(auth.householdId, capture, logId, sessionId, {
         recorder,
         sweeps: askResult.sweeps,
-        closeServedNow: askResult.frames.includes("close"),
+        closeServedNow: askResult.frames.includes("close") && plan.can_close,
       });
     } catch (err) {
       console.error("[Finn clarity] FAILED — capture apply threw; raw preserved in capture_log:", err);

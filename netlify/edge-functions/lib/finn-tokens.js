@@ -64,6 +64,9 @@ export function substituteTokens(text, ctx = {}) {
   const unknown = [];
   const out = String(text || "").replace(TOKEN, (whole, kind, id) => {
     let copy = textFor(kind, id);
+    // The close is code's decision: when the plan does not allow it, the
+    // token emits nothing and is reported (stand-in run 3).
+    if (kind === "FRAME" && id === "close" && ctx.canClose === false) { unknown.push("FRAME:close (refused, areas still open)"); return ""; }
     if (copy && kind === "FRAME" && id === "close" && ctx.closeList) copy = copy + "\n\n" + ctx.closeList;
     if (copy === null || copy === undefined) { unknown.push(kind + ":" + id); return ""; }
     if (kind === "ASK") for (const f of RETRIEVAL_PATHS[id].satisfies) served.add(f);
