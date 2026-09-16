@@ -679,6 +679,18 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
     }) } };
   }
 
+  // A property whose rent is recorded is an income-producing property:
+  // its use is "investment" unless the person said otherwise (stand-in
+  // run 4: the leased warehouse held the close open on "what it's for").
+  if (merged.investments && Array.isArray(merged.investments.properties) && merged.income && Array.isArray(merged.income.other)) {
+    const rented = new Set(merged.income.other.filter(o => o && /^rental_/.test(String(o.source || "")) && o.linked_asset_id).map(o => o.linked_asset_id));
+    if (merged.investments.properties.some(p => p && rented.has(p.id) && (p.use === undefined || p.use === null))) {
+      merged = { ...merged, investments: { ...merged.investments, properties: merged.investments.properties.map(p =>
+        p && rented.has(p.id) && (p.use === undefined || p.use === null) ? { ...p, use: "investment" } : p) } };
+      anomalies.push("property use set to investment from its linked rent");
+    }
+  }
+
   // Validation: invalid leaves drop, valid ones commit.
   const check = validateDomainsV2(merged);
   if (!check.ok) errors.push(...check.errors);
@@ -715,7 +727,11 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
   // Deferrals: the person put an item off. Recorded with a nudge count so
   // the plan can cap the pushing at two.
   const deferralList = (Array.isArray(capture.deferrals) ? capture.deferrals : []).map(x =>
-    typeof x === "string" ? { field: x.split("#")[0], item_id: x.includes("#") ? x.split("#")[1] || null : null } : (x && typeof x === "object" && typeof x.field === "string" ? { field: x.field, item_id: typeof x.item_id === "string" ? x.item_id : null } : null)).filter(Boolean);
+    typeof x === "string" ? { field: x.split("#")[0], item_id: x.includes("#") ? x.split("#")[1] || null : null } : (x && typeof x === "object" && typeof x.field === "string" ? { field: x.field, item_id: typeof x.item_id === "string" ? x.item_id : null } : null)).filter(Boolean)
+    // What a company or trust earns, put off under an improvised id
+    // (stand-in run 4: "income.entity.profit"), is the plan's entity item.
+    .map(df => /^income\.(?:other\.)?(?:entity|company|trust)\b|^income\.[a-z_.]*profit/.test(df.field) && !df.field.includes("[]")
+      ? { field: "income.other.entity", item_id: null } : df);
   // A legacy refusal with no figure given is a deferral too.
   for (const f of (Array.isArray(capture.refusals) ? capture.refusals : [])) {
     if (typeof f === "string" && !leafWrites(patch).some(w => w.id === f)) deferralList.push({ field: f, item_id: null });
@@ -780,7 +796,20 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
     .map(f => ({ field: f, at: now, session_id: sessionId }));
   const refusalsOut = (added.length || kept.length !== existing.length) ? [...kept, ...added] : undefined;
 
-  const goals = deepMerge(picture.goals ?? {}, capture.goals ?? {});
+  // Goals accumulate: a later, narrower reading never replaces earlier
+  // directions or notes (stand-in run 4: three directions became one).
+  const priorGoals = picture.goals ?? {};
+  const capGoals = capture.goals ?? {};
+  const goals = deepMerge(priorGoals, capGoals);
+  if (Array.isArray(priorGoals.directions) || Array.isArray(capGoals.directions)) {
+    goals.directions = [...new Set([...(Array.isArray(priorGoals.directions) ? priorGoals.directions : []), ...(Array.isArray(capGoals.directions) ? capGoals.directions : [])])];
+  }
+  if (typeof priorGoals.notes === "string" && priorGoals.notes && typeof capGoals.notes === "string" && capGoals.notes) {
+    const norm = t => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (norm(priorGoals.notes).includes(norm(capGoals.notes))) goals.notes = priorGoals.notes;
+    else if (norm(capGoals.notes).includes(norm(priorGoals.notes))) goals.notes = capGoals.notes;
+    else goals.notes = priorGoals.notes.replace(/\s*$/, "") + (/[.!?]$/.test(priorGoals.notes.trim()) ? " " : ". ") + capGoals.notes;
+  }
 
   // CODE decides coverage (the model's completed_domains is advisory).
   const plan = buildPlan(domains, goals);

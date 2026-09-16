@@ -387,9 +387,25 @@ function emDashScrubStream(onDone, ctx = {}) {
   let droppedQ = 0;
   let sawNudge = false;
   let emittedAny = false;
+  let closeRefused = false;   // the model tried to close with areas open
+  let verdictsDropped = 0;
 
+  // Verdict and wrap-up sentences (stand-in run 4): "I think we're in good
+  // shape", "while we're wrapping up". Finn never gives a verdict, and it
+  // never talks about finishing while the plan has areas open. These
+  // sentences are removed mechanically, like the em-dash.
+  const VERDICT = /\b(in good shape|solid (?:start|foundation|starting point|position|direction)|decent (?:runway|buffer|position)|healthy (?:buffer|position|balance)|a good position|well set up|well placed|on track|nothing to worry about)\b/i;
+  const WRAPUP = /\b(wrapping up|wrap (?:things )?up|pull together what we've built|pretty close to having the full picture|clear enough to hand to a professional|that's everything we need|we're (?:all )?done|we're finished|complete picture)\b/i;
+  function dropSentences(p) {
+    const parts = p.split(/(?<=[.!?])\s+/);
+    const keep = parts.filter(snt => {
+      if (VERDICT.test(snt) || (ctx.canClose === false && WRAPUP.test(snt))) { verdictsDropped++; return false; }
+      return true;
+    });
+    return keep.length === parts.length ? p : keep.join(" ");
+  }
   function scrub(s) {
-    return s.replace(/\s*—\s*/g, () => { substitutions++; return ", "; });
+    return dropSentences(s).replace(/\s*—\s*/g, () => { substitutions++; return ", "; });
   }
   function sub(s) {
     const r = substituteTokens(s, { closeList: ctx.closeList, canClose: ctx.canClose });
@@ -409,6 +425,18 @@ function emDashScrubStream(onDone, ctx = {}) {
     let out = "";
     const sep = () => (emittedAny || out ? "\n\n" : "");
     const emit = (t) => { if (!t.trim()) return; out += sep() + t; };
+    // A refused close ends the visible reply: nothing after it is shown,
+    // and code says plainly that the session carries on.
+    if (closeRefused) return "";
+    if (ctx.canClose === false && /\[FRAME:\s*close\s*\]/.test(p)) {
+      closeRefused = true;
+      const before = p.split(/\[FRAME:\s*close\s*\]/)[0];
+      if (heldQ !== null) { droppedQ++; heldQ = null; }
+      if (before.trim()) emit(sub(scrub(before.trim())));
+      console.error("[Finn clarity] close attempted with areas open; reply cut at the frame");
+      if (out) emittedAny = true;
+      return out;
+    }
     if (HAS_TOKEN.test(p)) {
       if (heldQ !== null) { droppedQ++; heldQ = null; }
       emit(sub(scrub(p)));
@@ -503,11 +531,28 @@ function emDashScrubStream(onDone, ctx = {}) {
       // model accepted it without the nudge. Code adds it (and a question
       // the model tacked on is dropped: one thread at a time).
       let nudged = false;
+      if (closeRefused) {
+        heldQ = null;
+        tail += (emittedAny || tail ? "\n\n" : "") + FRAMES.not_yet;
+        emittedAny = true;
+      }
       try {
         const cap = parseCapture(machineBuf);
-        const defs = cap && Array.isArray(cap.deferrals) ? cap.deferrals : [];
-        if (!sawNudge && defs.length && typeof ctx.isFirstDeferral === "function"
-            && defs.some(d => ctx.isFirstDeferral(typeof d === "string" ? d.split("#")[0] : d && d.field))) {
+        // A "deferral" of a field the same capture gives a value for is a
+        // figure from memory, not a skip (stand-in run 4: HECS got a nudge).
+        const valued = (field) => {
+          const doms = cap && cap.domains && typeof cap.domains === "object" ? cap.domains : {};
+          const parts = String(field || "").split(".");
+          if (parts.some(x => x.includes("[]"))) return false;
+          let node = doms;
+          for (const k of parts) node = node && typeof node === "object" ? node[k] : undefined;
+          return node !== null && node !== undefined;
+        };
+        const defs = (cap && Array.isArray(cap.deferrals) ? cap.deferrals : [])
+          .map(d => typeof d === "string" ? d.split("#")[0] : d && d.field)
+          .filter(f => f && !valued(f));
+        if (!sawNudge && !closeRefused && defs.length && typeof ctx.isFirstDeferral === "function"
+            && defs.some(f => ctx.isFirstDeferral(f))) {
           if (heldQ !== null) { heldQ = null; droppedQ++; }
           tail += (emittedAny || tail ? "\n\n" : "") + NUDGES.first;
           nudged = true;
@@ -522,6 +567,7 @@ function emDashScrubStream(onDone, ctx = {}) {
       if (substitutions > 0) console.log(`[Finn clarity] em-dash substitutions in visible reply: ${substitutions}`);
       if (asksServed > 0) console.log(`[Finn clarity] token substitutions in visible reply: ${asksServed}`);
       if (droppedQ > 0) console.log(`[Finn clarity] dropped ${droppedQ} model question paragraph(s) superseded by a code-emitted ask`);
+      if (verdictsDropped > 0) console.log(`[Finn clarity] verdict or wrap-up sentences removed from visible reply: ${verdictsDropped}`);
       logSofteners();
       if (typeof onDone === "function") {
         try {
@@ -781,8 +827,27 @@ async function applyCapture(householdId, capture, logId, sessionId, turn) {
     // The recorder's facts land first; the conversation model's capture is
     // applied on top, so where both speak, the model's reading wins.
     let recErrors = [];
-    if (turn.recorder && turn.recorder.domains && Object.keys(turn.recorder.domains).length) {
-      const pre = applyCaptureCore({ picture, capture: { domains: turn.recorder.domains }, sessionId, servedFields, sweepsServed: [], closeServed: false });
+    // Where the model gave a domain or item no confidence and the recorder
+    // did, the recorder's reading stands (stand-in run 4: a myGov figure
+    // landed "unrecorded" and Finn asked for it again).
+    if (turn.recorder && turn.recorder.domains && capture && capture.domains) {
+      for (const [dk, body] of Object.entries(capture.domains)) {
+        const rb = turn.recorder.domains[dk];
+        if (!body || typeof body !== "object" || Array.isArray(body) || !rb || typeof rb !== "object") continue;
+        if (body._confidence === undefined && typeof rb._confidence === "string") body._confidence = rb._confidence;
+        for (const [k, v] of Object.entries(body)) {
+          if (!Array.isArray(v) || !Array.isArray(rb[k])) continue;
+          for (const it of v) {
+            if (!it || typeof it !== "object" || !it.id || it._confidence !== undefined) continue;
+            const ri = rb[k].find(x => x && x.id === it.id);
+            if (ri && typeof ri._confidence === "string") it._confidence = ri._confidence;
+          }
+        }
+      }
+    }
+    const recHasGoals = turn.recorder && turn.recorder.goals && typeof turn.recorder.goals === "object" && Object.keys(turn.recorder.goals).length;
+    if (turn.recorder && ((turn.recorder.domains && Object.keys(turn.recorder.domains).length) || recHasGoals)) {
+      const pre = applyCaptureCore({ picture, capture: { domains: turn.recorder.domains || {}, ...(recHasGoals ? { goals: turn.recorder.goals } : {}) }, sessionId, servedFields, sweepsServed: [], closeServed: false });
       recErrors = pre.errors.map(e => "recorder: " + e);
       picture = { ...picture, domains: pre.domains, goals: pre.goals, refusals: pre.refusalsOut !== undefined ? pre.refusalsOut : picture.refusals };
     }

@@ -31,6 +31,8 @@ export const FRAMES = {
     "Let's start with the people. Who's in your household, and what does work look like at the moment?",
   ].join("\n\n"),
   close: "Here's what's still open. Each one is a gap in the picture right now. None of them are hard to find, and I'll show you where each one lives.",
+  // Emitted by code when the model tries to close while areas are open.
+  not_yet: "We're not finished yet. A few things the picture needs are still open, so let's keep going.",
 };
 
 export const NUDGES = {

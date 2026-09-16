@@ -59,5 +59,14 @@ export async function runStreamTests(chat, tokens) {
   const h = await run(f, ["Of course.\n\n[CAPTURE]{},\"deferrals\":[\"x.y\"]}"], { isFirstDeferral: () => true });
   t('malformed-block-missing-domains-salvaged', h.txt.includes(NUDGES.first));
 
-  return { pass: failures.length === 0, total: 14, failures };
+  // Stand-in run 4: a close attempted with areas open is cut at the frame,
+  // wrap-up and verdict sentences go, and code says the session carries on.
+  const k = await run(f, ["Other than those, I think we're in good shape. Let me pull together what we've built.\n\n[FRAME: close]\n\nThe picture is now clear enough to hand to a professional.\n\n[CAPTURE]{}"], { closeList: "- x", canClose: false });
+  t('refused-close-cuts-reply', !k.txt.includes('clear enough') && k.txt.includes(FRAMES.not_yet));
+  t('verdict-and-wrapup-sentences-removed', !/good shape|pull together/.test(k.txt));
+  // A figure given from memory is not a skip: no nudge.
+  const m = await run(f, ["Noted, about 9,000.\n\n[CAPTURE]{\"domains\":{\"debts\":{\"hecs_balance\":9000}},\"deferrals\":[\"debts.hecs_balance\"]}"], { isFirstDeferral: () => true });
+  t('no-nudge-when-deferred-field-has-value', !m.txt.includes(NUDGES.first));
+
+  return { pass: failures.length === 0, total: 17, failures };
 }

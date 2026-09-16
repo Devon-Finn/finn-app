@@ -219,7 +219,30 @@ export function runPlanTests({ plan, pipeline, tokens }) {
   const linkPic = { ...E2, domains: { investments: { properties: [{ id: 'w1', held_in: 'company', value_estimate: 640000 }], _confidence: 'sighted' } } };
   const link = pipeline.applyCaptureCore({ picture: linkPic, capture: { domains: { debts: { items: [{ type: 'commercial_loan', purpose: 'commercial_property', borrower: 'company', security: 'property_commercial', balance: 380000 }], _confidence: 'sighted' } } }, sessionId: 's', servedFields: new Set() });
   t('property-loan-auto-linked', link.domains.debts.items[0].secured_against_asset_id === 'w1');
-  t('close-list-item-first', plan.closeListText(buildPlan((() => { const x = fullHousehold(); x.domains.flags.to_verify = [{ field: 'super.funds[].balance', item_id: 's2', confidence: 'stated', floor: 'document', reason: 'below_floor' }]; return x.domains; })(), F.goals)).includes('- Hostplus (partner): the balance in that fund. Noted as from memory'));
+  t('close-list-item-first', plan.closeListText(buildPlan((() => { const x = fullHousehold(); x.domains.flags.to_verify = [{ field: 'super.funds[].balance', item_id: 's2', confidence: 'stated', floor: 'document', reason: 'below_floor' }]; return x.domains; })(), F.goals)).includes('- Hostplus (partner): the balance in that fund. Noted from memory'));
 
-  return { pass: failures.length === 0, total: 59, failures };
+
+  /* ── stand-in run 4 fixes ── */
+  // A company-profit put-off under an improvised id still covers income.
+  const r4a = pipeline.applyCaptureCore({ picture: { ...E2, domains: (() => { const x = fullHousehold().domains; x.income.other = x.income.other.slice(0, 2); return x; })() }, capture: { domains: {}, deferrals: ['income.entity.profit'] }, sessionId: 's', servedFields: new Set() });
+  t('improvised-entity-deferral-covers-income', r4a.plan.covered.includes('income') && r4a.plan.deferred.some(d => d.field === 'income.other.entity'));
+  // A property with linked rent gets its use.
+  const r4b = pipeline.applyCaptureCore({ picture: { ...E2, domains: { investments: { properties: [{ id: 'w1', held_in: 'company', value_estimate: 640000 }], _confidence: 'sighted' } } }, capture: { domains: { income: { other: [{ source: 'rental_commercial', entity: 'company', linked_asset_id: 'w1', amount_annual: 42000 }], _confidence: 'sighted' } } }, sessionId: 's', servedFields: new Set() });
+  t('rented-property-use-inferred', r4b.domains.investments.properties[0].use === 'investment');
+  // Goals accumulate.
+  const r4c = pipeline.applyCaptureCore({ picture: { ...E2, goals: { directions: ['a', 'b', 'c'], notes: 'Work optional by 60.' } }, capture: { domains: {}, goals: { directions: ['d'], notes: 'Means being able to stop.' } }, sessionId: 's', servedFields: new Set() });
+  t('goal-directions-accumulate', ['a', 'b', 'c', 'd'].every(x => r4c.goals.directions.includes(x)));
+  t('goal-notes-accumulate', r4c.goals.notes.includes('Work optional by 60') && r4c.goals.notes.includes('able to stop'));
+  // A remembered share value reaches the close; yes/no details and
+  // conversation-only items do not.
+  const r4d = fullHousehold();
+  r4d.domains.flags.to_verify = [
+    { field: 'investments.shares_value', item_id: null, confidence: 'estimated', floor: 'document', reason: 'below_floor' },
+    { field: 'protection.life.inside_super', item_id: null, confidence: 'stated', floor: 'document', reason: 'below_floor' },
+    { field: 'home.value_source', item_id: null, confidence: 'estimated', floor: 'stated', reason: 'below_floor' },
+  ];
+  const r4dl = plan.closeListText(buildPlan(r4d.domains, r4d.goals));
+  t('close-lists-remembered-share-value', r4dl.includes('Noted as an estimate') && r4dl.split('\n').length === 1);
+
+  return { pass: failures.length === 0, total: 64, failures };
 }

@@ -58,7 +58,7 @@ const TRIP_LABELS = {
   super_statement: "the super fund's app or myGov",
   policy_schedule: "the insurance page or policy schedule",
   investment_platform: "the investing platform",
-  home_value: "a lender valuation, rates notice or property estimate",
+  home_value: "a property estimate site such as realestate.com.au, or a lender valuation",
   rental_income: "the lease or agent statement",
   business_income: "the tax return or accountant's figures",
   hecs: "myGov, ATO section",
@@ -147,6 +147,14 @@ export function buildPlan(domains, goals, opts = {}) {
   for (const a of AREAS) areas[a] = { required: [], missing: [], to_verify: [], deferred: [], sweeps: [] };
 
   // need(area, field, present, item?, domainForItem?)
+  // The stored value, so the close can tell a figure from a yes/no.
+  function valueOf(field, item) {
+    const parts = field.split(".");
+    if (field.includes("[]")) return item ? item[parts[parts.length - 1]] : undefined;
+    let node = d;
+    for (const p of parts) node = isObj(node) ? node[p] : undefined;
+    return node;
+  }
   function need(area, field, present, item, domainKey) {
     const itemId = item && item.id ? item.id : null;
     const key = field + "|" + (itemId || "");
@@ -155,6 +163,7 @@ export function buildPlan(domains, goals, opts = {}) {
       field, item_id: itemId,
       label: labelFor(field, item) + (item && domainKey ? ", " + itemLabel(domainKey, item) : ""),
       trip: tripFor(field, item),
+      figure: num(valueOf(field, item)),
     };
     areas[area].required.push(rec);
     if (present) {
@@ -210,10 +219,13 @@ export function buildPlan(domains, goals, opts = {}) {
     // amount or that the person put off.
     const entHeld = other.filter(o => ["company", "trust"].includes(o.entity) && !["rental_residential", "rental_commercial"].includes(o.source));
     const entDeferred = entHeld.some(o => { const e = ledger.get("income.other[].amount_annual|" + o.id); return e && e.reason === "deferred"; })
-      || (ent && (() => { const e = ledger.get("income.other[].amount_annual|" + ent.id); return e && e.reason === "deferred"; })());
+      || (ent && (() => { const e = ledger.get("income.other[].amount_annual|" + ent.id); return e && e.reason === "deferred"; })())
+      // Stand-in run 4: the put-off was recorded against the plan id itself.
+      || (() => { const e = ledger.get("income.other.entity|"); return !!(e && e.reason === "deferred"); })();
     if (entDeferred) {
       areas.income.required.push({ field: "income.other.entity", item_id: null, label: labelFor("income.other.entity"), trip: "business_income" });
-      areas.income.deferred.push({ field: "income.other.entity", item_id: null, label: labelFor("income.other.entity"), trip: "business_income", nudges: 1 });
+      const le = ledger.get("income.other.entity|");
+      areas.income.deferred.push({ field: "income.other.entity", item_id: null, label: labelFor("income.other.entity"), trip: "business_income", nudges: (le && le.nudges) || 1 });
     } else {
       need("income", "income.other.entity", !!(ent && has(ent.amount_annual)) || entHeld.some(o => has(o.amount_annual)));
     }
@@ -242,6 +254,10 @@ export function buildPlan(domains, goals, opts = {}) {
     need("assets", "investments.properties[].use", has(p.use), p, "investments");
   }
   if (has(inv.shares_value) || has(inv.managed_funds_value)) {
+    // The holding's value is required too, so a remembered figure reaches
+    // the close (stand-in run 4: "about 70k" was never listed).
+    if (has(inv.shares_value)) need("assets", "investments.shares_value", true);
+    if (has(inv.managed_funds_value)) need("assets", "investments.managed_funds_value", true);
     need("assets", "investments.held_in", has(inv.held_in));
   }
   sweep("assets", "other_assets");
@@ -386,13 +402,20 @@ export function closeListText(plan) {
   const where = t => TRIP_LABELS[t] || "a conversation";
   const lines = [];
   // "label, item" reads better as "Item: label".
-  const nice = l => { const i = l.lastIndexOf(", "); if (i === -1) return l.charAt(0).toUpperCase() + l.slice(1); const item = l.slice(i + 2); return item.charAt(0).toUpperCase() + item.slice(1) + ": " + l.slice(0, i); };
+  const bare = t => t.replace(/\s*\([^)]*\)\s*$/, "");
+  const nice = l => { const i = l.lastIndexOf(", "); if (i === -1) { const b = bare(l); return b.charAt(0).toUpperCase() + b.slice(1); } const item = l.slice(i + 2); return item.charAt(0).toUpperCase() + item.slice(1) + ": " + bare(l.slice(0, i)); };
   for (const d of plan.deferred) lines.push("- " + nice(d.label) + ". Not gathered yet; it lives in " + where(d.trip) + ".");
+  // Only figures that have a source to check against are listed (stand-in
+  // run 4: yes/no details and "just a conversation" items cluttered it).
   for (const v of plan.to_verify) {
-    const how = v.confidence === "estimated" ? "an estimate" : "from memory";
-    lines.push("- " + nice(v.label) + ". Noted as " + how + "; it can be confirmed from " + where(v.trip) + ".");
+    if (!v.figure || v.trip === "conversation") continue;
+    const how = v.confidence === "estimated" ? "Noted as an estimate"
+      : (v.confidence === "stated" || (v.reason === "declined_source" && !v.confidence)) ? "Noted from memory"
+      : "Not yet checked against its source";
+    lines.push("- " + nice(v.label) + ". " + how + "; it can be confirmed from " + where(v.trip) + ".");
   }
-  return lines.length ? lines.join("\n") : "- Nothing is waiting on you. Every figure came from its source.";
+  const uniq = [...new Set(lines)];
+  return uniq.length ? uniq.join("\n") : "- Nothing is waiting on you. Every figure came from its source.";
 }
 
 /* The plan as the model's working notes. Compact, factual, no figures. */
