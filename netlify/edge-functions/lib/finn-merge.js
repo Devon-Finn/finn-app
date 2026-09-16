@@ -176,6 +176,17 @@ const NATURAL_KEYS = {
     && same(b.entity, p.entity),
   "context.children": (b, p) => typeof p.age === "number" && b.age === p.age,
 };
+// A second, looser pass for debts: the recorder and the model can disagree
+// on whether a household loan is "personal" or "joint" (stand-in run 5
+// stored the ETF split twice). Household-level holders are compatible; an
+// entity holder never is.
+const HOUSEHOLD_HOLDERS = new Set(["personal", "joint", "you", "partner", "unknown"]);
+const hh = v => v === undefined || v === null || HOUSEHOLD_HOLDERS.has(String(v).toLowerCase());
+const RELAXED_KEYS = {
+  "debts.items": (b, p) => p.type && b.type === p.type && hh(b.borrower) && hh(p.borrower)
+    && same(b.purpose, p.purpose)
+    && (!p.parent_loan_id || !b.parent_loan_id || b.parent_loan_id === p.parent_loan_id),
+};
 export function adoptNaturalIds(base, patch) {
   if (!isObj(patch) || !isObj(base)) return patch;
   const out = { ...patch };
@@ -189,7 +200,9 @@ export function adoptNaturalIds(base, patch) {
       const taken = new Set(pd[f].filter(i => isObj(i) && typeof i.id === "string").map(i => i.id));
       const arr = pd[f].map(item => {
         if (!isObj(item) || (typeof item.id === "string" && item.id) || item._remove) return item;
-        const hits = bd[f].filter(b => isObj(b) && b.id && !taken.has(b.id) && match(b, item));
+        let hits = bd[f].filter(b => isObj(b) && b.id && !taken.has(b.id) && match(b, item));
+        const relaxed = RELAXED_KEYS[domainKey + "." + f];
+        if (hits.length === 0 && relaxed) hits = bd[f].filter(b => isObj(b) && b.id && !taken.has(b.id) && relaxed(b, item));
         if (hits.length !== 1) return item;
         taken.add(hits[0].id);
         return { ...item, id: hits[0].id };

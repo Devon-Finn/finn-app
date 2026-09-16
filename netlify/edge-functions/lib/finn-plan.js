@@ -390,6 +390,7 @@ export function buildPlan(domains, goals, opts = {}) {
   return {
     phase, signals, shapeOpen, areas, covered, trips,
     missing: missingAll, deferred: deferredAll, to_verify: toVerifyAll,
+    sweeps_asked: [...sweepsAsked],
     sweeps_pending: sweepsPending,
     ledger: ledgerList,
     can_close: allCovered,

@@ -70,6 +70,9 @@ export function substituteTokens(text, ctx = {}) {
     // token emits nothing and is reported (stand-in run 3).
     if (kind === "FRAME" && id === "close" && ctx.canClose === false) { unknown.push("FRAME:close (refused, areas still open)"); return ""; }
     if (copy && kind === "FRAME" && id === "close" && ctx.closeList) copy = copy + "\n\n" + ctx.closeList;
+    // A sweep is asked once (stand-in run 5 asked "what else do you own?"
+    // twice in a row). Already asked: the token emits nothing.
+    if (kind === "SWEEP" && Array.isArray(ctx.sweepsAsked) && ctx.sweepsAsked.includes(id)) { unknown.push("SWEEP:" + id + " (already asked)"); return ""; }
     if (copy === null || copy === undefined) { unknown.push(kind + ":" + id); return ""; }
     if (kind === "ASK") for (const f of RETRIEVAL_PATHS[id].satisfies) served.add(f);
     if (kind === "SWEEP") sweeps.add(id);

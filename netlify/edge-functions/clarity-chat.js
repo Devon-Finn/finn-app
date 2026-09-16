@@ -408,7 +408,7 @@ function emDashScrubStream(onDone, ctx = {}) {
     return dropSentences(s).replace(/\s*—\s*/g, () => { substitutions++; return ", "; });
   }
   function sub(s) {
-    const r = substituteTokens(s, { closeList: ctx.closeList, canClose: ctx.canClose });
+    const r = substituteTokens(s, { closeList: ctx.closeList, canClose: ctx.canClose, sweepsAsked: ctx.sweepsAsked });
     for (const id of r.unknown) {
       console.error(`[Finn clarity] TOKEN FAULT — trigger token "${id}" is not recognised and emitted nothing`);
     }
@@ -440,7 +440,9 @@ function emDashScrubStream(onDone, ctx = {}) {
     if (HAS_TOKEN.test(p)) {
       if (heldQ !== null) { droppedQ++; heldQ = null; }
       emit(sub(scrub(p)));
-    } else if (/\?\s*$/.test(p.trim())) {
+    } else if (/\?/.test(p)) {
+      // Any paragraph carrying a question is held (stand-in run 5: a
+      // composed "anything else?" ended with an example list, not a "?").
       if (heldQ !== null) emit(heldQ);
       heldQ = sub(scrub(p));
     } else {
@@ -1100,6 +1102,7 @@ export default async function handler(request, context) {
   }, {
     closeList: closeListText(plan),
     canClose: plan.can_close,
+    sweepsAsked: plan.sweeps_asked || [],
     isFirstDeferral: (field) => !(plan.ledger || []).some(e => e && e.field === field && (e.nudges || 0) >= 1),
   }));
 

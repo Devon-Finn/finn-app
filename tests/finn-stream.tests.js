@@ -68,5 +68,10 @@ export async function runStreamTests(chat, tokens) {
   const m = await run(f, ["Noted, about 9,000.\n\n[CAPTURE]{\"domains\":{\"debts\":{\"hecs_balance\":9000}},\"deferrals\":[\"debts.hecs_balance\"]}"], { isFirstDeferral: () => true });
   t('no-nudge-when-deferred-field-has-value', !m.txt.includes(NUDGES.first));
 
-  return { pass: failures.length === 0, total: 17, failures };
+  // Stand-in run 5: a composed "anything else?" whose paragraph does not end
+  // with "?" is still dropped before the sweep.
+  const n = await run(f, ["Good.\n\nAre there any other debts in the picture? Things like car loans or cards.\n\n[SWEEP: other_debts]\n\n[CAPTURE]{}"], {});
+  t('mid-paragraph-question-dropped-before-sweep', !n.txt.includes('any other debts in the picture') && n.txt.includes('Now the borrowing side'));
+
+  return { pass: failures.length === 0, total: 18, failures };
 }

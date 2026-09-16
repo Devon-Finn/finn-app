@@ -244,5 +244,18 @@ export function runPlanTests({ plan, pipeline, tokens }) {
   const r4dl = plan.closeListText(buildPlan(r4d.domains, r4d.goals));
   t('close-lists-remembered-share-value', r4dl.includes('Noted as an estimate') && r4dl.split('\n').length === 1);
 
-  return { pass: failures.length === 0, total: 64, failures };
+
+  /* ── stand-in run 5 fixes ── */
+  const r5a = pipeline.applyCaptureCore({ picture: { ...E2, domains: { debts: { items: [{ id: 'd1', type: 'loan_split', purpose: 'investment_shares', borrower: 'personal', security: 'property_home', is_split: true, parent_loan_id: 'home' }], _confidence: 'stated' } } }, capture: { domains: { debts: { items: [{ type: 'loan_split', purpose: 'investment_shares', borrower: 'joint', security: 'property_home', is_split: true, parent_loan_id: 'home', balance: 60000 }], _confidence: 'sighted' } } }, sessionId: 's', servedFields: new Set() });
+  t('household-loan-not-duplicated-on-holder-wording', r5a.domains.debts.items.length === 1 && r5a.domains.debts.items[0].balance === 60000);
+  const r5b = pipeline.applyCaptureCore({ picture: { ...E2, domains: { debts: { items: [{ id: 'd1', type: 'commercial_loan', purpose: 'commercial_property', borrower: 'company', security: 'property_commercial' }], _confidence: 'stated' } } }, capture: { domains: { debts: { items: [{ type: 'commercial_loan', purpose: 'commercial_property', borrower: 'joint', security: 'property_commercial', balance: 1 }], _confidence: 'stated' } } }, sessionId: 's', servedFields: new Set() });
+  t('entity-loan-never-merged-with-household-loan', r5b.domains.debts.items.length === 2);
+  const r5c = pipeline.applyCaptureCore({ picture: { ...E2, goals: { notes: 'Want work to be optional by around 60. Want kids provided for if something happens.' } }, capture: { domains: {}, goals: { notes: 'Want work optional by around 60, not a hard stop. Want kids provided for if something happens to either parent.' } }, sessionId: 's', servedFields: new Set() });
+  t('goal-notes-rereading-not-doubled', (r5c.goals.notes.match(/optional/g) || []).length === 1);
+  t('plan-exposes-sweeps-asked', buildPlan({ flags: { sweeps_asked: ['other_assets'] } }, {}).sweeps_asked.includes('other_assets'));
+  const r5d = pipeline.applyCaptureCore({ picture: E2, capture: { domains: { home: { owns_home: true, with_lender_since: 2019, _confidence: 'stated' } } }, sessionId: 's', servedFields: new Set() });
+  t('number-in-text-field-kept', r5d.domains.home.with_lender_since === '2019');
+  t('sweep-served-once', tokens.substituteTokens('[SWEEP: other_assets]', { sweepsAsked: ['other_assets'] }).text === '');
+
+  return { pass: failures.length === 0, total: 70, failures };
 }

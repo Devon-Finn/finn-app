@@ -110,6 +110,9 @@ function v2CheckValue(spec, v, path, errors) {
     return v;
   }
   if (spec === STR) {
+    // A year or a number given where text is expected (stand-in run 5:
+    // with_lender_since 2019) is kept as its text.
+    if (typeof v === "number" && isFinite(v)) return String(v);
     if (typeof v !== "string") { errors.push(path + ": must be a string"); return undefined; }
     return v.slice(0, 500);
   }
@@ -806,8 +809,13 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
   }
   if (typeof priorGoals.notes === "string" && priorGoals.notes && typeof capGoals.notes === "string" && capGoals.notes) {
     const norm = t => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const words = t => new Set(norm(t).split(" ").filter(w => w.length > 2));
+    const a = words(priorGoals.notes), b = words(capGoals.notes);
+    const overlap = [...b].filter(w => a.has(w)).length / Math.max(1, Math.min(a.size, b.size));
     if (norm(priorGoals.notes).includes(norm(capGoals.notes))) goals.notes = priorGoals.notes;
     else if (norm(capGoals.notes).includes(norm(priorGoals.notes))) goals.notes = capGoals.notes;
+    // Mostly the same words: a re-reading, not a new goal. Keep the longer.
+    else if (overlap >= 0.6) goals.notes = capGoals.notes.length >= priorGoals.notes.length ? capGoals.notes : priorGoals.notes;
     else goals.notes = priorGoals.notes.replace(/\s*$/, "") + (/[.!?]$/.test(priorGoals.notes.trim()) ? " " : ". ") + capGoals.notes;
   }
 
