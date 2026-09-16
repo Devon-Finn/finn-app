@@ -55,5 +55,9 @@ export async function runStreamTests(chat, tokens) {
   const g = await run(f, ["Wrapping up.\n\n[FRAME: close]\n\n[CAPTURE]{}"], { closeList: "- x", canClose: false });
   t('close-frame-refused-when-plan-open', !g.txt.includes(FRAMES.close) && !g.txt.includes('[FRAME'));
 
-  return { pass: failures.length === 0, total: 13, failures };
+  // Stand-in run 4: the model dropped the opening {"domains": key.
+  const h = await run(f, ["Of course.\n\n[CAPTURE]{},\"deferrals\":[\"x.y\"]}"], { isFirstDeferral: () => true });
+  t('malformed-block-missing-domains-salvaged', h.txt.includes(NUDGES.first));
+
+  return { pass: failures.length === 0, total: 14, failures };
 }

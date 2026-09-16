@@ -347,6 +347,17 @@ function parseCapture(fullText) {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object") return parsed;
   } catch (err) {
+    // Stand-in run 4: the model wrote `{},"session_complete":false}`,
+    // i.e. dropped the opening `{"domains":`. Salvage exactly that shape.
+    if (/^\{/.test(raw) && !/^\{\s*"/.test(raw)) {
+      try {
+        const salvaged = JSON.parse('{"domains":' + raw);
+        if (salvaged && typeof salvaged === "object") {
+          console.error("[Finn clarity] capture block salvaged (missing \"domains\" key)");
+          return salvaged;
+        }
+      } catch (_) { /* fall through */ }
+    }
     console.error("[Finn clarity] capture block did not parse:", err);
   }
   return null;
@@ -1054,6 +1065,14 @@ export default async function handler(request, context) {
     let idx = fullText.indexOf("[CAPTURE]");
     let reExtracted = false;
     let capture = null;
+    // Stand-in run 4: an unusable model block used to end the turn here, so
+    // the recorder never ran and the served sweep was never recorded (the
+    // ETFs were lost and the income sweep was asked twice). The model's
+    // block is now only ONE input: when it is absent or unparseable, the
+    // turn carries on with an empty model capture, so the recorder's facts,
+    // the sweeps served and the ledger still land.
+    let modelBlockUnusable = false;
+    let logId = flushRes ? flushRes.logId : null;
     if (idx === -1) {
       // THE CAPTURE BLOCK IS MANDATORY (Devon, Sept 2026): absence is
       // always a fault. One targeted re-extraction pass runs over this
@@ -1061,34 +1080,31 @@ export default async function handler(request, context) {
       // person's stated facts must not be left in the transcript only.
       console.error("[Finn clarity] CAPTURE ABSENT — reply carried no capture block; running one targeted re-extraction over this turn");
       capture = await reExtractCapture(apiKey, messages, visibleRaw);
-      if (!capture) {
-        console.error("[Finn clarity] CAPTURE ABSENT — re-extraction produced no usable block; facts from this turn are not captured");
-        await insertCaptureLog(auth.householdId, "[CAPTURE ABSENT — re-extraction FAILED]\n" + fullText, null, "failed", sessionId);
-        await setWriteStatusFalse(auth.householdId);
-        return;
-      }
-      console.error("[Finn clarity] CAPTURE ABSENT — re-extraction recovered a block; applying through the normal gate");
       reExtracted = true;
-    }
-    let logId = flushRes ? flushRes.logId : null;
-    if (!reExtracted) {
+      if (!capture) {
+        console.error("[Finn clarity] CAPTURE ABSENT — re-extraction produced no usable block; continuing with the recorder only");
+        await insertCaptureLog(auth.householdId, "[CAPTURE ABSENT — re-extraction FAILED]\n" + fullText, null, "failed", sessionId);
+        modelBlockUnusable = true;
+        logId = null;
+      } else {
+        console.error("[Finn clarity] CAPTURE ABSENT — re-extraction recovered a block; applying through the normal gate");
+        logId = await insertCaptureLog(auth.householdId, "[REEXTRACTED after absent capture block]\n" + fullText, capture, "received", sessionId);
+      }
+    } else {
       capture = flushRes && flushRes.hasMarker ? flushRes.capture : parseCapture(fullText);
+      if (!logId) {
+        // Client disconnected before flush, or the write-ahead insert
+        // failed: land the raw row now, before any apply step can fail.
+        logId = await insertCaptureLog(auth.householdId, fullText, capture, "received", sessionId);
+      }
+      if (!capture) {
+        console.error("[Finn clarity] REFUSED — capture block did not parse; raw preserved in capture_log; continuing with the recorder only");
+        await markCaptureLog(logId, "refused", { errors: ["capture block did not parse"] });
+        modelBlockUnusable = true;
+        logId = null;
+      }
     }
-    if (!logId) {
-      // Client disconnected before flush, the write-ahead insert failed,
-      // or the block came from re-extraction: land the raw row now,
-      // before any apply step can fail. The re-extracted case is tagged
-      // in raw_text so the conduct linter can count absences.
-      logId = await insertCaptureLog(auth.householdId,
-        (reExtracted ? "[REEXTRACTED after absent capture block]\n" : "") + fullText,
-        capture, "received", sessionId);
-    }
-    if (!capture) {
-      console.error("[Finn clarity] REFUSED — capture block did not parse; raw preserved in capture_log");
-      await markCaptureLog(logId, "refused", { errors: ["capture block did not parse"] });
-      await setWriteStatusFalse(auth.householdId);
-      return;
-    }
+    if (modelBlockUnusable) capture = {};
     const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
     const hadAttachment = Array.isArray(lastUserMsg?.content) && lastUserMsg.content.some(b => b && (b.type === "image" || b.type === "document"));
     const lastUserText = typeof lastUserMsg?.content === "string" ? lastUserMsg.content : "";
@@ -1118,6 +1134,11 @@ export default async function handler(request, context) {
     } catch (err) {
       console.error("[Finn clarity] FAILED — capture apply threw; raw preserved in capture_log:", err);
       await markCaptureLog(logId, "failed", { errors: [String((err && err.message) || err)] });
+      await setWriteStatusFalse(auth.householdId);
+    }
+    if (modelBlockUnusable && !recorder && !machineTurn) {
+      // Neither reader produced anything: this turn's facts are not saved.
+      // Set after the apply, which stamps ok:true for the sweeps it records.
       await setWriteStatusFalse(auth.householdId);
     }
     // Conduct linter (capture-conduct step 6): runs automatically at the
