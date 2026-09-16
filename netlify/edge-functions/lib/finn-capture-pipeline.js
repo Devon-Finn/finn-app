@@ -525,6 +525,37 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
     }
   }
 
+  // A _confidence emitted at the root of domains applies to every domain
+  // in the capture that lacks its own (15 Sept+1 stand-in run).
+  if (capture.domains && typeof capture.domains === "object" && typeof capture.domains._confidence === "string") {
+    const rootConf = capture.domains._confidence;
+    delete capture.domains._confidence;
+    for (const [k, v] of Object.entries(capture.domains)) {
+      if (v && typeof v === "object" && !Array.isArray(v) && !v._confidence) v._confidence = rootConf;
+    }
+    anomalies.push("_confidence at the root of domains — applied to each domain");
+  }
+  // A known field placed under the wrong domain is moved to the one
+  // domain whose schema owns it (e.g. investments.other -> income.other).
+  if (capture.domains && typeof capture.domains === "object") {
+    for (const [dk, body] of Object.entries(capture.domains)) {
+      if (!body || typeof body !== "object" || Array.isArray(body) || !(dk in V2_SCHEMA)) continue;
+      for (const k of Object.keys(body)) {
+        if (k.startsWith("_") || k in V2_SCHEMA[dk]) continue;
+        const owners = Object.keys(V2_SCHEMA).filter(d => d !== dk && k in V2_SCHEMA[d]);
+        if (owners.length !== 1) continue;
+        const to = owners[0];
+        capture.domains[to] = capture.domains[to] || {};
+        if (!(k in capture.domains[to])) {
+          capture.domains[to][k] = body[k];
+          if (!capture.domains[to]._confidence && body._confidence) capture.domains[to]._confidence = body._confidence;
+          anomalies.push(`${dk}.${k} re-homed to ${to}.${k}`);
+        }
+        delete body[k];
+      }
+    }
+  }
+
   let baseDomains = picture.domains ?? {};
   if ((picture.schema_version ?? 1) < 2 && !isV2Domains(baseDomains)) {
     baseDomains = translateLegacyDomains(baseDomains);
@@ -533,7 +564,13 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
   baseDomains = migratePositionalLinks(assignAssetIds(baseDomains));
 
   let patch = capture.domains ?? {};
-  if (Object.keys(patch).length && !isV2Domains(patch)) {
+  // The protocol has emitted v2 for months; a patch is translated only when
+  // it carries an unmistakably v1 marker. (A super-only v2 patch without
+  // has_insurance was being mistaken for v1 and lost its confidence.)
+  const V1_MARK = "assets" in patch || "liabilities" in patch
+    || (patch.income && ["salary_annual", "partner_salary_annual", "side_income_annual", "monthly_expenses"].some(k => k in patch.income))
+    || (patch.protection && ["life_cover_amount", "tpd_amount", "trauma_amount"].some(k => k in patch.protection));
+  if (Object.keys(patch).length && !isV2Domains(patch) && V1_MARK) {
     patch = translateLegacyDomains(patch);
   }
   patch = migrateIncomeShape(patch);
@@ -610,6 +647,17 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
   // A legacy refusal with no figure given is a deferral too.
   for (const f of (Array.isArray(capture.refusals) ? capture.refusals : [])) {
     if (typeof f === "string" && !leafWrites(patch).some(w => w.id === f)) deferralList.push({ field: f, item_id: null });
+  }
+  // An item reference that is not an id (the model wrote a fund name) is
+  // resolved against the item's natural label when exactly one matches.
+  for (const df of deferralList) {
+    if (!df.item_id || !df.field.includes("[]")) continue;
+    const [dk, arrKey] = [df.field.split(".")[0], df.field.split(".")[1].replace("[]", "")];
+    const list = domains[dk] && Array.isArray(domains[dk][arrKey]) ? domains[dk][arrKey] : [];
+    if (list.some(x => x && x.id === df.item_id)) continue;
+    const needle = String(df.item_id).toLowerCase().replace(/[^a-z0-9]/g, "");
+    const hits = list.filter(x => x && [x.fund, x.type, x.held_in, x.source, x.name].some(v => typeof v === "string" && v.toLowerCase().replace(/[^a-z0-9]/g, "").includes(needle)));
+    if (hits.length === 1) df.item_id = hits[0].id;
   }
   for (const df of deferralList) {
     const k = keyOf(df.field, df.item_id);

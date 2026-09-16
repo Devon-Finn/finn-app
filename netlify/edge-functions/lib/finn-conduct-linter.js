@@ -28,7 +28,13 @@ const FACT_KEYWORDS = /\b(rate|balance|owing|term|repayment|cover|super|rent|cos
 // value with no document yet are estimates. A sentence naming only those
 // is exempt.
 const ESTIMATE_OK = /\b(spend|spending|goes out|living costs?|typical month)\b/i;
-const CLOSE_CLAIM = /\b(complete picture|picture is complete|genuinely complete|well done|you're all done|that's everything)\b/i;
+const CLOSE_CLAIM = /\b(complete picture|picture (?:is )?complete|genuinely complete|well done|you're all done|that's everything|that covers everything)\b/i;
+// Composed "anything else?" questions (the stand-in run): a sweep asked in
+// the model's own words never counts.
+const COMPOSED_SWEEP = /\b(any other (?:assets|debts|borrowing|super(?: accounts| funds)?|income)|anything else (?:owing|you own|coming in)|how many super funds|any (?:other )?debts or borrowings)\b/i;
+// Appraisals of figures or choices seen in live runs.
+const APPRAISAL = /\b(reasonable working figure|solid (?:start|foundation|starting point|position)|decent (?:runway|buffer|position)|doing double duty|doing quiet work|healthy (?:buffer|position|balance)|a good position|in good shape)\b/i;
+const RECORDER_TAG = /^\[RECORDER\]/;
 const SELF_INTRO = /\bI'?m Finn\b/;
 // Retrieval-instruction prose. CSV/export sentences are exempt: the bank
 // export walkthrough is reference data the model relays in its own words.
@@ -38,6 +44,7 @@ const ABSENT_TAG = /^\[(?:REEXTRACTED|CAPTURE ABSENT)/;
 
 function visibleOf(rawText) {
   let s = String(rawText || "");
+  if (/^\[RECORDER\]/.test(s)) return "";
   s = s.replace(/^\[(?:REEXTRACTED|CAPTURE ABSENT)[^\n]*\n/, "");
   const cuts = [s.indexOf("[CAPTURE]"), s.indexOf("[RESOLVE]")].filter(i => i !== -1);
   return cuts.length ? s.slice(0, Math.min(...cuts)) : s;
@@ -353,34 +360,42 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
       for (const w of leafWrites(capDomains)) {
         if (seen.has(w.id)) continue;
         seen.add(w.id);
-        if (!(w.domain in domains) && !present(w.id)) { if (!deferred.has(w.id)) details.push(`${w.id} was given but is not in the picture`); continue; }
-        if (!present(w.id) && !deferred.has(w.id)) details.push(`${w.id} was given but is not in the picture`);
+        // A field the pipeline re-homed to its owning domain counts where it landed.
+        const rest = w.id.slice(w.id.indexOf(".") + 1);
+        const landed = present(w.id) || Object.keys(domains).some(d => d !== w.domain && present(d + "." + rest));
+        if (!landed && !deferred.has(w.id)) details.push(`${w.id} was given but is not in the picture`);
       }
     }
     add("lost_fact", "Lost facts", details.length ? "fail" : "pass", details);
   }
 
   /* 14 · ACKNOWLEDGED, NOT CAPTURED (fail): a reply restates a dollar
-     figure that neither this turn's capture nor any earlier capture holds
-     ("Got it, $71,500" with an empty block). */
+     figure that no capture holds (neither earlier, nor this turn's model
+     capture, nor the recorder pass that follows it within a minute). */
   {
     const details = [];
-    const known = new Set();
-    const addNums = (v) => {
-      if (typeof v === "number") { known.add(Math.round(v)); known.add(Math.round(v * 12)); known.add(Math.round(v / 12)); }
-      else if (v && typeof v === "object") for (const x of Object.values(v)) addNums(x);
+    const numsOf = (v, set) => {
+      if (typeof v === "number") { set.add(Math.round(v)); set.add(Math.round(v * 12)); set.add(Math.round(v / 12)); set.add(Math.round(v * 26 / 12)); }
+      else if (v && typeof v === "object") for (const x of Object.values(v)) numsOf(x, set);
+      return set;
     };
     const ordered = captureRows.slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const flagged = new Set();
     for (const r of ordered) {
-      addNums(r.capture && r.capture.domains);
       const vis = visibleOf(r.raw_text);
+      if (!vis) continue;
+      const t = new Date(r.created_at).getTime();
+      const known = new Set();
+      for (const o of ordered) {
+        if (new Date(o.created_at).getTime() <= t + 60000) numsOf(o.capture && o.capture.domains, known);
+      }
       for (const m of vis.matchAll(/\$\s?(\d[\d,]*(?:\.\d+)?)\s?(k\b|m\b|million\b)?/gi)) {
         let v = parseFloat(m[1].replace(/,/g, ""));
         if (m[2]) v *= /^k/i.test(m[2]) ? 1000 : 1000000;
         v = Math.round(v);
-        if (v < 10 || known.has(v)) continue;
+        if (v < 10 || known.has(v) || flagged.has(v)) continue;
+        flagged.add(v);
         details.push(`"${m[0]}" acknowledged but not captured: ${vis.slice(Math.max(0, m.index - 40), m.index + 40).replace(/\s+/g, " ").trim()}`);
-        known.add(v);
       }
     }
     add("acknowledged_not_captured", "Acknowledged, not captured", details.length ? "fail" : "pass", details);
@@ -427,6 +442,20 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
     add("premature_close", "Premature close", details.length ? "fail" : "pass", details);
   }
 
+  /* 20 · Composed sweep (fail) and 21 · Appraisal (fail) */
+  {
+    const d1 = [], d2 = [];
+    for (const r of captureRows) {
+      for (const snt of sentences(visibleOf(r.raw_text))) {
+        if (COMPOSED_SWEEP.test(snt) && !snt.includes("[SWEEP:")) d1.push(`"${snt.slice(0, 140)}"`);
+        const m = snt.match(APPRAISAL);
+        if (m) d2.push(`"${m[0]}": ${snt.slice(0, 120)}`);
+      }
+    }
+    add("composed_sweep", "Composed sweep", d1.length ? "fail" : "pass", d1);
+    add("appraisal", "Appraisal language", d2.length ? "fail" : "pass", d2);
+  }
+
   /* 18 · Coverage (report): what the plan says at report time. */
   {
     const details = [];
@@ -453,7 +482,7 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
   const failures = checks.filter(c => c.status === "fail").length;
   return {
     generated_at: new Date().toISOString(),
-    turns: captureRows.length,
+    turns: captureRows.filter(r => !RECORDER_TAG.test(String(r.raw_text || ""))).length,
     serves: servedRows.length,
     checks,
     summary: { failures, verdict: failures === 0 ? "clean" : `${failures} check${failures === 1 ? "" : "s"} failing` },

@@ -402,6 +402,16 @@ export function planPromptSection(plan, opts = {}) {
       plan.deferred.map(x => x.label + " [nudges " + (x.nudges || 1) + "/2, field " + x.field + (x.item_id ? ", item " + x.item_id : "") + "]").slice(0, 14).join("; ") + ".");
   }
   if (plan.sweeps_pending.length) L.push("Sweeps not yet asked: " + plan.sweeps_pending.map(s => "[SWEEP: " + s + "]").join(" ") + ".");
+  // The next move, stated plainly (the stand-in run showed the model
+  // composing sweeps in its own words, which never count).
+  const basicsKnown = !plan.shapeOpen.some(x => !x.startsWith("[SWEEP"));
+  if (plan.phase === "shape" && basicsKnown && plan.sweeps_pending.length) {
+    L.push("NEXT MOVE: your one question in this reply is [SWEEP: " + plan.sweeps_pending.find(x => ["other_assets", "other_debts", "other_super", "other_income"].includes(x)) + "], emitted as the token. Writing your own version of an 'anything else?' question does NOT count: the area stays uncovered and you will have to ask it again.");
+  }
+  if (opts.servedPaths && opts.servedPaths.length) {
+    L.push("Sources already walked through this session (do not emit these [ASK] tokens again; if the person is stuck on one, help with the specific screen or menu in your own words): " + opts.servedPaths.join(", ") + ".");
+  }
+  L.push("Discipline, every reply: ONE question per reply. For a document-backed figure, emit the [ASK] token for its source first; never open with 'do you know roughly' or 'a rough sense'. Record everything the person says, including things that merely exist (a loan, a fund, a property, a cover) with no figures yet. Never compute a figure yourself. Never characterise a figure or a choice (no 'reasonable', 'solid', 'decent', 'doing double duty'). Never call any area or the picture complete. When the person skips something, the whole reply is [NUDGE: first] (or [NUDGE: accept] the second time) plus at most a short warm line; no new question in the same reply.");
   if (opts.unsaved && opts.unsaved.length) {
     L.push("Last turn these details did not save: " + opts.unsaved.slice(0, 8).join("; ") + ". Ask for them again naturally, owning it as your slip, and capture them correctly this time.");
   }

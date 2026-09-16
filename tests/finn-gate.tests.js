@@ -228,7 +228,7 @@ export function runLinterTests(regMod, pathsMod, linterMod) {
   // A clean session: one turn, nothing captured, nothing served.
   const clean = lint([row({})], { domains: {}, refusals: [] });
   t('clean-session-no-failures', clean.summary.failures === 0);
-  t('report-has-nineteen-checks', clean.checks.length === 19);
+  t('report-has-twentyone-checks', clean.checks.length === 21);
 
   // Composed ask: retrieval prose in raw visible text fails; a token does not.
   const composed = lint([row({ raw_text: 'Please open your banking app and read me the loan balance.\n[CAPTURE]{}' })], { domains: {}, refusals: [] });

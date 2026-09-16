@@ -358,7 +358,7 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
 
   /* ── the linter over the whole session: twelve rows, all passing ── */
   const report = lint(s.rows(), P);
-  t('linter-nineteen-rows', report.checks.length === 19);
+  t('linter-twentyone-rows', report.checks.length === 21);
   t('linter-zero-failures', report.summary.failures === 0);
   for (const c of report.checks) {
     t('linter-row-' + c.id + '-not-failing', c.status !== 'fail');
@@ -502,9 +502,34 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
     t('walk-close-refused-with-open-items', closeTry.sessionCompleteRefused === true && closeTry.sessionComplete === false);
   }
 
+  /* ════════ the 16 Sept stand-in run, replayed ════════ */
+  {
+    const r = makeSession(pipeline, paths, 'fx-standin-0916');
+    r.reply('Thanks.', { domains: { super: { funds: [{ fund: 'AustralianSuper', owner: 'you', balance: 186000 }, { fund: 'REST', owner: 'you', balance: null }], _confidence: 'sighted' } } });
+    // distributions emitted under investments: re-homed, not dropped
+    const misplaced = r.reply('Got those.', { domains: { investments: { shares_value: 71500, held_in: 'joint', other: [{ source: 'distributions', entity: 'joint', basis: 'gross', amount_annual: 2140 }], _confidence: 'sighted' } } });
+    t('standin-misplaced-field-rehomed', misplaced.errors.length === 0 && r.picture().domains.income.other.some(o => o.amount_annual === 2140));
+    // _confidence at the root of domains applies to each domain
+    r.reply('Noted.', { domains: { debts: { items: [{ type: 'commercial_loan', purpose: 'commercial_property', borrower: 'company', security: 'property_commercial', balance: 380000 }] }, _confidence: 'sighted' } });
+    const tvl = r.picture().domains.flags.to_verify;
+    t('standin-root-confidence-applied', tvl.some(e => e.field === 'debts.items[].balance' && e.confidence === 'sighted') && !tvl.some(e => e.confidence === 'unrecorded'));
+    // a deferral naming the fund rather than its id resolves to the item
+    r.reply('We can leave that.', { deferrals: ['super.funds[].balance#REST'] });
+    const restId = r.picture().domains.super.funds.find(f => f.fund === 'REST').id;
+    t('standin-deferral-by-name-resolves', r.picture().domains.flags.to_verify.some(e => e.field === 'super.funds[].balance' && e.item_id === restId && e.reason === 'deferred'));
+    const rr = lint(r.rows(), r.picture());
+    t('standin-no-lost-facts', rr.checks.find(c => c.id === 'lost_fact').status === 'pass');
+  }
+  failsOnly('composed-sweep',
+    lint([applied('Any other assets worth knowing about?\n[CAPTURE]{}', {})], emptyPic), 'composed_sweep');
+  failsOnly('appraisal',
+    lint([applied('That is a reasonable working figure for now.\n[CAPTURE]{}', {})], emptyPic), 'appraisal');
+  t('recorder-rows-skip-text-checks',
+    lint([applied('[RECORDER]\n[CAPTURE]{"domains":{}}', {}), applied('A reply.\n[CAPTURE]{}', {})], emptyPic).summary.failures === 0);
+
   return {
     pass: failures.length === 0,
-    total: 106,
+    total: 115,
     failures,
     hand_computed: {
       home_equity: 410000, lvr_percent: 56.8, surplus_monthly: 3402, buffer_months: 2.6,

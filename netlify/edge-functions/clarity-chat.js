@@ -272,6 +272,7 @@ Rules for the block:
   Every field lives in EXACTLY the domain listed above — never place a field under a different domain, even when the conversation surfaced them together. In particular: structure, entity and employer_super_on belong to income, NEVER to context, even though the work setup comes up during the household opening. A field under the wrong domain is dropped and lost, so check placement before you emit the block.
 - Hardship (flags): set from your read of the conversation, NEVER from asking — "are you in financial hardship" is never a question you put to someone. If genuine hardship shows (missed essential payments, collectors calling, choosing between essentials), set hardship true and record what prompted it in hardship_signal, in their words where possible, so the decision is auditable. Its _confidence is "inferred". This is the one field written from judgment, and it exists so the person is routed to free help — hard line 5 stands unchanged.
 - Absent versus not-yet-discussed (keep this distinction exact everywhere): when the person CONFIRMS something is not held or not in place, record it as explicitly false (e.g. protection tpd {held: false}, estate will {in_place: false}, has_offset: false). Never record a confirmed absence as null, and never omit it — a missing field or null means "not yet discussed"; false means "confirmed no". A confirmed absence is a captured fact and must be written to the block.
+- EXISTENCE COUNTS: the moment the person mentions that something exists (a loan, a card, a fund, a property, a cover, a company), record it as an item with whatever is known (type, purpose, borrower, fund, owner, held_in, held), even with no figures yet. A thing acknowledged in your reply but missing from the block is a lost fact.
 - "goals": loose directions only, e.g. {"directions":["security-leaning","kids-setup"],"notes":"wants to feel less exposed; kids' schooling on their mind"}. Include only when goals content actually surfaced this turn.
 - "completed_domains": advisory only. CODE decides which areas are covered, from the picture and the sweeps asked; you may omit this key.
 - "session_complete": true only in the reply that finishes the close, after [FRAME: close] has been served and every open item walked, and only when the working notes say closing is available. Code refuses it otherwise.
@@ -562,7 +563,7 @@ async function insertCaptureLog(householdId, rawText, capture, status, sessionId
    protocol, the person's last message and the visible reply, output
    restricted to the [CAPTURE] line. The result flows through the normal
    gate like any capture. Returns the parsed capture or null. */
-async function reExtractCapture(apiKey, messages, visibleReply) {
+async function reExtractCapture(apiKey, messages, visibleReply, pictureDomains, mode) {
   const protoStart = CLARITY_SYSTEM_PROMPT.indexOf("**CAPTURE PROTOCOL");
   const protoEnd = CLARITY_SYSTEM_PROMPT.indexOf("**TRANSACTION SUMMARY PROTOCOL");
   const protocol = (protoStart !== -1 && protoEnd > protoStart)
@@ -573,6 +574,25 @@ async function reExtractCapture(apiKey, messages, visibleReply) {
     : Array.isArray(lastUser?.content)
       ? lastUser.content.filter(b => b && b.type === "text").map(b => b.text).join("\n")
       : "";
+  const recorder = mode === "recorder";
+  const system = recorder
+    ? "You are the RECORDER for Finn's Clarity Session. The conversation model often acknowledges facts without recording them, so you record them independently. Read ONLY the person's latest message (and, for context, Finn's reply before it and the picture so far). Emit one [CAPTURE] line holding EVERY fact the PERSON stated or confirmed in that message, following the protocol exactly.\n" +
+      "Rules: (1) Facts only from the person. Something Finn said counts only if the person's message confirms it (\"yes that's right\" confirms Finn's restatement). (2) Record EXISTENCE as soon as something is mentioned, even with no figures: a debt becomes a debts item with the type, purpose and borrower you can tell; a property becomes an investments.properties item with held_in; a super fund becomes a super.funds item with fund and owner; a cover becomes protection.<type> {held:true, inside_super:...}. (3) Every figure goes in its exact schema home: rent and costs of a property go in income.other (source rental_residential/rental_commercial, amount_annual, basis, costs_annual); dividends/distributions go in income.other; never invent fields. (4) For an item already in the picture, echo its id exactly so it updates; for a new item leave id out. (5) _confidence per domain: \"sighted\" when the person is reading the figure off a screen, statement, app or payslip; \"stated\" when from memory or a plain fact; \"estimated\" when they say about/roughly/I think/I reckon; \"document\" ONLY if a file was attached this turn. Items may carry their own _confidence. (6) No arithmetic except converting the person's own period (fortnightly x 26 / 12 for monthly, monthly x 12 for annual). (7) Nothing invented. If the message holds no facts, emit [CAPTURE]{}. Output ONLY the [CAPTURE] line.\n\n" + protocol
+    : "You are the capture extractor for Finn's Clarity Session. A reply was produced without its mandatory capture block. Read the single conversation turn below and emit the capture block that reply SHOULD have ended with, following the protocol exactly. Output ONLY the [CAPTURE] line, nothing before or after it. Facts come only from what the person actually said this turn; nothing invented, and [CAPTURE]{} if the turn genuinely captured nothing.\n\n" + protocol;
+  const lastAssistantBefore = (() => {
+    const ix = messages.map(m => m.role).lastIndexOf("user");
+    for (let i = ix - 1; i >= 0; i--) if (messages[i].role === "assistant") return typeof messages[i].content === "string" ? messages[i].content : "";
+    return "";
+  })();
+  const userContent = recorder
+    ? "Picture so far (ids included):\n" + JSON.stringify(pictureDomains || {}).slice(0, 12000) +
+      "\n\nFinn's previous message (what the person was answering):\n" + String(lastAssistantBefore).replace(/\[CAPTURE\][\s\S]*$/, "").slice(0, 3000) +
+      "\n\nThe person's latest message:\n" + personText.slice(0, 4000) +
+      "\n\nFinn's reply to it (context only; not a source of facts unless the person confirmed them):\n" + String(visibleReply || "").slice(0, 3000) +
+      "\n\nEmit the [CAPTURE] line for the person's latest message."
+    : "The person said:\n" + personText.slice(0, 4000) +
+      "\n\nFinn's visible reply was:\n" + String(visibleReply || "").slice(0, 4000) +
+      "\n\nEmit the [CAPTURE] line for this turn.";
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -583,25 +603,20 @@ async function reExtractCapture(apiKey, messages, visibleReply) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 900,
-        system: "You are the capture extractor for Finn's Clarity Session. A reply was produced without its mandatory capture block. Read the single conversation turn below and emit the capture block that reply SHOULD have ended with, following the protocol exactly. Output ONLY the [CAPTURE] line, nothing before or after it. Facts come only from what the person actually said this turn; nothing invented, and [CAPTURE]{} if the turn genuinely captured nothing.\n\n" + protocol,
-        messages: [{
-          role: "user",
-          content: "The person said:\n" + personText.slice(0, 4000) +
-            "\n\nFinn's visible reply was:\n" + String(visibleReply || "").slice(0, 4000) +
-            "\n\nEmit the [CAPTURE] line for this turn.",
-        }],
+        max_tokens: 1500,
+        system,
+        messages: [{ role: "user", content: userContent }],
       }),
     });
     if (!res.ok) {
-      console.error(`[Finn clarity] re-extraction call failed — ${res.status}`);
+      console.error(`[Finn clarity] ${recorder ? "recorder" : "re-extraction"} call failed — ${res.status}`);
       return null;
     }
     const data = await res.json();
     const text = Array.isArray(data?.content) ? data.content.filter(b => b.type === "text").map(b => b.text).join("") : "";
     return parseCapture(text);
   } catch (err) {
-    console.error("[Finn clarity] re-extraction threw:", err);
+    console.error(`[Finn clarity] ${recorder ? "recorder" : "re-extraction"} threw:`, err);
     return null;
   }
 }
@@ -695,6 +710,20 @@ async function readPicture(householdId) {
 // the request start (15 Sept walk: a quick reply let one turn's save
 // overwrite the previous one), and the write is conditional on updated_at,
 // retried on conflict, so concurrent saves cannot clobber each other.
+function clampDocument(capture) {
+  // No file was attached this turn, so nothing can be "document": the
+  // person read or remembered it. Clamp to "sighted".
+  const walk = (v) => {
+    if (Array.isArray(v)) { v.forEach(walk); return; }
+    if (v && typeof v === "object") {
+      if (v._confidence === "document") v._confidence = "sighted";
+      Object.values(v).forEach(walk);
+    }
+  };
+  if (capture && capture.domains) walk(capture.domains);
+  return capture;
+}
+
 async function applyCapture(householdId, capture, logId, sessionId, turn) {
   let servedFields = new Set();
   let closeServed = !!turn.closeServedNow;
@@ -710,11 +739,21 @@ async function applyCapture(householdId, capture, logId, sessionId, turn) {
   }
 
   for (let attempt = 1; attempt <= 4; attempt++) {
-    const picture = (await readPicture(householdId)) || { domains: {}, goals: {}, completed_domains: [] };
+    let picture = (await readPicture(householdId)) || { domains: {}, goals: {}, completed_domains: [] };
+    const updatedAt = picture.updated_at;
+    // The recorder's facts land first; the conversation model's capture is
+    // applied on top, so where both speak, the model's reading wins.
+    let recErrors = [];
+    if (turn.recorder && turn.recorder.domains && Object.keys(turn.recorder.domains).length) {
+      const pre = applyCaptureCore({ picture, capture: { domains: turn.recorder.domains }, sessionId, servedFields, sweepsServed: [], closeServed: false });
+      recErrors = pre.errors.map(e => "recorder: " + e);
+      picture = { ...picture, domains: pre.domains, goals: pre.goals, refusals: pre.refusalsOut !== undefined ? pre.refusalsOut : picture.refusals };
+    }
     const result = applyCaptureCore({
       picture, capture, sessionId, servedFields,
       sweepsServed: turn.sweeps || [], closeServed,
     });
+    result.errors = [...recErrors, ...result.errors];
     for (const a of result.anomalies) console.error(`[Finn clarity] capture anomaly: ${a}.`);
     if (result.errors.length) {
       console.error(`[Finn clarity] PARTIAL — ${result.errors.length} field(s) dropped for household ${householdId}; the rest committed: ${JSON.stringify(result.errors)}`);
@@ -729,8 +768,8 @@ async function applyCapture(householdId, capture, logId, sessionId, turn) {
       last_write_status: { ok: true, at },
       updated_at: at,
     });
-    const guard = picture.updated_at
-      ? `&updated_at=eq.${encodeURIComponent(picture.updated_at)}`
+    const guard = updatedAt
+      ? `&updated_at=eq.${encodeURIComponent(updatedAt)}`
       : `&updated_at=is.null`;
     const res = await sbFetch(`/rest/v1/picture?household_id=eq.${householdId}${guard}`, {
       method: "PATCH",
@@ -785,15 +824,16 @@ function frameStream(text) {
 // works from the current picture.
 async function waitForInFlight(householdId, sessionId) {
   if (!sessionId) return null;
-  let last = null;
-  for (let i = 0; i < 8; i++) {
-    const r = await sbFetch(`/rest/v1/capture_log?household_id=eq.${householdId}&session_id=eq.${sessionId}&status=neq.path_served&select=status,errors,created_at&order=created_at.desc&limit=1`);
+  for (let i = 0; i < 24; i++) {
+    const since = new Date(Date.now() - 90000).toISOString();
+    const r = await sbFetch(`/rest/v1/capture_log?household_id=eq.${householdId}&session_id=eq.${sessionId}&status=eq.received&created_at=gt.${encodeURIComponent(since)}&select=id&limit=1`);
     const rows = r.ok ? await r.json() : [];
-    last = rows[0] || null;
-    if (!last || last.status !== "received") return last;
+    if (!rows.length) break;
     await new Promise(res => setTimeout(res, 500));
   }
-  return last;
+  const r = await sbFetch(`/rest/v1/capture_log?household_id=eq.${householdId}&session_id=eq.${sessionId}&status=in.(applied,failed,refused)&raw_text=not.like.%5BRECORDER%5D*&select=status,errors,created_at&order=created_at.desc&limit=1`);
+  const rows = r.ok ? await r.json() : [];
+  return rows[0] || null;
 }
 
 export default async function handler(request, context) {
@@ -884,6 +924,12 @@ export default async function handler(request, context) {
 
   // The working notes: computed by code from the current picture.
   const plan = buildPlan(picture.domains ?? {}, picture.goals ?? {});
+  let servedPaths = [];
+  if (sessionId) {
+    const sr = await sbFetch(`/rest/v1/capture_log?household_id=eq.${auth.householdId}&session_id=eq.${sessionId}&status=eq.path_served&select=field_id`);
+    const sf = new Set(sr.ok ? (await sr.json()).map(r => r.field_id) : []);
+    servedPaths = Object.entries(RETRIEVAL_PATHS).filter(([, p]) => p.satisfies.length && p.satisfies.every(f => sf.has(f))).map(([id]) => id);
+  }
   const unsaved = lastRow && Array.isArray(lastRow.errors) ? lastRow.errors.map(e => String(e).replace(/^gate: /, "")).slice(0, 8) : [];
 
   const contextBlock =
@@ -894,7 +940,7 @@ export default async function handler(request, context) {
     `Areas covered (decided by code): ${JSON.stringify(plan.covered)}\n` +
     `Snapshot answers (warm start — never re-ask these): ${snapshotAnswers ? JSON.stringify(snapshotAnswers) : "(no linked snapshot)"}\n` +
     `Note: the marker "[Session start]" is a system marker, not from the person.` +
-    planPromptSection(plan, { unsaved });
+    planPromptSection(plan, { unsaved, servedPaths });
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -1013,9 +1059,23 @@ export default async function handler(request, context) {
       await setWriteStatusFalse(auth.householdId);
       return;
     }
+    const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
+    const hadAttachment = Array.isArray(lastUserMsg?.content) && lastUserMsg.content.some(b => b && (b.type === "image" || b.type === "document"));
+    const lastUserText = typeof lastUserMsg?.content === "string" ? lastUserMsg.content : "";
+    const machineTurn = /^\[(Session start|TRANSACTION)/.test(lastUserText.trim());
+    let recorder = null;
+    if (!machineTurn) {
+      const fresh = await readPicture(auth.householdId);
+      recorder = await reExtractCapture(apiKey, messages, visibleRaw, fresh ? fresh.domains : {}, "recorder");
+      if (recorder) {
+        await insertCaptureLog(auth.householdId, "[RECORDER]\n[CAPTURE]" + JSON.stringify(recorder), recorder, "applied", sessionId);
+      }
+    }
+    if (!hadAttachment) { clampDocument(capture); if (recorder) clampDocument(recorder); }
     let applied = null;
     try {
       applied = await applyCapture(auth.householdId, capture, logId, sessionId, {
+        recorder,
         sweeps: askResult.sweeps,
         closeServedNow: askResult.frames.includes("close"),
       });

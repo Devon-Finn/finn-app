@@ -375,7 +375,9 @@ export function persistenceGate(patchDomains, mergedDomains, validRefusals) {
     const conf = (w.item && typeof w.item._confidence === "string")
       ? w.item._confidence
       : (patchDomains[w.domain] || {})._confidence;
-    const rank = CONFIDENCE_RANK[conf] ?? 0;
+    // No confidence at all: treated as "stated" (a plain answer), still
+    // recorded as unrecorded when it falls below a higher floor.
+    const rank = CONFIDENCE_RANK[conf] ?? CONFIDENCE_RANK.stated;
     const sightedOk = conf === "sighted" && floorName === "document" && !uploadWorks(w.id);
     if (rank >= floor || sightedOk) {
       clears.push({ field: w.id, item_id: itemId });
