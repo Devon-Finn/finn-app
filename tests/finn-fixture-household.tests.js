@@ -16,10 +16,11 @@
      home_equity          950000 − 540000                    = 410000
      lvr_percent          540000 ÷ 950000 × 100              = 56.8
      surplus_monthly      (7100+5400) − 5200 − 3300
-                          − (550+48+0 personal minimums)     = 3402
-     buffer_months        24000 ÷ (5200+3300+598) — a buffer
+                          − (550+0 personal minimums; the
+                          card cleared monthly adds nothing) = 3450
+     buffer_months        24000 ÷ (5200+3300+550) — a buffer
                           covers what still has to be paid
-                          when income stops                  = 2.6
+                          when income stops                  = 2.7
      super_total          210000 + 145000 + 18000            = 373000
      income_total_annual  120000 + 85000
                           + (52000+4200+9000 other)          = 270200
@@ -283,8 +284,10 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
   const der = derive(D);
   t('home-equity-410000', der.home_equity === 410000);
   t('lvr-56.8', der.lvr_percent === 56.8);
-  t('surplus-3402', der.surplus_monthly === 3402);
-  t('buffer-months-2.6', der.buffer_months === 2.6);
+  // 16 Sept 2026 tile review: the card cleared monthly no longer adds its
+  // $48 minimum (its spending is already in living costs).
+  t('surplus-3450', der.surplus_monthly === 3450);
+  t('buffer-months-2.7', der.buffer_months === 2.7);
   t('super-total-373000', der.super_total === 373000);
   t('income-total-270200', der.income_total_annual === 270200);
   t('income-costs-18000-held-separately', der.income_costs_annual === 18000);
@@ -529,12 +532,26 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
   t('recorder-rows-skip-text-checks',
     lint([applied('[RECORDER]\n[CAPTURE]{"domains":{}}', {}), applied('A reply.\n[CAPTURE]{}', {})], emptyPic).summary.failures === 0);
 
+  /* ── tile batch, 16 Sept 2026: where the money goes, and questions ── */
+  {
+    const D2 = JSON.parse(JSON.stringify(D));
+    D2.expenses = { living_monthly: 5200, includes_housing: false, by_category: { travel: 100, groceries: 1400, other: 50 }, annual_bills_monthly: 400, annual_bills_note: 'car rego; council rates', coverage_months: 12, _confidence: 'document' };
+    const der2 = derive(D2);
+    const tr2 = evaluate(D2, { derived: der2 }).tiles.find(x => x.tile === 2);
+    const html2 = panels.renderTile(2, D2, der2, tr2, library, {});
+    const iG = html2.indexOf('Groceries'), iT = html2.indexOf('Travel and holidays');
+    t('where-it-goes-fixed-order', iG > -1 && iT > iG && html2.includes('car rego and council rates'));
+    t('where-it-goes-no-judgement', !/\b(high|low|too much|a lot|overspend)\b/i.test(html2.slice(html2.indexOf('Where it goes'), html2.indexOf('The rest of the income details'))));
+    const html1 = panels.renderTile(1, D, der, evaluate(D, { derived: der }).tiles.find(x => x.tile === 1), library, {});
+    t('every-tile-has-questions-to-ask', html1.includes('Questions to ask') && !html1.includes('Worth a conversation'));
+  }
+
   return {
     pass: failures.length === 0,
-    total: 115,
+    total: 118,
     failures,
     hand_computed: {
-      home_equity: 410000, lvr_percent: 56.8, surplus_monthly: 3402, buffer_months: 2.6,
+      home_equity: 410000, lvr_percent: 56.8, surplus_monthly: 3450, buffer_months: 2.7,
       super_total: 373000, income_total_annual: 270200, income_costs_annual: 18000,
       property_equity_commercial: 300000, property_equity_holiday: 310000,
       debts_total_personal: 107400, debts_total_company: 380000,

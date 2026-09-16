@@ -35,11 +35,11 @@
 export const RETRIEVAL_PATHS = {
   home_value: {
     name: "what the home is worth",
-    where: "The quickest honest read is your lender's app or website, which usually shows their current estimate of the property, or your most recent council rates notice.",
-    look_for: "Look for the estimated value or valuation figure. If it shows a range, keep the range, both ends matter.",
-    honest: "A rates notice and most portal estimates lag the market, so the figure is a considered estimate rather than a sale price, and that is exactly how I will record it.",
-    offer: "Attach a photo or screenshot of the estimate or notice here and I will read it, or read the figure to me exactly as it appears and tell me where it came from.",
-    satisfies: ["home.value_estimate", "home.value_source", "investments.properties[].value_estimate"],
+    where: "The closest read on what a home would sell for today is an online estimate: search the address on realestate.com.au and open the property page. If a lender has valued it in the last year or so, that works too.",
+    look_for: "Look for the estimated value and the low and high figures shown with it. Keep both ends of that range, they matter as much as the middle.",
+    honest: "An online estimate is a starting point rather than a sale price, so I will record it as an estimate with its range. A council rates notice usually sits well under what a home would sell for, so it is a last resort rather than a first stop.",
+    offer: "Attach a screenshot of the estimate here and I will read it, or read me the middle figure and both ends of the range exactly as they appear, and tell me where they came from.",
+    satisfies: ["home.value_estimate", "home.value_low", "home.value_high", "home.value_source", "investments.properties[].value_estimate"],
   },
   loan_details: {
     name: "the loan, from the loan screen",
@@ -129,10 +129,10 @@ export const RETRIEVAL_PATHS = {
   },
   living_costs: {
     name: "the spending, from a transaction export",
-    where: "The fullest honest read of what goes out comes from a transaction export covering the last twelve months, and I can walk you through getting one from your bank.",
-    look_for: "Once the file lands here, code does the arithmetic across the whole year, so one-off months do not distort the figure.",
-    honest: "A guessed monthly figure is usually well under the real one, which is why the export is worth the two minutes.",
-    offer: "Attach the file here when you have it, and I will read it straight away. If an export isn't possible right now, tell me what you think goes out in a typical month, leaving the mortgage aside, and I'll note it as an estimate to firm up.",
+    where: "The fullest honest read of what goes out comes from twelve months of transactions, from every account and card the spending comes out of. Rego, insurance, school costs and Christmas land unevenly across the year, so a shorter stretch can't simply be scaled up, and I can walk you through getting the export from your bank.",
+    look_for: "Export each account and card as a CSV covering the last twelve months. Some banks only export a few months at a time, so one account can take two or three downloads; send them all, and a joint account only once.",
+    honest: "Once the files land here, code sorts the spending into where it goes and does the arithmetic across the whole year. A guessed monthly figure is usually well under the real one, which is why the export is worth the few minutes.",
+    offer: "Attach the files here when you have them, and I will read them straight away. If an export isn't possible right now, tell me what you think goes out in a typical month, leaving the mortgage aside, and I'll note it as an estimate to firm up.",
     satisfies: ["expenses.living_monthly"],
   },
   hecs: {

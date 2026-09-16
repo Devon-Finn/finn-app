@@ -1,5 +1,6 @@
 {
   "_meta": {
+    "questions_status": "DRAFT 16 Sept 2026 (Claude): tiles[n].questions and insights[].question are draft copy awaiting Devon's edit and Charlie's sign-off. They render as questions for the person to take to a professional, never as Finn's view.",
     "source": "docs/field-spec.md Part 4 + docs/component-spec.md 5.2 (structure) + docs/education-library.md (copy, signed off tile by tile with Devon) + docs/term-registry.md (companion)",
     "rules": [
       "position_line.template is filled by slot substitution ONLY. The renderer never composes or rewords the sentence, and no model call touches this path.",
@@ -58,6 +59,7 @@
   "tiles": {
     "1": {
       "title": "Your home and mortgage",
+      "questions": [{"q": "How does my rate compare with what lenders are offering today?", "pro": "mortgage_broker"}, {"q": "Does the way my loan is set up, including any splits, offset or fixed period, still fit how we live now?", "pro": "mortgage_broker"}, {"q": "What does this loan cost me in fees each year, and what do I get for them?", "pro": "mortgage_broker"}],
       "calm": {
         "statement": "Nothing here routes to anyone.",
         "why": "With no loan against the place there's no rate to review, no structure to look at and no lender in the picture. A home owned outright is the simplest position this tile can hold.",
@@ -66,14 +68,17 @@
       }
     },
     "2": {
-      "title": "What's left over each month"
+      "title": "What's left over each month",
+      "questions": [{"q": "What could the money left over each month be doing for the things we want?", "pro": "financial_planner"}, {"q": "Which of our regular costs land once or twice a year, and how do we plan for them?", "pro": "financial_planner"}]
     },
     "3": {
       "title": "Your safety net",
+      "questions": [{"q": "How much would we want within easy reach if our income paused?", "pro": "financial_planner"}, {"q": "Does money in an offset work the same way as savings for us?", "pro": "mortgage_broker"}],
       "section_b": "Your safety net is money you could reach quickly, without selling anything or asking anyone's permission. The months figure is that amount divided by what a month of your life costs, so it's expressed as time rather than dollars. It counts only money you already hold. Credit you could draw on isn't included, because that belongs to a lender rather than to you."
     },
     "4": {
       "title": "Your super",
+      "questions": [{"q": "Do we need every super account we hold, and what does each one cost us?", "pro": "financial_planner"}, {"q": "What insurance sits inside our super, and what would it pay?", "pro": "insurance_specialist"}, {"q": "Is the nomination on each fund current, and does it say what we want?", "pro": "financial_planner"}],
       "section_b": "Super is money held for you until retirement, in one account or several. Each account charges its own fees, taken out of the balance rather than billed to you, so they're easy not to notice. Accounts can also hold insurance inside them, with the premiums coming out of the balance the same way.",
       "calm": {
         "statement": "Nothing here routes to anyone.",
@@ -84,10 +89,12 @@
     },
     "5": {
       "title": "Protection",
+      "questions": [{"q": "What would our household need if one of us couldn't work for a year or more?", "pro": "insurance_specialist"}, {"q": "Which of our cover sits inside super and which outside, and what difference does that make?", "pro": "insurance_specialist"}],
       "section_b": "Life cover pays a lump sum if you die. Total and permanent disability cover pays if you're permanently unable to work again. Income protection is a different thing again, it replaces part of your income month to month while you're unable to work, and stops when you go back. They're three separate events, and holding cover for one doesn't cover you for the others."
     },
     "6": {
       "title": "Your will and estate",
+      "questions": [{"q": "Do our wills still describe our family as it is now?", "pro": "estate_lawyer"}, {"q": "Who could make decisions for us if we couldn't make them ourselves?", "pro": "estate_lawyer"}, {"q": "How does our super pass on, and does it line up with our wills?", "pro": "estate_lawyer"}],
       "section_b": "A will directs what happens to what you own. An enduring power of attorney lets someone you choose make decisions on your behalf if you're unable to, while you're still alive, which a will doesn't cover. Guardianship names who would raise your children. A super nomination directs your super, which is dealt with separately from your will.",
       "calm": {
         "statement": "Nothing here routes to anyone.",
@@ -98,14 +105,17 @@
     },
     "7": {
       "title": "Your investments",
+      "questions": [{"q": "Does the way our investments are spread still suit our timeframe?", "pro": "financial_planner"}, {"q": "How are our investment income and any borrowing for it treated at tax time?", "pro": "accountant"}],
       "section_b": "An investment property has its own value, its own loan and its own equity, in the same way your home does. The rent it earns is income, and the interest on its loan is treated differently at tax time from the interest on the loan for the home you live in. For shares and funds, what they earn is taxed at the marginal rate of whoever the asset is held by, so whose name is on it changes what it costs."
     },
     "8": {
       "title": "Your other debts",
+      "questions": [{"q": "What does each of our debts cost us over a year, all in?", "pro": "mortgage_broker"}, {"q": "If money ever got tight, what help is available and who do we call?", "pro": "financial_counsellor"}],
       "section_b": "The minimum repayment on a credit card is calculated as a small percentage of the balance, which means most of an early payment goes to interest rather than the debt. It's why a balance at 20% moves slowly even when the minimum is met every month."
     },
     "9": {
       "title": "How your income is made up",
+      "questions": [{"q": "Is the way our income is earned set up sensibly for tax?", "pro": "accountant"}, {"q": "What records should we keep for income that doesn't come through a payslip?", "pro": "accountant"}],
       "section_b": "Income from an employer has tax taken out before it reaches you, and the employer pays super on top of it. Income you earn for yourself arrives whole, with the tax on it settled later, and no super attached unless you arrange it yourself. The total here is annual and before tax, so it won't match what actually lands in your account each month.",
       "calm": {
         "statement": "Nothing here routes to anyone.",
@@ -118,6 +128,7 @@
   "insights": [
     {
       "id": "1.1",
+      "question": "Given my rate and how long I've been with my lender, is there a sharper rate or a better set-up available to me?",
       "title": "Your rate and how the loan is set up",
       "tile": 1,
       "variant": null,
@@ -138,6 +149,7 @@
     },
     {
       "id": "1.2",
+      "question": "Is the offset on my loan worth keeping, and what is it costing me while it's empty?",
       "title": "An offset account with nothing in it",
       "tile": 1,
       "variant": null,
@@ -158,6 +170,7 @@
     },
     {
       "id": "1.3",
+      "question": "What are the options and the risks around the equity in my home?",
       "title": "Your equity and what it could be used for",
       "tile": 1,
       "variant": null,
@@ -178,6 +191,7 @@
     },
     {
       "id": "2.1",
+      "question": "What should the money left over each month be doing, given what we want?",
       "title": "What your spare money could be doing",
       "tile": 2,
       "variant": null,
@@ -198,6 +212,7 @@
     },
     {
       "id": "2.2",
+      "question": "What are our options when more goes out each month than comes in?",
       "title": "When there's nothing left over",
       "tile": 2,
       "variant": null,
@@ -220,6 +235,7 @@
     },
     {
       "id": "3.1",
+      "question": "Is the length of time our safety net would last right for our household?",
       "title": "How long your safety net would last",
       "tile": 3,
       "variant": null,
@@ -240,6 +256,7 @@
     },
     {
       "id": "3.2a",
+      "question": "Would our safety net do more for us sitting against the loan?",
       "title": "Where your safety net sits",
       "tile": 3,
       "variant": "has_offset",
@@ -260,6 +277,7 @@
     },
     {
       "id": "3.2b",
+      "question": "Would an offset account on our loan change how our safety net works?",
       "title": "Where your safety net sits",
       "tile": 3,
       "variant": "no_offset",
@@ -281,6 +299,7 @@
     },
     {
       "id": "4.1",
+      "question": "Should our super sit in fewer accounts, and what would we lose or keep by moving it?",
       "title": "More than one super account",
       "tile": 4,
       "variant": null,
@@ -301,6 +320,7 @@
     },
     {
       "id": "5.1",
+      "question": "Does the cover we hold match what our household would actually need?",
       "title": "The cover that protects your household",
       "tile": 5,
       "variant": null,
@@ -321,6 +341,7 @@
     },
     {
       "id": "6.1",
+      "question": "Which of our legal documents need writing or updating, and what happens if we leave them?",
       "title": "Your will and the legal basics",
       "tile": 6,
       "variant": null,
@@ -341,6 +362,7 @@
     },
     {
       "id": "7.1",
+      "question": "Is the loan and set-up on our investment property still right for us?",
       "title": "Your investment property",
       "tile": 7,
       "variant": null,
@@ -361,6 +383,7 @@
     },
     {
       "id": "7.2",
+      "question": "Do our investments still fit what we're aiming for and our timeframe?",
       "title": "Your investments and how they fit",
       "tile": 7,
       "variant": null,
@@ -382,6 +405,7 @@
     },
     {
       "id": "8.1a",
+      "question": "Is there a cheaper or simpler way to hold our other debts?",
       "title": "Your other debts",
       "tile": 8,
       "variant": "has_mortgage",
@@ -402,6 +426,7 @@
     },
     {
       "id": "8.1b",
+      "question": "What's the cheapest order to clear our debts in?",
       "title": "Your other debts",
       "tile": 8,
       "variant": "no_mortgage",
@@ -425,6 +450,7 @@
     },
     {
       "id": "9.1",
+      "question": "Is the way our income is structured working well for us at tax time?",
       "title": "How your income is set up",
       "tile": 9,
       "variant": null,
@@ -447,6 +473,7 @@
   "overrides": [
     {
       "id": "hardship",
+      "question": "What help can I ask my lenders for while money is tight?",
       "title": "If money is tight right now",
       "tile": 8,
       "variant": null,

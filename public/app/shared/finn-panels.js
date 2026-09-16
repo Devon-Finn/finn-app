@@ -243,35 +243,60 @@
     // (component-spec 2.1): a figure captured as "estimated" carries it in
     // its own label; document and stated carry nothing, the unremarkable
     // case. Applies to captured figures, not derived results.
-    const conf = (dom, label) => dom && dom._confidence === 'estimated' ? label + ', your estimate' : label;
+    // Per-field where the ledger knows (16 Sept 2026: a remembered home
+    // value was marking every loan figure "your estimate"); the domain's
+    // confidence only when there is no ledger at all.
+    const ledger = d.flags && Array.isArray(d.flags.to_verify) ? d.flags.to_verify : null;
+    const confField = (dom, field, label) => {
+      if (ledger) return ledger.some(e => e && e.field === field && !e.item_id && e.confidence === 'estimated') ? label + ', your estimate' : label;
+      return dom && dom._confidence === 'estimated' ? label + ', your estimate' : label;
+    };
+    const conf = (dom, label, field) => field ? confField(dom, field, label)
+      : (ledger ? label : (dom && dom._confidence === 'estimated' ? label + ', your estimate' : label));
     let html = '';
 
     if (tileNo === 1) {
+      // Everything secured on the home, as the equity figure counts it.
+      const securedAll = (num(der.home_equity) !== null && num(home.value_estimate) !== null) ? home.value_estimate - der.home_equity : null;
+      const securedOther = (securedAll !== null && num(home.mortgage_balance) !== null) ? securedAll - home.mortgage_balance : null;
       if (money(der.home_equity)) {
+        const owed = securedAll !== null ? securedAll : home.mortgage_balance;
         const bar = C().proportionBar(
-          { label: 'Owed ' + money(home.mortgage_balance), value: home.mortgage_balance },
+          { label: 'Owed ' + money(owed), value: owed },
           { label: 'Yours ' + money(der.home_equity), value: der.home_equity },
-          'Loan ' + money(home.mortgage_balance) + ' against equity ' + money(der.home_equity));
+          'Lending ' + money(owed) + ' against equity ' + money(der.home_equity));
         html += C().figureHero(money(der.home_equity), 'is the part of the property you own', 'outright.', bar);
       } else if (money(home.value_estimate)) {
         html += C().figureHero(money(home.value_estimate), 'is what the home is worth, on your', 'estimate.');
       }
+      // The estimate's range, where one was given (Devon, 16 Sept 2026):
+      // the value and the equity are estimates, and the range says how wide.
+      if (money(home.value_low) && money(home.value_high)) {
+        const eqLo = securedAll !== null ? money(home.value_low - securedAll) : null;
+        const eqHi = securedAll !== null ? money(home.value_high - securedAll) : null;
+        const src = text(home.value_source);
+        html += '<p class="fp-range">' + (src && /estimate/i.test(src) ? 'The ' + esc(src) : 'The estimate' + (src ? ' (' + esc(src) + ')' : '')) +
+          ' ranges from ' + money(home.value_low) + ' to ' + money(home.value_high) + '.' +
+          (eqLo && eqHi ? ' On that range, what you own of it sits between ' + eqLo + ' and ' + eqHi + '.' : '') + '</p>';
+      }
+      const otherRow = securedOther ? [{ label: 'Other lending secured on the home, such as a split', op: '−', value: money(securedOther) }] : [];
       html += calcSection('What you own of it', [
-        { label: conf(home, 'Value'), op: '', value: money(home.value_estimate), missing: money(home.value_estimate) === null },
-        { label: conf(home, 'Loan balance'), op: '−', value: money(home.mortgage_balance), missing: money(home.mortgage_balance) === null },
+        { label: conf(home, 'Value', 'home.value_estimate') + (text(home.value_source) ? ', ' + text(home.value_source) : ''), op: '', value: money(home.value_estimate), missing: money(home.value_estimate) === null },
+        { label: conf(home, 'Loan balance', 'home.mortgage_balance'), op: '−', value: money(home.mortgage_balance), missing: money(home.mortgage_balance) === null },
+        ...otherRow,
         { label: 'What you own of it', op: '=', value: money(der.home_equity), missing: money(der.home_equity) === null, result: true },
       ], hand('equity'));
       html += calcSection('How much of the place is borrowed', [
-        { label: conf(home, 'What you still owe'), op: '', value: money(home.mortgage_balance), missing: money(home.mortgage_balance) === null },
-        { label: conf(home, 'What the property is worth'), op: '÷', value: money(home.value_estimate), missing: money(home.value_estimate) === null },
+        { label: conf(home, 'What you still owe', 'home.mortgage_balance') + (securedOther ? ', including other lending on the home' : ''), op: '', value: money(securedAll !== null && securedOther ? securedAll : home.mortgage_balance), missing: money(home.mortgage_balance) === null },
+        { label: conf(home, 'What the property is worth', 'home.value_estimate'), op: '÷', value: money(home.value_estimate), missing: money(home.value_estimate) === null },
         { label: 'How much of the place is borrowed', op: '=', value: rate(der.lvr_percent), missing: rate(der.lvr_percent) === null, result: true },
       ], hand('lvr'));
       if (home.has_offset === true) {
         const chargedOn = (num(home.mortgage_balance) !== null && num(home.offset_balance) !== null)
           ? money(home.mortgage_balance - home.offset_balance) : null;
         html += calcSection('What interest is charged on', [
-          { label: conf(home, 'Loan balance'), op: '', value: money(home.mortgage_balance), missing: money(home.mortgage_balance) === null },
-          { label: conf(home, 'In your offset'), op: '−', value: money(home.offset_balance), missing: money(home.offset_balance) === null },
+          { label: conf(home, 'Loan balance', 'home.mortgage_balance'), op: '', value: money(home.mortgage_balance), missing: money(home.mortgage_balance) === null },
+          { label: conf(home, 'In your offset', 'home.offset_balance'), op: '−', value: money(home.offset_balance), missing: money(home.offset_balance) === null },
           { label: 'What interest is charged on', op: '=', value: chargedOn, missing: chargedOn === null, result: true },
         ], hand('offset'));
       }
@@ -291,17 +316,18 @@
       }
       const takeHomeKnown = [inc.salary_net_monthly, inc.partner_salary_net_monthly].filter(v => num(v) !== null);
       const takeHome = takeHomeKnown.length ? takeHomeKnown.reduce((a, b) => a + b, 0) : null;
-      const mins = arr(debts.items).map(it => num(it && it.minimum_monthly)).filter(v => v !== null);
+      const minsTotal = num(der.personal_minimums_monthly);
       const rows = [
-        { label: conf(inc, 'Take-home pay, both of you'), op: '', value: money(takeHome), missing: takeHome === null },
-        { label: conf(exp, 'Living costs'), op: '−', value: money(exp.living_monthly) ? money(exp.living_monthly) + (exp.includes_housing === true ? ' · includes housing' : '') : null, missing: money(exp.living_monthly) === null },
+        { label: conf(inc, 'Take-home pay, both of you', 'income.salary_net_monthly'), op: '', value: money(takeHome), missing: takeHome === null },
+        { label: conf(exp, 'Living costs', 'expenses.living_monthly'), op: '−', value: money(exp.living_monthly) ? money(exp.living_monthly) + (exp.includes_housing === true ? ' · includes housing' : '') : null, missing: money(exp.living_monthly) === null },
       ];
       if (exp.includes_housing !== true) {
-        rows.push({ label: conf(exp, 'Housing repayment'), op: '−', value: money(exp.housing_repayment_monthly), missing: money(exp.housing_repayment_monthly) === null });
+        rows.push({ label: 'Housing repayment', op: '−', value: money(der.housing_monthly), missing: money(der.housing_monthly) === null });
       }
-      if (mins.length) rows.push({ label: 'Minimum payments, other debts', op: '−', value: money(mins.reduce((a, b) => a + b, 0)) });
+      if (minsTotal) rows.push({ label: 'Minimum payments, other personal debts', op: '−', value: money(minsTotal) });
       rows.push({ label: 'What’s left over', op: '=', value: money(der.surplus_monthly), missing: money(der.surplus_monthly) === null, result: true });
       html += calcSection('What’s left over each month', rows, hand('take_home_pay'));
+      html += whereItGoes(exp);
       html += refBlock('The rest of the income details', [
         ['Salary, before tax', money(inc.salary_gross_annual) ? money(inc.salary_gross_annual) + '/year' : null],
         ['Partner salary, before tax', money(inc.partner_salary_gross_annual) ? money(inc.partner_salary_gross_annual) + '/year' : null],
@@ -314,10 +340,10 @@
       } else if (money(buf.accessible_savings)) {
         html += C().figureHero(money(buf.accessible_savings), 'is the money you could reach', 'quickly.');
       }
-      const housing = exp.includes_housing === true ? 0 : num(exp.housing_repayment_monthly);
-      const monthCost = (num(exp.living_monthly) !== null && housing !== null) ? exp.living_monthly + housing : null;
+      const housing = num(der.housing_monthly);
+      const monthCost = (num(exp.living_monthly) !== null && housing !== null) ? exp.living_monthly + housing + (num(der.personal_minimums_monthly) || 0) : null;
       html += calcSection('How long it would last', [
-        { label: conf(buf, 'Accessible savings'), op: '', value: money(buf.accessible_savings), missing: money(buf.accessible_savings) === null },
+        { label: conf(buf, 'Accessible savings', 'buffer.accessible_savings'), op: '', value: money(buf.accessible_savings), missing: money(buf.accessible_savings) === null },
         { label: 'What a month costs', op: '÷', value: money(monthCost), missing: monthCost === null },
         { label: 'How long it would last', op: '=', value: num(der.buffer_months) !== null ? der.buffer_months + ' months' : null, missing: num(der.buffer_months) === null, result: true },
       ]);
@@ -465,8 +491,8 @@
         }], []) + '</div>';
       }
       html += '<div class="fp-teach"><h4 class="fp-calchead">Held outside property</h4>' + statusList([
-        [conf(inv, 'Shares and ETFs'), money(inv.shares_value) ? money(inv.shares_value) + (text(inv.held_in) ? ' · held in ' + text(inv.held_in) : '') : null],
-        [conf(inv, 'Managed funds'), money(inv.managed_funds_value)],
+        [conf(inv, 'Shares and ETFs', 'investments.shares_value'), money(inv.shares_value) ? money(inv.shares_value) + (text(inv.held_in) ? ' · held in ' + text(inv.held_in) : '') : null],
+        [conf(inv, 'Managed funds', 'investments.managed_funds_value'), money(inv.managed_funds_value)],
       ]) + '</div>';
       html += refBlock('The rest of the property details', props.length ? props.flatMap((p, i) => [
         ['Rate' + (props.length > 1 ? ', property ' + (i + 1) : ''), rate(p && p.rate_percent)],
@@ -540,7 +566,7 @@
         }], []) + '</div>';
       }
       html += refBlock('Held separately', [
-        [conf(debts, 'HECS'), money(debts.hecs_balance)],
+        [conf(debts, 'HECS', 'debts.hecs_balance'), money(debts.hecs_balance)],
       ]);
     }
 
@@ -599,15 +625,83 @@
     return html;
   }
 
+  /* ══════════ questions (Devon, 16 Sept 2026) ══════════
+     Every tile carries questions worth taking to a professional; a tile
+     whose figures raise one for this household carries that one too, on
+     its card. They are the person's questions to ask, never Finn's view.
+     Copy lives in the library (draft until Devon and Charlie sign it off). */
+  function questionsSection(tileNo, library) {
+    const tileMeta = library && library.tiles && library.tiles[String(tileNo)];
+    const qs = arr(tileMeta && tileMeta.questions).filter(x => x && typeof x.q === 'string');
+    if (!qs.length) return '';
+    const pros = (library && library.professionals) || {};
+    return '<div class="fp-section fp-questions"><h4 class="fp-calchead">Questions to ask</h4><ul class="fp-qlist">' +
+      qs.map(x => '<li><span class="fp-qtext">' + esc(x.q) + '</span>' +
+        (pros[x.pro] ? '<span class="fp-qpro">' + esc(pros[x.pro].name) + '</span>' : '') + '</li>').join('') +
+      '</ul></div>';
+  }
+
+  /* ══════════ where the money goes (tile 2) ══════════
+     Categories from a bank export, in a FIXED order (never sorted by size,
+     never labelled high or low). Each row is a share of the same total. */
+  const SPEND_LABELS = [
+    ['groceries', 'Groceries'], ['eating_out', 'Eating out and takeaway'], ['transport', 'Car and transport'],
+    ['utilities', 'Power, water, phone and internet'], ['insurance', 'Insurance'], ['health', 'Health and medical'],
+    ['kids_education', 'Kids, school and childcare'], ['home_costs', 'Rates, strata and home upkeep'],
+    ['shopping', 'Shopping and household'], ['leisure', 'Subscriptions, fitness and leisure'],
+    ['travel', 'Travel and holidays'], ['other', 'Everything else'],
+  ];
+  const listWords = xs => xs.length <= 1 ? (xs[0] || '') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1];
+  function whereItGoes(exp) {
+    const cats = exp && exp.by_category && typeof exp.by_category === 'object' ? exp.by_category : null;
+    if (!cats) {
+      if (money(exp && exp.living_monthly)) {
+        return '<div class="fp-section fp-where"><h4 class="fp-calchead">Where it goes</h4>' +
+          '<p class="fp-range">This figure was given as a total, so there is no breakdown yet. Twelve months of transactions from your accounts and cards would show where it goes.</p></div>';
+      }
+      return '';
+    }
+    const rows = SPEND_LABELS.filter(([k]) => num(cats[k]) !== null && cats[k] > 0);
+    const total = rows.reduce((a, [k]) => a + cats[k], 0);
+    if (!(total > 0)) return '';
+    let html = '<div class="fp-section fp-where"><h4 class="fp-calchead">Where it goes</h4><div class="fp-spend">';
+    for (const [k, label] of rows) {
+      const pct = Math.round(cats[k] / total * 100);
+      html += '<div class="fp-srow"><span class="fp-slabel">' + esc(label) + '</span>' +
+        '<span class="fp-sbar"><span style="width:' + Math.max(pct, 1) + '%"></span></span>' +
+        '<span class="fp-sval">' + money(cats[k]) + '<span class="u">/month</span></span></div>';
+    }
+    html += '</div>';
+    const notes = [];
+    if (num(exp.annual_bills_monthly) !== null && exp.annual_bills_monthly > 0) {
+      const named = text(exp.annual_bills_note) ? text(exp.annual_bills_note).split('; ').filter(x => x && x !== 'other yearly bills').slice(0, 3) : [];
+      notes.push('About ' + money(exp.annual_bills_monthly) + ' a month of this is once-a-year bills' +
+        (named.length ? ' such as ' + esc(listWords(named)) : '') + ', spread across the year.');
+    }
+    if (num(exp.one_off_monthly) !== null && exp.one_off_monthly > 0) {
+      notes.push('About ' + money(exp.one_off_monthly) + ' a month of it was one-off spending. It stays in, because every year has something like it.');
+    }
+    if (num(exp.coverage_months) !== null) {
+      notes.push(exp.coverage_months < 11
+        ? 'Built from ' + exp.coverage_months + ' months of transactions, so some once-a-year costs may not be in it yet.'
+        : 'Built from ' + Math.round(exp.coverage_months) + ' months of transactions across your accounts and cards.');
+    }
+    if (notes.length) html += '<p class="fp-range">' + notes.join(' ') + '</p>';
+    return html + '</div>';
+  }
+
   /* ══════════ insights as gap cards ══════════ */
 
   function gapCardFor(insight, entry, domains, derived, library, costHtml) {
     const pos = fillPositionLine(entry.position_line, domains, derived);
     let body = '';
+    // The personal question leads the card; the insight's own title then
+    // introduces the explanation underneath.
+    if (entry.question && entry.title) body += '<p class="fp-intro">' + esc(entry.title) + '</p>';
     if (entry.intro && !isPlaceholder(entry.intro)) body += '<p class="fp-intro">' + esc(entry.intro) + '</p>';
 
     const HEADINGS = {
-      why: 'Why this is worth a conversation',
+      why: 'Why this question matters',
       turn_up: 'What a look at this can turn up',
       dont_realise: "The part most people don't realise",
       how_professional: 'How the professional works',
@@ -654,7 +748,7 @@
     const pro = entry.route_primary && library.professionals && library.professionals[entry.route_primary];
     return C().gapCard({
       id: entry.id,
-      headline: entry.title || '',
+      headline: entry.question || entry.title || '',
       hook: pos || '',
       chip: pro ? pro.name + ' · ' + pro.cost_pill.toLowerCase() : '',
       bodyHtml: body,
@@ -665,8 +759,7 @@
      place of the insight stack when a tile has figures and zero insights.
      Only tiles 1, 4, 6 and 9 can go calm and carry a block; the other five
      can never go calm, so no block is expected for them. Never a tick,
-     never green — the component enforces the palette, the status flag
-     stays neutral grey Nothing flagged. */
+     never green — the component enforces the palette. */
   function calmSection(tileNo, tileResult, domains, library) {
     if (!tileResult || tileResult.insights.length) return '';
     if (!tileReached(tileNo, domains)) return ''; // still building, not calm
@@ -693,7 +786,7 @@
         return gapCardFor(ins, entry, domains, derived, library, costHtml);
       })
       .filter(Boolean);
-    return '<div class="fp-section fp-insights"><h4 class="fp-calchead">Worth a conversation</h4>' +
+    return '<div class="fp-section fp-insights"><h4 class="fp-calchead">Questions for your situation</h4>' +
       C().stepRail(cards) + '</div>';
   }
 
@@ -795,6 +888,7 @@
     }
     html += insightsSection(tileResult, domains, derived, library);
     html += calmSection(tileNo, tileResult, domains, library);
+    html += questionsSection(tileNo, library);
     html += '</article>';
     return html;
   }

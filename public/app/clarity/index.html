@@ -101,9 +101,12 @@
   .prog-fill{height:100%; width:0%; background:var(--steel); border-radius:6px; transition:width .5s;}
   .prog-label{font-size:12px; color:var(--steel); margin-top:8px;}
   /* ===== INSIGHT TILES (3b — Layer 2, per the locked v10 mockup) =====
-     Status is a ROUTER, never a verdict: warm edge = worth a conversation,
-     forest edge = nothing flagged, neutral = still building. No red, no
-     traffic-light, no grading of any number. */
+     The badge says where the GATHERING is (Complete / Still gathering),
+     never a verdict (Devon, 16 Sept 2026: no "Nothing flagged", no "In good
+     shape"). Edge colours are unchanged: warm = there are questions for this
+     household's situation, forest = complete, neutral = still gathering.
+     Every tile carries a questions pointer. No red, no traffic-light, no
+     grading of any number. */
   .tiles{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   @media(max-width:1180px){.tiles{grid-template-columns:1fr;}}
   .tile{background:var(--surface); border:1px solid var(--rule); border-radius:13px; padding:15px 15px 14px; cursor:pointer; transition:all .18s; box-shadow:var(--shadow); position:relative; overflow:hidden;}
@@ -131,6 +134,7 @@
   .tile .facts{font-size:11.5px; color:var(--light); font-weight:500; margin-top:5px; line-height:1.45;}
   .tile .route{display:flex; align-items:flex-start; gap:6px; margin-top:8px; font-size:11.5px; font-weight:600; color:var(--warm-deep); line-height:1.4;}
   .tile .route svg{width:11px; height:11px; flex-shrink:0; margin-top:2px;}
+  .tile .route.neutral{color:var(--steel-deep); font-weight:500;}
   .tile .ctx{display:block; font-size:11.5px; color:var(--light); font-weight:500; margin-top:4px; line-height:1.4;}
   .tile .complete{margin-top:11px; height:3px; background:var(--rule-soft); border-radius:4px; overflow:hidden;}
   .tile .complete .cf{height:100%; background:var(--steel-deep); border-radius:4px; transition:width .5s;}
@@ -292,11 +296,10 @@
             <div class="headline" id="heroLine">Your picture's <span class="fr">being built</span>.</div>
             <div class="prog-wrap">
               <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
-              <div class="prog-label" id="progLabel">0 of 8 areas built</div>
             </div>
           </div>
           <div class="tiles" id="tilesGrid"></div>
-          <div class="dash-note" id="dashNote"><b>Built from your real figures as you talk.</b> A warm edge means an area is worth a conversation with the right professional — it's never a judgment of your numbers. Tap any tile for the full detail.</div>
+          <div class="dash-note" id="dashNote"><b>Built from your real figures as you talk.</b> Every tile has questions worth taking to the right professional. Where your own figures raise one, the tile says so. It's never a judgment of your numbers. Tap any tile for the full detail.</div>
           <div id="whoView" class="fc" style="display:none"></div>
         </div>
       </div>
@@ -537,8 +540,8 @@ function addTyping() {
    Display rules carried through from the education library: a missing value
    is "none recorded", never zero; no colour verdicts, no benchmarks, no
    scores with denominators. Display is broader than triggering — a visible
-   tile with nothing flagged shows its figures and routes nowhere. A tile
-   whose domain the conversation never reached is "Still building": no
+   tile with no questions for the situation shows its figures only. A tile
+   whose domain the conversation never reached is "Still gathering": no
    insight fires on a domain that was never reached.
 
    Referral cards (the old 3c layer) are intentionally NOT wired here; they
@@ -549,7 +552,14 @@ let FINN_LIBRARY = null;
 function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
 function fmt$(n) { const r = Math.round(n); return (r < 0 ? '-$' + Math.abs(r).toLocaleString('en-AU') : '$' + r.toLocaleString('en-AU')); }
 
-const BADGE_LABEL = { flag: 'Worth a conversation', calm: 'Nothing flagged', building: 'Still building' };
+// The badge reports the gathering, never the money. The colour class
+// (flag / calm / building) is unchanged; the words come from `reached`.
+function badgeLabel(reached) { return reached ? 'Complete' : 'Still gathering'; }
+function questionPointer(count) {
+  return count > 0
+    ? { text: count + (count === 1 ? ' question' : ' questions') + ' for your situation', cls: 'route' }
+    : { text: 'Questions to ask', cls: 'route neutral' };
+}
 
 // Whether a tile's domain was reached — one shared definition, in
 // finn-panels.js, used by the grid badges and the panel calm decision.
@@ -652,24 +662,19 @@ function renderTiles(picture) {
     const state = t.insights.length ? 'flag' : (reached ? 'calm' : 'building');
     const head = tileHeadline(t.tile, d, derived);
     const title = FINN_LIBRARY && FINN_LIBRARY.tiles[String(t.tile)] ? FINN_LIBRARY.tiles[String(t.tile)].title : 'Tile ' + t.tile;
-    const firstInsight = t.insights[0];
-    let routeLabel = '';
-    if (firstInsight && FINN_LIBRARY) {
-      const entry = [].concat(FINN_LIBRARY.insights, FINN_LIBRARY.overrides).find(e => e.id === firstInsight.id);
-      if (entry) routeLabel = entry.action_label;
-    }
+    const pointer = questionPointer(t.insights.length);
     const el = document.createElement('div');
     el.className = 'tile s-' + state + (reached ? ' done' : '');
     el.setAttribute('data-tile', t.tile);
     el.onclick = () => openDetail(t.tile);
     el.innerHTML =
-      '<div class="status-row"><span class="badge ' + state + '"><span class="d"></span>' + BADGE_LABEL[state] + '</span><span class="ico">' + CHEV + '</span></div>' +
+      '<div class="status-row"><span class="badge ' + state + '"><span class="d"></span>' + badgeLabel(reached) + '</span><span class="ico">' + CHEV + '</span></div>' +
       '<div class="name">' + esc(title) + '</div>' +
       (head
         ? '<div class="metric">' + esc(head.metric) + (head.unit ? ' <span class="unit">' + esc(head.unit) + '</span>' : '') + '</div>' +
           (head.facts ? '<div class="facts">' + esc(head.facts) + '</div>' : '')
-        : '<div class="metric empty">Still building<span class="ctx">fills in as you talk with Finn</span></div>') +
-      (routeLabel ? '<div class="route">' + ROUTE_ARROW + '<span>' + esc(routeLabel) + '</span></div>' : '') +
+        : '<div class="metric empty">Still gathering<span class="ctx">fills in as you talk with Finn</span></div>') +
+      '<div class="' + pointer.cls + '"><span>' + esc(pointer.text) + '</span>' + ROUTE_ARROW + '</div>' +
       '<div class="complete"><div class="cf" style="width:' + (reached ? 100 : 0) + '%"></div></div>';
     grid.appendChild(el);
   }
@@ -677,7 +682,6 @@ function renderTiles(picture) {
 
 function renderHero(completed) {
   const n = completed.filter(k => VALID_AREAS.includes(k)).length;
-  document.getElementById('progLabel').textContent = n + ' of 8 areas built';
   document.getElementById('progFill').style.width = (n / 8 * 100) + '%';
   if (n === 8) {
     document.getElementById('heroLine').innerHTML = 'Every area’s <span class="fr">covered</span>.';
@@ -746,7 +750,7 @@ function openDetail(tileNo) {
   document.getElementById('dpTitle').textContent = tileMeta ? tileMeta.title : 'Tile ' + tileNo;
   const badge = document.getElementById('dpBadge');
   badge.className = 'dp-badge badge ' + state;
-  badge.innerHTML = '<span class="d"></span>' + BADGE_LABEL[state];
+  badge.innerHTML = '<span class="d"></span>' + badgeLabel(reached);
 
   const firstVisit = !sectionBSeen[String(tileNo)];
   let html = '<div class="dp-inner">' +
@@ -755,7 +759,7 @@ function openDetail(tileNo) {
     markSectionBSeen(tileNo);
   }
   if (state === 'building') {
-    html += '<div class="dp-section"><div class="dp-building">This area is still building — the figures fill in as the conversation covers it.</div></div>';
+    html += '<div class="dp-section"><div class="dp-building">This area is still being gathered. The figures fill in as the conversation covers it.</div></div>';
   }
   html += '</div>';
   document.getElementById('dpBody').innerHTML = html;

@@ -22,19 +22,35 @@
     let housingTotal = 0;
     let oneOffTotal = 0;
     const oneOffLabels = [];
+    // Where the money goes (16 Sept 2026): the same rows, by category.
+    // Housing and internal transfers leave the categories exactly as they
+    // leave the total, so the categories always add up to the figure.
+    const cats = Object.assign({}, summary.base_by_category || {});
+    const addCat = (k, v) => { const key = k || 'other'; cats[key] = (cats[key] || 0) + v; };
+    let annualTotal = (summary.annual_bills && summary.annual_bills.total) || 0;
+    const annualLabels = ((summary.annual_bills && summary.annual_bills.labels) || []).slice();
     for (const r of summary.recurring) {
       const res = resolutions[r.id];
       if (res === "housing") { housingTotal += r.total; continue; }
       kept += r.total;
+      addCat(r.category, r.total);
     }
     for (const o of summary.outliers.filter(o => !o.recurring)) {
       const res = resolutions[o.id];
       if (res === "housing") { housingTotal += o.amount; continue; }
       if (res === "internal_transfer") continue;
       kept += o.amount;
+      addCat(o.category, o.amount);
       if (res === "one_off") { oneOffTotal += o.amount; oneOffLabels.push(o.label); }
+      if (res === "recurring_annual") {
+        annualTotal += o.amount;
+        const term = o.annual_term || 'other yearly bills';
+        if (annualLabels.length < 5 && !annualLabels.includes(term)) annualLabels.push(term);
+      }
     }
     const months = summary.coverage.months;
+    const byCategory = {};
+    for (const [k, v] of Object.entries(cats)) byCategory[k] = Math.round(v / months);
     return {
       living_monthly: Math.round(kept / months),
       housing_monthly: housingTotal ? Math.round(housingTotal / months) : null,
@@ -42,9 +58,13 @@
       one_off_labels: oneOffLabels,
       annual_equivalent: Math.round((kept / months) * 12),
       coverage_months: months,
+      by_category: byCategory,
+      annual_bills_monthly: Math.round(annualTotal / months),
+      annual_bills_labels: annualLabels,
       confidence: summary.coverage_short ? "estimated" : "document",
     };
   }
 
-  window.finnTransactions = { applyResolutions };
+  if (typeof window !== 'undefined') window.finnTransactions = { applyResolutions };
+  if (typeof globalThis !== 'undefined') globalThis.__finnApplyResolutions = applyResolutions;
 })();

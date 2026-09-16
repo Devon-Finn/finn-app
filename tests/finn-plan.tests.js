@@ -257,5 +257,18 @@ export function runPlanTests({ plan, pipeline, tokens }) {
   t('number-in-text-field-kept', r5d.domains.home.with_lender_since === '2019');
   t('sweep-served-once', tokens.substituteTokens('[SWEEP: other_assets]', { sweepsAsked: ['other_assets'] }).text === '');
 
-  return { pass: failures.length === 0, total: 70, failures };
+
+  /* ── tile batch, 16 Sept 2026 ── */
+  const tb = pipeline.applyCaptureCore({ picture: E2, capture: { domains: {
+    expenses: { living_monthly: 6441, includes_housing: false, by_category: { groceries: 1500, transport: 700, not_a_category: 5 }, annual_bills_monthly: 781, coverage_months: 11.8, source: 'bank_export', _confidence: 'document' },
+    home: { owns_home: true, value_estimate: 850000, value_low: 790000, value_high: 905000, value_source: 'realestate.com.au estimate', _confidence: 'stated' },
+  } }, sessionId: 's', servedFields: new Set() });
+  t('spending-categories-stored', tb.domains.expenses.by_category.groceries === 1500 && tb.domains.expenses.coverage_months === 11.8);
+  t('unknown-spending-category-dropped', !('not_a_category' in tb.domains.expenses.by_category));
+  t('home-value-range-stored', tb.domains.home.value_low === 790000 && tb.domains.home.value_high === 905000);
+  const cat = pipeline.__categorise;
+  t('categorise-merchants', cat('WOOLWORTHS 3353 TRARALGON') === 'groceries' && cat('UBER *EATS') === 'eating_out'
+    && cat('RACV CAR INSURANCE') === 'insurance' && cat('VICROADS REGO RENEWAL') === 'transport' && cat('SOMETHING PTY LTD') === 'other');
+
+  return { pass: failures.length === 0, total: 74, failures };
 }

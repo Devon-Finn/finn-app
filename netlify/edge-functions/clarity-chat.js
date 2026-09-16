@@ -259,7 +259,7 @@ Rules for the block:
   context: adults, children (array of {age}), owner_age, partner_age, work_intent ("both continuing"/"one reducing"/"one stopping"/"unsure"), horizon_years
   income: salary_gross_annual, salary_net_monthly, partner_salary_gross_annual, partner_salary_net_monthly (pay may instead be given in the period the person used, e.g. salary_net_fortnightly, partner_salary_gross_fortnightly, salary_net_weekly; code converts, never convert it yourself), other (array of {source, linked_asset_id, entity, amount_annual, basis} — EVERY non-salary regular source lands here, typed, never lumped. source is "rental_residential"/"rental_commercial"/"dividends"/"distributions"/"trust_distribution"/"business_profit"/"director_fee"/"government"/"other". linked_asset_id ties the entry to what produces it: use the producing asset's id exactly as shown in the picture context (every property and debt item carries a system-assigned id), "entity" for the company or trust, "holdings" for the share portfolio, null where nothing in the picture produces it or the producing asset was only captured this turn and has no id yet. entity is whose hands it arrives in: "personal"/"joint"/"company"/"trust"/"smsf"/"unknown". basis is "gross" or "net_of_costs" — always ask which the figure is; never net figures yourself and never characterise the gearing. For a RENTAL at basis "gross", also capture costs_annual — the year's costs on that property (agent fees, rates, insurance, maintenance, interest), read from the agent statement or tax return in the same visit as the rent; where costs are genuinely zero, record costs_annual 0 with costs_note saying why. A gross rental without its costs stays an open item and the income total is not presented as complete), structure ("paye"/"sole_trader"/"company"/"trust"/"mixed"), entity ({type, name} where a company or trust exists), employer_super_on (array naming the income streams employer super is paid on, e.g. ["salary","partner_salary"])
   expenses: living_monthly (EXCLUDING housing debt repayments), includes_housing (explicit true/false — NEVER omitted or null when living_monthly is captured: false when the figure excludes housing as you asked, true only when the person genuinely can only give an all-in figure), housing_repayment_monthly
-  home: owns_home, value_estimate, value_source, mortgage_balance, rate_percent, rate_type, lender, with_lender_since, repayment_monthly, term_remaining_years, has_offset (ONLY ever from asking the offset question — never inferred from any balance), offset_balance, package_fee_annual
+  home: owns_home, value_estimate (the middle figure), value_low and value_high (both ends of the range an online estimate shows; capture both whenever they're given), value_source (plain words, e.g. "realestate.com.au estimate", "lender valuation", "rates notice", "their own estimate"), mortgage_balance, rate_percent, rate_type, lender, with_lender_since, repayment_monthly, term_remaining_years, has_offset (ONLY ever from asking the offset question — never inferred from any balance), offset_balance, package_fee_annual
   buffer: accessible_savings, where_held, linked_to_loan, counts_credit_as_buffer
   super: funds (array of {fund, owner, balance, has_insurance}) where owner is "you"/"partner"/the partner's name and has_insurance is whether that fund has insurance attached inside it, multiple_accounts (true ONLY when a single person holds more than one account), extra_contributions
   protection: life / tpd / income_protection / trauma, each exactly {held, amount, inside_super}. held true with amount null is a valid and common state (they have it, they don't know how much).
@@ -284,10 +284,10 @@ Rules for the block:
 
 **TRANSACTION SUMMARY PROTOCOL (machine blocks — the person never sees these):**
 When a user turn contains [TRANSACTION SUMMARY] {json}, code has already parsed their bank CSVs deterministically: totals, recurring groups, cross-account transfers and card payments already excluded. You NEVER do arithmetic on it — no summing, no averaging, no division; a model adding up transactions is approximately right and unverifiable, which is exactly what this path exists to remove. Your job is ONLY the questions code can't answer:
-- Walk the "outliers" one at a time, one open thread, in plain language. A large_one_off: is it a yearly bill that'll come around again, or a one-off ("there's a $4,000 payment to X in March — a yearly premium that recurs, or a one-off?"). A housing_candidate: is this the mortgage or rent (captured separately, never in living costs)? A transfer_suspect: is this money moving between their own accounts?
+- Walk the "outliers" one at a time, one open thread, in plain language. A large_one_off: is it a yearly bill that'll come around again, or a one-off ("there's a $4,000 payment to X in March — a yearly premium that recurs, or a one-off?"). A housing_candidate: is this the mortgage or rent (captured separately, never in living costs)? Any loan repayment (home loan, a split, a car or personal loan) resolves as housing here: repayments are counted from the loan details, never inside living costs. Where several outliers are plainly the same bill (four council rates payments, two rego renewals), ask about them together in one question and resolve them together. A transfer_suspect: is this money moving between their own accounts?
 - As answers land, emit resolve lines, each on its own line immediately BEFORE the [CAPTURE] block: [RESOLVE] {"o1":"one_off","r2":"housing"} — categories are exactly recurring_annual | one_off | housing | internal_transfer. You may batch several answered ids in one line. Never invent an id and never resolve an unanswered outlier. Nothing visible ever follows a [RESOLVE] line: say everything you want to say first, then the [RESOLVE] line(s), then [CAPTURE], and end the reply.
 - If the summary has coverage_short true, say plainly the export covered less than a year and the figure will be an estimate until a fuller export sharpens it.
-When a user turn contains [TRANSACTION RESULT] {json}, code has applied their answers and done the division. State the composition plainly, two facts, no adjustment, no verdict, in this shape: "That works out at $X a month across the year. About $Y a month of that was one-off spending — <the one-off labels in plain words> — so a typical month is quieter than that, and a year has things like them in it." (Where one_off_monthly is 0, just state the monthly figure.) Then capture: expenses.living_monthly from the result, includes_housing false, housing_repayment_monthly where the result carries housing_monthly, and the domain _confidence from the result's confidence field. The figures come from the result verbatim — you never recompute them.`;
+When a user turn contains [TRANSACTION RESULT] {json}, code has applied their answers and done the division. State the composition plainly, two facts, no adjustment, no verdict, in this shape: "That works out at $X a month across the year. About $Y a month of that was one-off spending — <the one-off labels in plain words> — so a typical month is quieter than that, and a year has things like them in it." (Where one_off_monthly is 0, just state the monthly figure.) Code records the result itself (the monthly figure, includes_housing false, any housing figure, where the money goes by category, the once-a-year bills, the months covered and the confidence), so you capture nothing from it and never recompute it; you don't list categories and you never describe any category as high, low, a lot or too much. You may say the spending tile now shows where it goes. Where coverage_months is under 11, say plainly that a shorter stretch can miss once-a-year costs and that the rest of the year would firm the figure up.`;
 
 /* ════════════════════ Supabase helpers (service role) ════════════════════ */
 async function sbFetch(path, init = {}) {
@@ -1177,6 +1177,42 @@ export default async function handler(request, context) {
     const hadAttachment = Array.isArray(lastUserMsg?.content) && lastUserMsg.content.some(b => b && (b.type === "image" || b.type === "document"));
     const lastUserText = typeof lastUserMsg?.content === "string" ? lastUserMsg.content : "";
     const machineTurn = /^\[(Session start|TRANSACTION)/.test(lastUserText.trim());
+    // A bank-export result is recorded by CODE, verbatim (16 Sept 2026):
+    // the figure, where it goes by category, the once-a-year bills and how
+    // many months it covers. The model's reading of the same turn never
+    // overrides these.
+    const txResult = /^\[TRANSACTION RESULT\]/.test(lastUserText.trim()) ? (() => {
+      try { return JSON.parse(lastUserText.trim().replace(/^\[TRANSACTION RESULT\]\s*/, "")); } catch { return null; }
+    })() : null;
+    if (txResult && typeof txResult.living_monthly === "number") {
+      capture = capture && typeof capture === "object" ? capture : {};
+      capture.domains = capture.domains && typeof capture.domains === "object" ? capture.domains : {};
+      const cats = {};
+      for (const [k, v] of Object.entries(txResult.by_category || {})) if (typeof v === "number" && isFinite(v)) cats[k] = Math.round(v);
+      const labels = Array.isArray(txResult.annual_bills_labels) ? txResult.annual_bills_labels.filter(x => typeof x === "string").slice(0, 5) : [];
+      capture.domains.expenses = {
+        ...(capture.domains.expenses || {}),
+        living_monthly: Math.round(txResult.living_monthly),
+        includes_housing: false,
+        // The loan screen already gives the home loan repayment, and loan
+        // splits are counted as debt minimums; the export's housing figure
+        // (which sweeps both up) is used only when there is no loan-screen
+        // figure, e.g. rent.
+        ...(typeof txResult.housing_monthly === "number" && !(picture && picture.domains && picture.domains.home && typeof picture.domains.home.repayment_monthly === "number")
+          ? { housing_repayment_monthly: Math.round(txResult.housing_monthly) } : {}),
+        by_category: cats,
+        annual_bills_monthly: typeof txResult.annual_bills_monthly === "number" ? Math.round(txResult.annual_bills_monthly) : null,
+        annual_bills_note: labels.length ? labels.join("; ") : null,
+        one_off_monthly: typeof txResult.one_off_monthly === "number" ? Math.round(txResult.one_off_monthly) : null,
+        coverage_months: typeof txResult.coverage_months === "number" ? txResult.coverage_months : null,
+        source: "bank_export",
+        _confidence: txResult.confidence === "document" ? "document" : "estimated",
+      };
+      if (picture && picture.domains && picture.domains.home && typeof picture.domains.home.repayment_monthly === "number") {
+        delete capture.domains.expenses.housing_repayment_monthly;
+      }
+      console.log("[Finn clarity] bank-export result recorded by code");
+    }
     let recorder = null;
     if (!machineTurn) {
       const fresh = await readPicture(auth.householdId);
@@ -1185,7 +1221,14 @@ export default async function handler(request, context) {
         await insertCaptureLog(auth.householdId, "[RECORDER]\n[CAPTURE]" + JSON.stringify(recorder), recorder, "applied", sessionId);
       }
     }
-    if (!hadAttachment) { clampDocument(capture); if (recorder) clampDocument(recorder); }
+    if (!hadAttachment) {
+      // The bank-export figure was computed by code from the files, so it
+      // keeps its document grade; everything else in the turn is clamped.
+      const txExp = txResult && capture && capture.domains ? capture.domains.expenses : null;
+      const keep = txExp ? txExp._confidence : null;
+      clampDocument(capture); if (recorder) clampDocument(recorder);
+      if (txExp) txExp._confidence = keep;
+    }
     // The model sometimes accepts a skip without recording it; the
     // recorder's deferrals stand in when the model recorded none.
     if (capture && recorder && Array.isArray(recorder.deferrals) && recorder.deferrals.length

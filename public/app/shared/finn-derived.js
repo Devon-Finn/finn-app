@@ -59,7 +59,11 @@
     // lands, so neither belongs in the personal surplus or the buffer.
     const personalMinimums = Array.isArray(debts.items)
       ? debts.items
-          .filter(it => it && it.type !== 'hecs_help' && !['company', 'trust', 'smsf', 'partnership'].includes(it.borrower))
+          // A card cleared in full every month: its spending is already in
+          // living costs, so its minimum is not a further outgoing (tile
+          // review, 16 Sept 2026).
+          .filter(it => it && it.type !== 'hecs_help' && !['company', 'trust', 'smsf', 'partnership'].includes(it.borrower)
+            && !(it.cleared_monthly === true && ['credit_card', 'bnpl'].includes(it.type)))
           .reduce((a, it) => a + (num(it && it.minimum_monthly) ?? 0), 0)
       : 0;
     function monthlyHousing() {
@@ -215,7 +219,11 @@
       if (num(it.balance) !== null) debts_total_by_entity[b] = (debts_total_by_entity[b] || 0) + it.balance;
     }
 
-    return { home_equity, lvr_percent, surplus_monthly, buffer_months, super_total, income_total_annual, income_costs_annual, income_total_bases, income_unreconciled, property_equity, debts_total, debts_total_by_entity };
+    // Exposed so the tile-2 and tile-3 calculations show the same rows the
+    // figures were built from.
+    const housing_monthly = monthlyHousing();
+    const personal_minimums_monthly = personalMinimums;
+    return { housing_monthly, personal_minimums_monthly, home_equity, lvr_percent, surplus_monthly, buffer_months, super_total, income_total_annual, income_costs_annual, income_total_bases, income_unreconciled, property_equity, debts_total, debts_total_by_entity };
   }
 
   window.finnDerived = { derive };

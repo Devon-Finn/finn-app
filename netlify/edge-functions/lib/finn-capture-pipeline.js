@@ -12,6 +12,8 @@
 import { FIELD_REGISTRY, persistenceGate, leafWrites } from "./finn-field-registry.js";
 import { assignAssetIds, mergeDomainsById, migratePositionalLinks, resolveSecurity, adoptNaturalIds } from "./finn-merge.js";
 import { buildPlan, AREAS, SWEEPS } from "./finn-plan.js";
+import { SPEND_CATEGORY_KEYS } from "./finn-csv-engine.js";
+export { categorise as __categorise } from "./finn-csv-engine.js";
 
 /* ════════════ SCHEMA v2 — field-spec.md Part 2 (Step 1) ════════════
    The domains JSONB target shape. Conventions, enforced here:
@@ -60,6 +62,7 @@ const V2_ENUMS = {
   income_basis: ["gross", "net_of_costs"],
 };
 const COVER = { held: BOOL, amount: MONEY, inside_super: BOOL };
+const SPEND_CATS = Object.fromEntries(SPEND_CATEGORY_KEYS.map(k => [k, MONEY]));
 const ESTATE_DOC = { in_place: "docstate", last_updated: STR };
 
 const V2_SCHEMA = {
@@ -74,8 +77,15 @@ const V2_SCHEMA = {
   // migrateIncomeShape — to income._unmapped and flags.income_unreconciled,
   // never silently dropped from a total.
   income: { salary_gross_annual: MONEY, salary_net_monthly: MONEY, partner_salary_gross_annual: MONEY, partner_salary_net_monthly: MONEY, other: { array: { id: STR, source: { enum: "other_income_source" }, linked_asset_id: STR, entity: { enum: "income_entity" }, amount_annual: MONEY, basis: { enum: "income_basis" }, costs_annual: MONEY, costs_note: STR } }, structure: { enum: "structure" }, entity: { object: { type: STR, name: STR } }, employer_super_on: { array: STR } },
-  expenses: { living_monthly: MONEY, includes_housing: BOOL, housing_repayment_monthly: MONEY },
-  home: { owns_home: BOOL, value_estimate: MONEY, value_source: STR, mortgage_balance: MONEY, rate_percent: RATE, rate_type: STR, lender: STR, with_lender_since: STR, repayment_monthly: MONEY, term_remaining_years: INT, has_offset: BOOL, offset_balance: MONEY, package_fee_annual: MONEY },
+  // by_category and the annual/one-off/coverage fields are CODE-WRITTEN
+  // from a bank-export result (a [TRANSACTION RESULT] turn), never
+  // composed by the model. Categories are a fixed set (finn-csv-engine).
+  expenses: { living_monthly: MONEY, includes_housing: BOOL, housing_repayment_monthly: MONEY,
+    by_category: { object: SPEND_CATS }, annual_bills_monthly: MONEY, annual_bills_note: STR,
+    one_off_monthly: MONEY, coverage_months: RATE, source: STR },
+  // value_low / value_high: the range an online estimate shows (Devon,
+  // 16 Sept: the portal estimate is the default source, range kept).
+  home: { owns_home: BOOL, value_estimate: MONEY, value_low: MONEY, value_high: MONEY, value_source: STR, mortgage_balance: MONEY, rate_percent: RATE, rate_type: STR, lender: STR, with_lender_since: STR, repayment_monthly: MONEY, term_remaining_years: INT, has_offset: BOOL, offset_balance: MONEY, package_fee_annual: MONEY },
   buffer: { accessible_savings: MONEY, where_held: STR, linked_to_loan: BOOL, counts_credit_as_buffer: BOOL, other_cash: MONEY, other_cash_where_held: STR },
   super: { funds: { array: { id: STR, fund: STR, owner: STR, balance: MONEY, has_insurance: BOOL } }, multiple_accounts: BOOL, extra_contributions: BOOL },
   protection: { life: { object: COVER }, tpd: { object: COVER }, income_protection: { object: COVER }, trauma: { object: COVER } },
@@ -148,6 +158,9 @@ function v2CheckObject(shape, obj, path, errors) {
     // An item-level confidence is read by the gate, then dropped here: the
     // stored confidence lives on the domain and in the to_verify ledger.
     if (k === "_confidence") continue;
+    // Item notes are the model's working prose; they have no home on an
+    // item and are dropped quietly (they filled partial_writes with noise).
+    if (k === "_notes") continue;
     if (!(k in shape)) { errors.push(path + "." + k + ": unknown field"); continue; }
     const checked = v2CheckValue(shape[k], v, path + "." + k, errors);
     if (checked !== undefined) out[k] = checked;

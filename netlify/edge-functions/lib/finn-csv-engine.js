@@ -174,6 +174,71 @@ const CARD_PAYMENT_RE = /((credit ?card|mastercard|visa|amex|card) ?(payment|pym
 
 const DAY = 86400000;
 
+/* ── Where the money goes (Devon, 16 Sept 2026) ──
+   Each spending row is sorted into one of a FIXED set of categories by the
+   merchant text, first match wins. This is description, never judgment:
+   the categories exist so a person can see where their money goes, and
+   nothing downstream ever calls a category high, low or too much.
+   Budgeting stays an input to the surplus, not a feature. */
+export const SPEND_CATEGORIES = [
+  { key: "groceries",      label: "Groceries" },
+  { key: "eating_out",     label: "Eating out and takeaway" },
+  { key: "transport",      label: "Car and transport" },
+  { key: "utilities",      label: "Power, water, phone and internet" },
+  { key: "insurance",      label: "Insurance" },
+  { key: "health",         label: "Health and medical" },
+  { key: "kids_education", label: "Kids, school and childcare" },
+  { key: "home_costs",     label: "Rates, strata and home upkeep" },
+  { key: "shopping",       label: "Shopping and household" },
+  { key: "leisure",        label: "Subscriptions, fitness and leisure" },
+  { key: "travel",         label: "Travel and holidays" },
+  { key: "other",          label: "Everything else" },
+];
+export const SPEND_CATEGORY_KEYS = SPEND_CATEGORIES.map(c => c.key);
+
+const CATEGORY_RULES = [
+  ["travel", /(qantas|virgin ?australia|jetstar|rex airlines|airbnb|booking\.com|expedia|hotels?\.com|wotif|webjet|flight ?centre|\bmotel\b|resort|holiday|caravan park|big4|discovery parks|spirit of tasmania|cruise)/i],
+  ["insurance", /(insurance|insur\b|\baami\b|allianz|\bnrma ins|youi|budget direct|\bgio\b|suncorp ins|\bqbe\b|\bcgu\b|real insurance|\bbupa\b|medibank|\bhcf\b|\bnib\b|\bahm\b|hbf|teachers health|\bgmhba\b|health fund|clearview|tal life|\bmlc\b|\bzurich\b|\baia\b|premium)/i],
+  ["groceries", /(woolworths|woolies|coles(?! ?express)|\baldi\b|\biga\b|foodworks|harris farm|costco|drakes|romeo'?s|spudshed|friendly grocer|supermarket|butcher|bakers? delight|green ?grocer|fruit ?(and|&) ?veg)/i],
+  ["eating_out", /(mcdonald|hungry jack|\bkfc\b|domino|pizza|subway|guzman|grill'?d|nando|oporto|red rooster|zambrero|uber\W*eats|doordash|menulog|deliveroo|\bcafe\b|caf[eé]|coffee|espresso|restaurant|\bbar\b|\bpub\b|hotel bistro|bistro|takeaway|sushi|kebab|thai|noodle|bakery|donut|boost juice|starbucks|gloria jean)/i],
+  ["transport", /(\bbp\b|ampol|caltex|\bshell\b|coles ?express|7-?eleven|united petrol|puma energy|liberty oil|metro petroleum|\bfuel\b|petrol|linkt|e-?toll|eastlink|citylink|transurban|\bmyki\b|\bopal\b|go ?card|translink|public transport|parking|secure parking|wilson parking|\buber\b(?!\W*eats)|\bdidi\b|\bola\b|\btaxi\b|13cabs|vicroads|transport for nsw|service nsw rego|registration|\brego\b|\btac\b|mydealer|autobarn|supercheap|repco|ultra tune|mycar|tyre|mechanic|car wash|\bracv\b|\bnrma\b|\bracq\b|\braa\b|\brac\b)/i],
+  ["utilities", /(\bagl\b|origin energy|energy ?australia|red energy|lumo|alinta|powershop|simply energy|momentum energy|tango energy|globird|dodo|ovo energy|\bpower\b|electricity|\bgas\b|yarra valley water|sydney water|south east water|city west water|barwon water|gippsland water|unitywater|icon water|sa water|water corp|\bwater\b|telstra|optus|vodafone|\btpg\b|iinet|aussie ?broadband|belong|amaysim|boost mobile|\bnbn\b|internet|mobile plan)/i],
+  ["health", /(chemist|pharmacy|priceline|terry white|amcal|blooms|medical|\bclinic\b|\bgp\b|doctor|dental|dentist|orthodont|physio|chiro|osteo|pathology|radiology|imaging|hospital|optometr|specsavers|opsm|psycholog|medicare|vet(erinary)?\b|\bvet\b)/i],
+  ["kids_education", /(school|college|grammar|primary|secondary|childcare|child care|early learning|kindergarten|\bkinder\b|oshc|before and after school|tuition|tutor|kumon|swim(ming)? school|uniform|\bdance\b|scouts|little athletics|football club|netball|cricket club|soccer club|university|tafe|\bhecs\b)/i],
+  ["home_costs", /(council|\brates\b|shire of|city of|strata|owners corp|body corporate|bunnings|mitre ?10|home ?hardware|plumb|electrician|handyman|pest|garden|landscap|cleaning|cleaner|locksmith|hipages|airtasker)/i],
+  ["leisure", /(netflix|stan\b|stan\.com|binge|kayo|foxtel|disney|spotify|apple\.com|itunes|google ?(play|one|storage)|youtube|amazon prime|paramount|audible|playstation|xbox|nintendo|steam|\bgym\b|fitness|anytime fitness|f45|snap fitness|jetts|goodlife|yoga|pilates|cinema|hoyts|village cinemas|event cinemas|ticketek|ticketmaster|golf|bowls|club\b|patreon|chatgpt|openai|microsoft|adobe|dropbox)/i],
+  ["shopping", /(kmart|\bbig w\b|target|myer|david jones|jb ?hi-?fi|harvey norman|the good guys|officeworks|amazon|ebay|catch\.com|temu|shein|\biconic\b|cotton on|uniqlo|h&m|zara|rebel|\bbcf\b|anaconda|spotlight|lincraft|ikea|fantastic furniture|freedom|adairs|house\b|petbarn|pet stock|petstock|chemist warehouse|dan murphy|bws|liquorland|first choice liquor|bottle ?shop|newsagen|australia post|auspost|best & less|lowes|rivers|payless|athlete'?s foot|hairdress|barber|salon|beauty|nails|afterpay|zip ?pay|zip ?money|humm|klarna)/i],
+];
+
+// Once-a-year bills: named here so the tile can say what spreads across
+// the year. Presence only; nothing is judged.
+const ANNUAL_RE = /(\brego\b|registration|vicroads|\btac\b|council|\brates\b|insurance|premium|school fees?|term fees?|land tax|strata|owners corp|body corporate|membership|annual)/i;
+
+// Plain names for once-a-year bills, never the bank's raw text.
+const ANNUAL_TERMS = [
+  [/(\brego\b|registration|vicroads|\btac\b)/i, "car rego"],
+  [/(home|house|contents|building)\W*(and\W*contents\W*)?insur/i, "home insurance"],
+  [/(car|motor|vehicle|comprehensive)\W*insur/i, "car insurance"],
+  [/(health|medibank|bupa|\bhcf\b|\bnib\b|\bahm\b)/i, "health insurance"],
+  [/(insurance|premium)/i, "insurance"],
+  [/(council|\brates\b)/i, "council rates"],
+  [/(school fees?|term fees?)/i, "school fees"],
+  [/land tax/i, "land tax"],
+  [/(strata|owners corp|body corporate)/i, "strata"],
+  [/(membership|annual)/i, "memberships"],
+];
+function annualTerm(description) {
+  for (const [re, term] of ANNUAL_TERMS) if (re.test(description)) return term;
+  return null;
+}
+
+export function categorise(description) {
+  const d = String(description || "");
+  for (const [key, re] of CATEGORY_RULES) if (re.test(d)) return key;
+  return "other";
+}
+const emptyCats = () => Object.fromEntries(SPEND_CATEGORY_KEYS.map(k => [k, 0]));
+
 /* Summarise parsed files into the model-facing shape. Deterministic. */
 export function summarise(parsedFiles) {
   const cardFilePresent = parsedFiles.some(f => f.isCard);
@@ -214,7 +279,7 @@ export function summarise(parsedFiles) {
   all.forEach((r, i) => { if (!used.has(i) && r.fromCard && r.amount > 0) used.add(i); });
 
   const debits = all.filter((r, i) => !used.has(i) && r.amount < 0)
-    .map((r) => ({ date: r.date, description: r.description, amount: Math.abs(r.amount), norm: normDesc(r.description) }));
+    .map((r) => ({ date: r.date, description: r.description, amount: Math.abs(r.amount), norm: normDesc(r.description), category: categorise(r.description) }));
   const creditsTotal = all.filter((r, i) => !used.has(i) && r.amount > 0 && !r.fromCard)
     .reduce((a, r) => a + r.amount, 0);
 
@@ -247,6 +312,7 @@ export function summarise(parsedFiles) {
         typical_amount: Math.round(meanAmt),
         total: Math.round(items.reduce((a, i) => a + i.amount, 0)),
         count: items.length,
+        category: items[0].category,
         housing_candidate: HOUSING_RE.test(items[0].description),
       });
     }
@@ -269,14 +335,29 @@ export function summarise(parsedFiles) {
     if (d.amount >= threshold) kinds.push("large_one_off");
     if (kinds.length) {
       d.isOutlier = true;
-      outliers.push({ id: "o" + (++oid), label: d.description, date: new Date(d.date).toISOString().slice(0, 10), amount: Math.round(d.amount), kind: kinds[0] });
+      outliers.push({ id: "o" + (++oid), label: d.description, date: new Date(d.date).toISOString().slice(0, 10), amount: Math.round(d.amount), kind: kinds[0], category: d.category, annual_term: annualTerm(d.description) });
     }
   }
   for (const r of recurring.filter(r => r.housing_candidate)) {
-    outliers.push({ id: r.id, label: r.label, date: null, amount: r.total, kind: "housing_candidate", recurring: true });
+    outliers.push({ id: r.id, label: r.label, date: null, amount: r.total, kind: "housing_candidate", recurring: true, category: r.category });
   }
 
-  const base = Math.round(nonRecurring.filter(d => !d.isOutlier).reduce((a, d) => a + d.amount, 0));
+  const baseRows = nonRecurring.filter(d => !d.isOutlier);
+  const base = Math.round(baseRows.reduce((a, d) => a + d.amount, 0));
+  const baseByCategory = emptyCats();
+  for (const d of baseRows) baseByCategory[d.category] += d.amount;
+  for (const k of SPEND_CATEGORY_KEYS) baseByCategory[k] = Math.round(baseByCategory[k]);
+  // Once-a-year bills among the non-recurring rows (outliers resolved as
+  // housing or transfers are removed client-side; these never are).
+  // Outliers are counted client-side once the person classifies them, so
+  // only the rows already in the base are counted here.
+  const annualRows = baseRows.filter(d => ANNUAL_RE.test(d.description) && !HOUSING_RE.test(d.description) && !TRANSFER_RE.test(d.description));
+  const annualByLabel = new Map();
+  for (const d of annualRows) {
+    const label = annualTerm(d.description) || "other yearly bills";
+    annualByLabel.set(label, { label, total: (annualByLabel.get(label)?.total || 0) + d.amount });
+  }
+  const annual = [...annualByLabel.values()].sort((a, b) => b.total - a.total);
 
   return {
     coverage: { from: new Date(from).toISOString().slice(0, 10), to: new Date(to).toISOString().slice(0, 10), months },
@@ -284,6 +365,8 @@ export function summarise(parsedFiles) {
     account_count: parsedFiles.length,
     card_file_present: cardFilePresent,
     base_debits: base,           // span totals, not annualised — divide by coverage.months
+    base_by_category: baseByCategory,
+    annual_bills: { total: Math.round(annual.reduce((a, x) => a + x.total, 0)), labels: annual.slice(0, 5).map(x => x.label) },
     recurring: recurring.map(({ housing_candidate, ...r }) => r),
     outliers,
     credits_total: Math.round(creditsTotal),

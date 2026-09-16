@@ -109,7 +109,9 @@ export const FIELD_REGISTRY = {
 
   /* ── home ── */
   "home.owns_home":       { label: "whether you own the place you live in", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
-  "home.value_estimate":  { label: "what the home is worth", retrieval: "required", evidence: ["lender_valuation", "rates_notice", "portal_estimate", "appraisal"], paths: ["home_value"], accepts_upload: true, confidence_floor: "stated", range_permitted: true, softeners: "forbidden", feeds: ["home_equity", "lvr_percent"] },
+  "home.value_estimate":  { label: "what the home is worth", retrieval: "required", evidence: ["portal_estimate", "lender_valuation", "appraisal", "rates_notice"], paths: ["home_value"], accepts_upload: true, confidence_floor: "stated", range_permitted: true, softeners: "forbidden", feeds: ["home_equity", "lvr_percent"] },
+  "home.value_low":       { label: "the low end of the estimate's range", retrieval: "offered", evidence: ["portal_estimate", "lender_valuation"], paths: ["home_value"], accepts_upload: true, confidence_floor: "stated", softeners: "forbidden" },
+  "home.value_high":      { label: "the high end of the estimate's range", retrieval: "offered", evidence: ["portal_estimate", "lender_valuation"], paths: ["home_value"], accepts_upload: true, confidence_floor: "stated", softeners: "forbidden" },
   "home.value_source":    { label: "where that value comes from", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "home.mortgage_balance": { label: "what's still owing on the loan", retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden", feeds: ["home_equity", "lvr_percent"] },
   "home.rate_percent":    { label: "the rate the loan is on", retrieval: "required", evidence: ["loan_statement", "banking_app"], paths: ["loan_details"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
