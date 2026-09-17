@@ -71,7 +71,7 @@ export async function runStreamTests(chat, tokens) {
   // Stand-in run 5: a composed "anything else?" whose paragraph does not end
   // with "?" is still dropped before the sweep.
   const n = await run(f, ["Good.\n\nAre there any other debts in the picture? Things like car loans or cards.\n\n[SWEEP: other_debts]\n\n[CAPTURE]{}"], {});
-  t('mid-paragraph-question-dropped-before-sweep', !n.txt.includes('any other debts in the picture') && n.txt.includes('Now the borrowing side'));
+  t('mid-paragraph-question-dropped-before-sweep', !n.txt.includes('any other debts in the picture') && n.txt.includes('What do you owe, all of it in one go?'));
 
   // Live walk, 17 Sept 2026: internal words leaked ("A few quick sweep questions:").
   const j = await run(f, ["Good.\n\nBefore we gather figures, a few quick sweep questions:\n\n[SWEEP: other_income]\n\n[CAPTURE]{}"], {});
@@ -100,5 +100,32 @@ export async function runStreamTests(chat, tokens) {
   const soft = await run(f, ["And roughly how much do the distributions come to each year?\n\n[CAPTURE]{}"], {});
   t('softener-removed-from-question', soft.txt.startsWith('And how much do the distributions come to each year?'));
 
-  return { pass: failures.length === 0, total: 26, failures };
+  // Walk 8: a recap that adds what the person never said is dropped.
+  const rc = await run(f, ["Good, that's helpful. So Jess is employed by a school, PAYE, employer pays her super.\n\nFor you, are you paid a wage through the company?\n\n[CAPTURE]{}"], { userCorpus: "I work for my own company, jess is a teacher" });
+  t('unsupported-recap-dropped', !rc.txt.includes('PAYE') && rc.txt.includes("Good, that's helpful.") && rc.txt.includes('paid a wage'));
+  const rc2 = await run(f, ["So that's you, Jess and two kids.\n\n[CAPTURE]{}"], { userCorpus: "me, my wife jess and our 2 kids" });
+  t('supported-recap-kept', rc2.txt.startsWith("So that's you, Jess and two kids."));
+
+  const rc3 = await run(f, ["So the home loan is $412,000 at 6.09% variable, principal and interest, with an offset.\n\n[CAPTURE]{}"], { userCorpus: "412k, 6.09% variable, P&I, offset has 38k" });
+  t('loan-recap-with-expanded-terms-kept', rc3.txt.startsWith('So the home loan is $412,000'));
+
+  const rough = await run(f, ["What does it pay out to you beyond the wage? Your accountant's figures would have it, but a rough sense is fine if that's what you have handy.\n\n[CAPTURE]{}"], {});
+  t('guess-invitation-dropped', !/rough sense/.test(rough.txt) && rough.txt.includes('beyond the wage?'));
+
+  const colon = await run(f, ["Noted, that's one for the accountant.\n\nBefore we move on, just to make sure the picture is complete:\n\nIs there anything else coming in regularly?\n\n[CAPTURE]{}"], { sweepsAsked: ['other_income'] });
+  t('dangling-lead-in-removed', colon.txt.startsWith("Noted, that's one for the accountant.") && !colon.txt.includes('complete:'));
+
+  // Walk 8: the only line was an already-asked sweep, so the reply was empty.
+  const fb = {};
+  const empty = await run(f, ["[SWEEP: other_income]\n\n[CAPTURE]{}"], { sweepsAsked: ['other_income'], fallback: { kind: 'ask', id: 'loan_details', text: 'Next, the loan. What does the loan screen show?' }, result: fb });
+  t('empty-reply-gets-fallback-question', empty.txt.startsWith('Next, the loan.') && fb.fallbackAsk === 'loan_details');
+  const noq = await run(f, ["Thanks, noted.\n\n[CAPTURE]{}"], { fallback: { kind: 'plain', id: null, text: 'Next, the balance for the car loan. What can you tell me about that?' } });
+  t('statement-only-reply-gets-fallback', noq.txt.startsWith('Thanks, noted.\n\nNext, the balance'));
+  const hasq = await run(f, ["What does Jess earn?\n\n[CAPTURE]{}"], { fallback: { kind: 'plain', id: null, text: 'FALLBACK' } });
+  t('reply-with-question-no-fallback', !hasq.txt.includes('FALLBACK'));
+
+  const served = await run(f, ["[ASK: living_costs]\n\n[CAPTURE]{}"], { fallback: { kind: 'plain', id: null, text: 'FALLBACK' } });
+  t('code-ask-without-question-mark-no-fallback', !served.txt.includes('FALLBACK'));
+
+  return { pass: failures.length === 0, total: 35, failures };
 }

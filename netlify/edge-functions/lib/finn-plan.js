@@ -42,7 +42,7 @@ export const SWEEPS = {
   },
   other_debts: {
     area: "liabilities",
-    text: "Now the borrowing side, all of it in one go. Apart from the home loan, is there anything else owing? A credit card, a car loan, a personal loan, buy now pay later, a split off the mortgage, a line of credit, HECS, money owed to family or the tax office, and anything borrowed inside a company or trust.",
+    text: "What do you owe, all of it in one go? A home loan or a split off it, a line of credit, a credit card, a car or personal loan, buy now pay later, HECS, money owed to family or the tax office, and anything borrowed inside a company or trust.",
   },
   other_super: {
     area: "super",

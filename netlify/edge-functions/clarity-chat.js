@@ -1,5 +1,5 @@
 import { bankExportsPromptSection } from "./lib/finn-bank-exports.js";
-import { RETRIEVAL_PATHS, retrievalPromptSection, assertRequiredServable } from "./lib/finn-retrieval-paths.js";
+import { RETRIEVAL_PATHS, retrievalPromptSection, assertRequiredServable, askFor } from "./lib/finn-retrieval-paths.js";
 import { substituteTokens, promptTokenSection, FRAMES, NUDGES } from "./lib/finn-tokens.js";
 import { buildPlan, planPromptSection, closeListText, SWEEPS } from "./lib/finn-plan.js";
 import { FIELD_REGISTRY, CONFIDENCE_RANK, PRODUCERS } from "./lib/finn-field-registry.js";
@@ -393,6 +393,7 @@ function emDashScrubStream(onDone, ctx = {}) {
   let verdictsDropped = 0;
   let visibleOut = "";        // the visible reply, sent once at the end
   let sawSweep = false;
+  let sawFrame = false;       // a code-authored open/close frame went out
 
   // Verdict and wrap-up sentences (stand-in run 4): "I think we're in good
   // shape", "while we're wrapping up". Finn never gives a verdict, and it
@@ -401,13 +402,30 @@ function emDashScrubStream(onDone, ctx = {}) {
   const VERDICT = /\b(in good shape|solid (?:start|foundation|starting point|position|direction)|decent (?:runway|buffer|position)|healthy (?:buffer|position|balance)|a good position|well set up|well placed|on track|nothing to worry about)\b/i;
   // Internal words never reach the person (live walk, 17 Sept 2026: "A few
   // quick sweep questions").
-  const JARGON = /\b(sweeps?|sweep questions?|trips? phase|shape phase|working notes|the plan says|capture block|ledger|to_verify)\b/i;
+  const JARGON = /\b(sweeps?|sweep questions?|shape|trips? phase|working notes|the plan says|capture block|ledger|to_verify)\b/i;
   const WRAPUP = /\b(wrapping up|wrap (?:things )?up|pull together what we've built|pretty close to having the full picture|clear enough to hand to a professional|that's everything we need|we're (?:all )?done|we're finished|complete picture)\b/i;
+  // Recaps that add what the person never said (walk 8: "So Jess is
+  // employed by a school, PAYE, employer pays her super" after "Jess is a
+  // teacher"). A recap sentence carrying a status word the person has not
+  // used anywhere in the session is dropped.
+  const RECAP = /^(?:so|got it,? so|right,? so|ok(?:ay)?,? so|that means|which means)\b|\bso (?:you're|you are|that's|that is|she's|she is|he's|he is|your|jess|they)\b/i;
+  // Status words about people and ownership only: loan-screen terms are
+  // routinely abbreviated by the person ("P&I", "IO") and recapped in full.
+  const STATUS_WORDS = ["paye", "employee", "employed", "employer", "director", "dividend", "trust", "joint", "binding", "non-binding", "self-employed", "sole trader", "contractor", "casual", "part-time", "full-time", "renting"];
+  const corpus = String(ctx.userCorpus || "").toLowerCase();
+  function unsupportedRecap(snt) {
+    if (!ctx.userCorpus || !RECAP.test(snt)) return false;
+    const low = snt.toLowerCase();
+    return STATUS_WORDS.some(w => new RegExp("\\b" + w.replace(/[-\s]/g, "[-\\s]") + "\\b").test(low) && !corpus.includes(w.split(" ")[0].replace(/-.*/, "")));
+  }
   function dropSentences(p) {
     const parts = p.split(/(?<=[.!?])\s+/);
     const keep = parts.filter(snt => {
       if (/\[(ASK|SWEEP|FRAME|NUDGE):/.test(snt)) return true; // code's own tokens
       if (VERDICT.test(snt) || JARGON.test(snt) || (ctx.canClose === false && WRAPUP.test(snt))) { verdictsDropped++; return false; }
+      // "A rough sense is fine" invites a guess (walk 8).
+      if (/\b(rough (?:sense|figure|idea|estimate|number)|ballpark|best guess|roughly)\b[^.?!]*\b(fine|okay|ok|works|will do|is enough)\b/i.test(snt)) { verdictsDropped++; return false; }
+      if (unsupportedRecap(snt)) { verdictsDropped++; console.log('[Finn clarity] recap with unsaid status dropped: "' + snt.slice(0, 120) + '"'); return false; }
       return true;
     });
     return keep.length === parts.length ? p : keep.join(" ");
@@ -422,6 +440,7 @@ function emDashScrubStream(onDone, ctx = {}) {
     }
     if (r.nudges.length) sawNudge = true;
     if (r.sweeps.length) sawSweep = true;
+    if (r.frames.length) sawFrame = true;
     if (r.served.length || r.sweeps.length || r.frames.length || r.nudges.length) asksServed++;
     return r.text;
   }
@@ -611,6 +630,9 @@ function emDashScrubStream(onDone, ctx = {}) {
       }
       if (!nudged) tail += flushHeld();
       let visible = visibleOut + tail;
+      // A lead-in left hanging by a dropped question ("just to make sure the
+      // picture is complete:") goes too (walk 8).
+      visible = visible.replace(/(?:\n\n)?[^\n]*:\s*$/, "").replace(/\s+$/, "");
       // Shape first, by code (stand-in run 7: Finn jumped to the loan screen
       // with the four "anything else?" questions unasked). While the plan is
       // mapping the household and a sweep is pending, the reply's question
@@ -621,6 +643,15 @@ function emDashScrubStream(onDone, ctx = {}) {
         visible = ack + SWEEPS[ctx.forceSweep].text;
         if (ctx.result) { ctx.result.forcedSweep = ctx.forceSweep; ctx.result.suppressAsks = true; }
         console.log("[Finn clarity] shape phase: reply replaced with sweep " + ctx.forceSweep);
+      }
+      // Never end a turn without a question (walk 8: the model's only line
+      // was an already-asked sweep, so the person saw an empty reply). Code
+      // adds the next open item from the plan.
+      if (ctx.fallback && ctx.fallback.text && !nudged && !closeRefused && !sawFrame && asksServed === 0
+          && !(ctx.result && ctx.result.forcedSweep) && !/\?/.test(visible)) {
+        visible = (visible ? visible + "\n\n" : "") + ctx.fallback.text;
+        if (ctx.result && ctx.fallback.kind === "ask") ctx.result.fallbackAsk = ctx.fallback.id;
+        console.log("[Finn clarity] reply had no question: fallback added (" + (ctx.fallback.id || "plain") + ")");
       }
       if (visible) controller.enqueue(encoder.encode(deltaLine(visible)));
       if (machineBuf) controller.enqueue(encoder.encode(deltaLine("\n\n" + machineBuf)));
@@ -1104,7 +1135,8 @@ export default async function handler(request, context) {
     `Areas covered (decided by code): ${JSON.stringify(plan.covered)}\n` +
     `Snapshot answers (warm start — never re-ask these): ${snapshotAnswers ? JSON.stringify(snapshotAnswers) : "(no linked snapshot)"}\n` +
     `Note: the marker "[Session start]" is a system marker, not from the person.` +
-    planPromptSection(plan, { unsaved, servedPaths });
+    planPromptSection(plan, { unsaved, servedPaths }) +
+    "\n\nBEFORE YOU REPLY: any recap repeats only what the person actually said. \"Jess is a teacher\" does not tell you she is PAYE, employed by a school, or has super paid. If they didn't say it, don't state it; ask it, on its own turn.";
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -1154,6 +1186,18 @@ export default async function handler(request, context) {
   const forceSweepId = plan.phase === "shape" && basicsKnown
     ? ["other_assets", "other_debts", "other_super", "other_income"].find(id => (plan.sweeps_pending || []).includes(id)) || null
     : null;
+  // The fallback question, for a reply that would otherwise end without one.
+  const fallback = (() => {
+    if (forceSweepId || plan.can_close) return null;
+    const trip = (plan.trips || []).find(t => t.items.some(i => i.status === "missing"));
+    if (!trip) return null;
+    if (RETRIEVAL_PATHS[trip.id] && !servedPaths.includes(trip.id)) return { kind: "ask", id: trip.id, text: askFor(trip.id) };
+    const item = trip.items.find(i => i.status === "missing");
+    const l = String(item.label || "").replace(/\s*\([^)]*\)\s*$/, "");
+    const cut = l.lastIndexOf(", ");
+    const what = cut === -1 ? l.toLowerCase() : l.slice(0, cut).toLowerCase() + " for the " + l.slice(cut + 2);
+    return { kind: "plain", id: null, text: `Next, the ${what}. What can you tell me about that?` };
+  })();
   const streamResult = {};
   let resolveWriteAhead;
   const writeAhead = new Promise(resolve => { resolveWriteAhead = resolve; });
@@ -1171,6 +1215,11 @@ export default async function handler(request, context) {
     canClose: plan.can_close,
     sweepsAsked: plan.sweeps_asked || [],
     forceSweep: forceSweepId,
+    fallback,
+    // Everything the person has typed this session, for the recap check.
+    userCorpus: messages.filter(m => m && m.role === "user").map(m => typeof m.content === "string" ? m.content
+      : Array.isArray(m.content) ? m.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : "")
+      .filter(t => !/^\[(Session start|TRANSACTION)/.test(t)).join(" \n "),
     result: streamResult,
     isFirstDeferral: (field) => !(plan.ledger || []).some(e => e && e.field === field && (e.nudges || 0) >= 1),
   }));
@@ -1197,6 +1246,9 @@ export default async function handler(request, context) {
       // What the person saw was the sweep, not the model's figure ask.
       askResult.sweeps = [streamResult.forcedSweep];
       askResult.served = [];
+    }
+    if (streamResult.fallbackAsk && RETRIEVAL_PATHS[streamResult.fallbackAsk]) {
+      askResult.served = [...new Set([...askResult.served, ...RETRIEVAL_PATHS[streamResult.fallbackAsk].satisfies])];
     }
     for (const id of askResult.unknown) {
       console.error(`[Finn clarity] TOKEN FAULT — trigger token "${id}" served nothing`);
