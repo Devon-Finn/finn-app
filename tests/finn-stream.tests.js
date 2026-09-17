@@ -92,5 +92,13 @@ export async function runStreamTests(chat, tokens) {
   const n2 = await run(f, ["No problem, we can come back to that.\n\nNow the REST account, can you check it?\n\n[CAPTURE]{\"deferrals\":[\"super.funds[].has_insurance#x\"]}"], { isFirstDeferral: () => true });
   t('nudge-replaces-contradicting-reply', n2.txt.startsWith(NUDGES.first) && !n2.txt.includes('No problem'));
 
-  return { pass: failures.length === 0, total: 24, failures };
+  // Stand-in run 7: shape first, by code.
+  const fs = {};
+  const sw = await run(f, ["Good, thanks.\n\n[ASK: loan_details]\n\n[CAPTURE]{}"], { forceSweep: 'other_assets', result: fs });
+  t('shape-phase-sweep-replaces-figure-ask', sw.txt.startsWith('Good, thanks.') && sw.txt.includes('Beyond the home and super') && !sw.txt.includes('loan account') && fs.forcedSweep === 'other_assets');
+
+  const soft = await run(f, ["And roughly how much do the distributions come to each year?\n\n[CAPTURE]{}"], {});
+  t('softener-removed-from-question', soft.txt.startsWith('And how much do the distributions come to each year?'));
+
+  return { pass: failures.length === 0, total: 26, failures };
 }

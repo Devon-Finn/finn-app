@@ -1,7 +1,7 @@
 import { bankExportsPromptSection } from "./lib/finn-bank-exports.js";
 import { RETRIEVAL_PATHS, retrievalPromptSection, assertRequiredServable } from "./lib/finn-retrieval-paths.js";
 import { substituteTokens, promptTokenSection, FRAMES, NUDGES } from "./lib/finn-tokens.js";
-import { buildPlan, planPromptSection, closeListText } from "./lib/finn-plan.js";
+import { buildPlan, planPromptSection, closeListText, SWEEPS } from "./lib/finn-plan.js";
 import { FIELD_REGISTRY, CONFIDENCE_RANK, PRODUCERS } from "./lib/finn-field-registry.js";
 import { applyCaptureCore } from "./lib/finn-capture-pipeline.js";
 import { runConductLinter } from "./lib/finn-conduct-linter.js";
@@ -392,6 +392,7 @@ function emDashScrubStream(onDone, ctx = {}) {
   let askedQ = false;         // a code-emitted ask already went out
   let verdictsDropped = 0;
   let visibleOut = "";        // the visible reply, sent once at the end
+  let sawSweep = false;
 
   // Verdict and wrap-up sentences (stand-in run 4): "I think we're in good
   // shape", "while we're wrapping up". Finn never gives a verdict, and it
@@ -420,6 +421,7 @@ function emDashScrubStream(onDone, ctx = {}) {
       console.error(`[Finn clarity] TOKEN FAULT — trigger token "${id}" is not recognised and emitted nothing`);
     }
     if (r.nudges.length) sawNudge = true;
+    if (r.sweeps.length) sawSweep = true;
     if (r.served.length || r.sweeps.length || r.frames.length || r.nudges.length) asksServed++;
     return r.text;
   }
@@ -480,7 +482,8 @@ function emDashScrubStream(onDone, ctx = {}) {
       // question paragraph is dropped, so the person is never asked about
       // two things at once and the unasked one comes up on its own turn.
       if (heldQ !== null || askedQ || reAsksSweep(p)) { droppedQ++; return out; }
-      heldQ = sub(scrub(oneQuestion(p)));
+      // No softeners in a question (Devon: real figures, not guesses).
+      heldQ = sub(scrub(oneQuestion(p).replace(/\b(roughly|approximately|ballpark|a rough idea of)\s+/gi, "")));
     } else {
       if (heldQ !== null) { emit(heldQ); heldQ = null; }
       emit(sub(scrub(p)));
@@ -607,7 +610,18 @@ function emDashScrubStream(onDone, ctx = {}) {
         console.error("[Finn clarity] auto-nudge check failed:", err);
       }
       if (!nudged) tail += flushHeld();
-      const visible = visibleOut + tail;
+      let visible = visibleOut + tail;
+      // Shape first, by code (stand-in run 7: Finn jumped to the loan screen
+      // with the four "anything else?" questions unasked). While the plan is
+      // mapping the household and a sweep is pending, the reply's question
+      // becomes that sweep; any figure ask in it is withheld.
+      if (ctx.forceSweep && SWEEPS[ctx.forceSweep] && !sawSweep && !nudged && !closeRefused) {
+        const first = visible.split(/\n{2,}/)[0] || "";
+        const ack = first && !/\?/.test(first) && first.length <= 240 ? first + "\n\n" : "";
+        visible = ack + SWEEPS[ctx.forceSweep].text;
+        if (ctx.result) { ctx.result.forcedSweep = ctx.forceSweep; ctx.result.suppressAsks = true; }
+        console.log("[Finn clarity] shape phase: reply replaced with sweep " + ctx.forceSweep);
+      }
       if (visible) controller.enqueue(encoder.encode(deltaLine(visible)));
       if (machineBuf) controller.enqueue(encoder.encode(deltaLine("\n\n" + machineBuf)));
       if (substitutions > 0) console.log(`[Finn clarity] em-dash substitutions in visible reply: ${substitutions}`);
@@ -1134,6 +1148,13 @@ export default async function handler(request, context) {
   // but the tee'd save branch still drains the full model output — the
   // fallback below inserts the raw row itself before applying, so the
   // disconnect-still-saves property is preserved.
+  // Shape phase: the household basics are known and an "anything else?"
+  // sweep is still pending, so the next question is that sweep.
+  const basicsKnown = !(plan.shapeOpen || []).some(x => !String(x).startsWith("[SWEEP"));
+  const forceSweepId = plan.phase === "shape" && basicsKnown
+    ? ["other_assets", "other_debts", "other_super", "other_income"].find(id => (plan.sweeps_pending || []).includes(id)) || null
+    : null;
+  const streamResult = {};
   let resolveWriteAhead;
   const writeAhead = new Promise(resolve => { resolveWriteAhead = resolve; });
   const scrubbed = clientStream.pipeThrough(emDashScrubStream(async fullText => {
@@ -1149,6 +1170,8 @@ export default async function handler(request, context) {
     closeList: closeListText(plan),
     canClose: plan.can_close,
     sweepsAsked: plan.sweeps_asked || [],
+    forceSweep: forceSweepId,
+    result: streamResult,
     isFirstDeferral: (field) => !(plan.ledger || []).some(e => e && e.field === field && (e.nudges || 0) >= 1),
   }));
 
@@ -1170,6 +1193,11 @@ export default async function handler(request, context) {
     const visibleEnd = cuts.length ? Math.min(...cuts) : fullText.length;
     const visibleRaw = fullText.slice(0, visibleEnd);
     const askResult = substituteTokens(visibleRaw);
+    if (streamResult.forcedSweep) {
+      // What the person saw was the sweep, not the model's figure ask.
+      askResult.sweeps = [streamResult.forcedSweep];
+      askResult.served = [];
+    }
     for (const id of askResult.unknown) {
       console.error(`[Finn clarity] TOKEN FAULT — trigger token "${id}" served nothing`);
     }
