@@ -143,5 +143,24 @@ export async function runStreamTests(chat, tokens) {
   const src2 = await run(f, ["Is that from the statement or from memory?\n\n[CAPTURE]{}"], { lastUser: "it's 9 grand" });
   t('source-question-kept-when-unsaid', src2.txt.startsWith('Is that from the statement'));
 
-  return { pass: failures.length === 0, total: 40, failures };
+  // Run 10: "round out the shape of the household ... own or rent?" was
+  // dropped whole and the reply stalled.
+  const shp = await run(f, ["Good. So you're both continuing as you are.\n\nOne more thing to round out the shape of the household before we get into figures: do you own the place you live in, or are you renting?\n\n[CAPTURE]{}"], { userCorpus: "staying as is", fallback: { kind: 'plain', id: null, text: 'FALLBACK' } });
+  t('plain-word-shape-kept', shp.txt.includes('do you own the place') && !shp.txt.includes('FALLBACK'));
+  const jq = await run(f, ["Good.\n\nA couple of quick shape questions: what does Jess do?\n\n[CAPTURE]{}"], { fallback: { kind: 'plain', id: null, text: 'Do you own the home you live in, or rent?' } });
+  t('jargon-question-dropped-gets-fallback', !/shape questions/.test(jq.txt) && jq.txt.includes('Good.\n\nDo you own the home you live in, or rent?'));
+
+  // Run 10: the model nudged the same skip twice in a row.
+  const rn = await run(f, ["Noted. What about Jess's super, do you know which fund she's with?\n\n[NUDGE: first]\n\n[CAPTURE]{\"deferrals\":[\"super.funds[].balance#r1\"]}"], { prevAssistant: NUDGES.first, isFirstDeferral: () => false });
+  t('repeat-first-nudge-becomes-accept', rn.txt.includes(NUDGES.accept) && !rn.txt.includes(NUDGES.first) && rn.txt.includes("which fund she's with?"));
+  const rn2 = await run(f, ["[NUDGE: first]\n\n[CAPTURE]{}"], { prevAssistant: "What's the balance?", isFirstDeferral: () => true });
+  t('genuine-first-nudge-kept', rn2.txt.startsWith(NUDGES.first));
+
+  const gh = await run(f, ["Good to have those in place. Do you each have an enduring power of attorney?\n\n[CAPTURE]{}"], {});
+  t('good-to-have-in-place-dropped', gh.txt.startsWith('Do you each have an enduring power of attorney?'));
+
+  const gq = await run(f, ["That's fine. Do you have a rough sense of what the company made last year?\n\n[CAPTURE]{}"], { fallback: { kind: 'plain', id: null, text: 'Next on the list is the kids. What can you tell me about that?' } });
+  t('guess-question-dropped', !/rough sense/.test(gq.txt) && gq.txt.includes('Next on the list'));
+
+  return { pass: failures.length === 0, total: 46, failures };
 }

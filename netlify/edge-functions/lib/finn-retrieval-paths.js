@@ -131,7 +131,7 @@ export const RETRIEVAL_PATHS = {
     name: "the spending, from a transaction export",
     where: "The fullest honest read of what goes out comes from twelve months of transactions, from every account and card the spending comes out of. Rego, insurance, school costs and Christmas land unevenly across the year, so a shorter stretch can't simply be scaled up, and I can walk you through getting the export from your bank.",
     look_for: "Export each account and card as a CSV covering the last twelve months. Some banks only export a few months at a time, so one account can take two or three downloads; send them all, and a joint account only once.",
-    honest: "Once the files land here, code sorts the spending into where it goes and does the arithmetic across the whole year. A guessed monthly figure is usually well under the real one, which is why the export is worth the few minutes.",
+    honest: "Once the files land here, I sort the spending into where it goes and work it out across the whole year. A guessed monthly figure is usually well under the real one, which is why the export is worth the few minutes.",
     offer: "Attach the files here when you have them, and I will read them straight away. If an export isn't possible right now, tell me what you think goes out in a typical month, leaving the mortgage aside, and I'll note it as an estimate to firm up.",
     satisfies: ["expenses.living_monthly"],
   },

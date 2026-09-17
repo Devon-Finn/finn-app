@@ -395,15 +395,18 @@ function emDashScrubStream(onDone, ctx = {}) {
   let sawSweep = false;
   let sawFrame = false;       // a code-authored open/close frame went out
   let sweepRefused = false;   // the model re-emitted a sweep already asked
+  let supersededQ = null;     // the model's question a token displaced
 
   // Verdict and wrap-up sentences (stand-in run 4): "I think we're in good
   // shape", "while we're wrapping up". Finn never gives a verdict, and it
   // never talks about finishing while the plan has areas open. These
   // sentences are removed mechanically, like the em-dash.
-  const VERDICT = /\b(in good shape|solid (?:start|foundation|starting point|position|direction)|decent (?:runway|buffer|position)|healthy (?:buffer|position|balance)|a good position|well set up|well placed|on track|nothing to worry about)\b/i;
+  const VERDICT = /\b(in good shape|solid (?:start|foundation|starting point|position|direction)|decent (?:runway|buffer|position)|healthy (?:buffer|position|balance)|a good position|well set up|well placed|on track|nothing to worry about|good to have (?:those|that|it|them) in place|that's (?:reassuring|a relief))\b/i;
   // Internal words never reach the person (live walk, 17 Sept 2026: "A few
   // quick sweep questions").
-  const JARGON = /\b(sweeps?|sweep questions?|shape|trips? phase|working notes|the plan says|capture block|ledger|to_verify)\b/i;
+  // "shape" alone is plain English ("the shape of the household"); only the
+  // internal phrases go (run 10 lost a whole question to the bare word).
+  const JARGON = /\b(sweeps?|sweep questions?|shape (?:phase|questions?)|trips? phase|working notes|the plan says|capture block|ledger|to_verify|confidence level|in the picture at)\b/i;
   const WRAPUP = /\b(wrapping up|wrap (?:things )?up|pull together what we've built|pretty close to having the full picture|clear enough to hand to a professional|that's everything we need|we're (?:all )?done|we're finished|complete picture)\b/i;
   // Recaps that add what the person never said (walk 8: "So Jess is
   // employed by a school, PAYE, employer pays her super" after "Jess is a
@@ -415,7 +418,7 @@ function emDashScrubStream(onDone, ctx = {}) {
   const STATUS_WORDS = ["paye", "employee", "employed", "employer", "director", "dividend", "trust", "joint", "binding", "non-binding", "self-employed", "sole trader", "contractor", "casual", "part-time", "full-time", "renting"];
   const corpus = String(ctx.userCorpus || "").toLowerCase();
   const SOURCE_Q = /\b(from memory|off the top of your head|in front of you (?:right )?now|did (?:you|she|he) (?:check|look)|checked (?:it )?just now)\b/i;
-  const SOURCE_SAID = /\b(payslip|statement|screen|app|portal|mygov|in front of me|checked|looked (?:it )?up|just looked|from memory|off the top of my head|roughly|about|around|guess)\b/i;
+  const SOURCE_SAID = /\b(payslip|statement|screen|app|portal|mygov|in front of me|checked|looked (?:it )?up|just looked|from memory|off the top of my head|my guess|a guess)\b/i;
   function unsupportedRecap(snt) {
     if (!ctx.userCorpus || !RECAP.test(snt)) return false;
     const low = snt.toLowerCase();
@@ -424,17 +427,28 @@ function emDashScrubStream(onDone, ctx = {}) {
   function dropSentences(p) {
     const parts = p.split(/(?<=[.!?])\s+/);
     const keep = parts.filter(snt => {
+      const k = keepSentence(snt);
+      // A question removed here leaves a hole code must fill (run 10).
+      if (!k && /\?\s*$/.test(snt)) droppedQ++;
+      return k;
+    });
+    return keep.length === parts.length ? p : keep.join(" ");
+  }
+  function keepSentence(snt) {
+    {
       if (/\[(ASK|SWEEP|FRAME|NUDGE):/.test(snt)) return true; // code's own tokens
       if (VERDICT.test(snt) || JARGON.test(snt) || (ctx.canClose === false && WRAPUP.test(snt))) { verdictsDropped++; return false; }
+      // "Do you have a rough sense of what the company made?" asks for a
+      // guess (run 10). Finn asks for the figure or nudges; never a guess.
+      if (/\?\s*$/.test(snt) && /\b(rough (?:sense|figure|idea|estimate|number)|ballpark|best guess|a guess|guesstimate)\b/i.test(snt)) { verdictsDropped++; return false; }
       // "A rough sense is fine" invites a guess (walk 8).
       if (/\b(rough (?:sense|figure|idea|estimate|number)|ballpark|best guess|roughly)\b[^.?!]*\b(fine|okay|ok|works|will do|is enough)\b/i.test(snt)) { verdictsDropped++; return false; }
       // "Is that from the payslip or from memory?" when the person just said
       // where it came from (walk 8b: "ok got the payslip. gross is...").
-      if (ctx.lastUser && SOURCE_Q.test(snt) && SOURCE_SAID.test(ctx.lastUser)) { verdictsDropped++; droppedQ++; return false; }
+      if (ctx.lastUser && SOURCE_Q.test(snt) && SOURCE_SAID.test(ctx.lastUser)) { verdictsDropped++; return false; }
       if (unsupportedRecap(snt)) { verdictsDropped++; console.log('[Finn clarity] recap with unsaid status dropped: "' + snt.slice(0, 120) + '"'); return false; }
       return true;
-    });
-    return keep.length === parts.length ? p : keep.join(" ");
+    }
   }
   function scrub(s) {
     return dropSentences(s).replace(/\s*—\s*/g, () => { substitutions++; return ", "; });
@@ -498,7 +512,7 @@ function emDashScrubStream(onDone, ctx = {}) {
       return out;
     }
     if (HAS_TOKEN.test(p)) {
-      if (heldQ !== null) { droppedQ++; heldQ = null; }
+      if (heldQ !== null) { droppedQ++; supersededQ = heldQ; heldQ = null; }
       emit(sub(scrub(p)));
       askedQ = true;
     } else if (/\?/.test(p)) {
@@ -652,6 +666,25 @@ function emDashScrubStream(onDone, ctx = {}) {
         visible = ack + SWEEPS[ctx.forceSweep].text;
         if (ctx.result) { ctx.result.forcedSweep = ctx.forceSweep; ctx.result.suppressAsks = true; }
         console.log("[Finn clarity] shape phase: reply replaced with sweep " + ctx.forceSweep);
+      }
+      // A second first-nudge on the same thing (run 10: "note it and come
+      // back" got the whole nudge again) becomes the acceptance, and the
+      // conversation moves on with the model's own next question.
+      if (!nudged && visible.includes(NUDGES.first)) {
+        // The capture's deferrals decide when it names them (all already
+        // nudged = a repeat); otherwise the previous reply being the nudge.
+        const repeat = (() => {
+          let ds = [];
+          try { const c = parseCapture(machineBuf); ds = (c && Array.isArray(c.deferrals) ? c.deferrals : []).map(d => typeof d === "string" ? { f: d.split("#")[0], i: d.split("#")[1] || null } : { f: d && d.field, i: d && d.item_id }).filter(d => d.f); } catch { ds = []; }
+          if (ds.length && typeof ctx.isFirstDeferral === "function") return ds.every(d => !ctx.isFirstDeferral(d.f, d.i));
+          return !!(ctx.prevAssistant && ctx.prevAssistant.includes(NUDGES.first.slice(0, 60)));
+        })();
+        if (repeat) {
+          const next = supersededQ || (ctx.fallback && ctx.fallback.text) || "";
+          visible = visible.replace(NUDGES.first, NUDGES.accept + (next ? "\n\n" + next : ""));
+          if (!supersededQ && ctx.fallback && ctx.fallback.kind === "ask" && ctx.result) ctx.result.fallbackAsk = ctx.fallback.id;
+          console.log("[Finn clarity] repeated first nudge turned into the acceptance");
+        }
       }
       // A hole code made gets filled by code (walk 8: the model's only line
       // was an already-asked sweep, so the person saw an empty reply). When
@@ -1205,6 +1238,19 @@ export default async function handler(request, context) {
   // The fallback question, for a reply that would otherwise end without one.
   const fallback = (() => {
     if (forceSweepId || plan.can_close) return null;
+    // Mapping the household: the next open shape question (run 10: the
+    // tenure question was lost and the reply stalled).
+    const SHAPE_ASKS = {
+      "who is in the household": "Who's in your household?",
+      "children and ages": "Do you have children, and how old are they?",
+      "how each income is earned": "How does each of you earn: employed by someone else, through your own company, as a sole trader, or through a trust?",
+      "whether they own the home": "Do you own the home you live in, or rent?",
+    };
+    const shapeNext = (plan.shapeOpen || []).find(x => !String(x).startsWith("[SWEEP"));
+    if (shapeNext) {
+      const key = Object.keys(SHAPE_ASKS).find(k => String(shapeNext).startsWith(k));
+      if (key) return { kind: "plain", id: null, text: SHAPE_ASKS[key] };
+    }
     const trip = (plan.trips || []).find(t => t.items.some(i => i.status === "missing"));
     if (!trip) return null;
     if (RETRIEVAL_PATHS[trip.id] && !servedPaths.includes(trip.id)) return { kind: "ask", id: trip.id, text: askFor(trip.id) };
@@ -1236,6 +1282,7 @@ export default async function handler(request, context) {
     userCorpus: messages.filter(m => m && m.role === "user").map(m => typeof m.content === "string" ? m.content
       : Array.isArray(m.content) ? m.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : "")
       .filter(t => !/^\[(Session start|TRANSACTION)/.test(t)).join(" \n "),
+    prevAssistant: (() => { const a = messages.filter(m => m && m.role === "assistant"); const m = a[a.length - 1]; return !m ? "" : typeof m.content === "string" ? m.content : Array.isArray(m.content) ? m.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : ""; })(),
     lastUser: (() => { const u = messages.filter(m => m && m.role === "user").map(m => typeof m.content === "string" ? m.content
       : Array.isArray(m.content) ? m.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : ""); return u.length ? u[u.length - 1] : ""; })(),
     result: streamResult,

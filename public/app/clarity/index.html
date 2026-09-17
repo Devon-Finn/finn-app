@@ -282,7 +282,7 @@
             <button class="send" id="sendBtn" aria-label="Send">↑</button>
           </div>
         </div>
-        <input type="file" id="fileInput" accept="application/pdf,image/png,image/jpeg,image/webp,text/csv,.csv" style="display:none">
+        <input type="file" id="fileInput" multiple accept="application/pdf,image/png,image/jpeg,image/webp,text/csv,.csv" style="display:none">
       </div>
 
       <div class="dash">
@@ -410,7 +410,8 @@ const fileInput = document.getElementById('fileInput');
 const attachChip = document.getElementById('attachChip');
 
 attachBtn.addEventListener('click', () => fileInput.click());
-fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); fileInput.value = ''; });
+// Several bank exports at once (run 10: only the first of two CSVs was kept).
+fileInput.addEventListener('change', () => { for (const f of [...fileInput.files]) handleFile(f); fileInput.value = ''; });
 document.getElementById('attachRemove').addEventListener('click', clearAttachment);
 
 // Paste a screenshot straight into the chat — Finn's ask literally says
@@ -437,8 +438,8 @@ const convoEl = document.querySelector('.convo');
 ['dragover', 'dragenter'].forEach(ev => convoEl.addEventListener(ev, e => { e.preventDefault(); }));
 convoEl.addEventListener('drop', e => {
   e.preventDefault();
-  const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-  if (f) handleFile(f);
+  const fs = e.dataTransfer && e.dataTransfer.files ? [...e.dataTransfer.files] : [];
+  for (const f of fs) handleFile(f);
 });
 
 function clearAttachment() {

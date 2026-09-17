@@ -295,5 +295,15 @@ export function runPlanTests({ plan, pipeline, tokens }) {
   const pf = S.domains.super.funds.filter(x => x.owner === 'partner');
   t('nameless-partner-fund-filled-not-duplicated', pf.length === 1 && pf[0].fund === 'Hostplus' && S.domains.super.funds.length === 2);
 
-  return { pass: failures.length === 0, total: 78, failures };
+  // Run 10: the home loan as a debt item, and HECS as a "home_loan" for study.
+  let H = { domains: { home: { owns_home: true } }, goals: {}, completed_domains: [], refusals: [] };
+  H = ap(H, { domains: { debts: { items: [
+    { type: 'home_loan', purpose: 'owner_occupied', borrower: 'joint', security: 'property_home', balance: 412000, rate_percent: 6.09, minimum_monthly: 2780 },
+    { type: 'home_loan', purpose: 'education', borrower: 'personal' },
+    { type: 'credit_card', purpose: 'personal', borrower: 'personal', balance: 2300 },
+  ] } } });
+  t('home-loan-item-folded-into-home', H.domains.home.mortgage_balance === 412000 && H.domains.home.repayment_monthly === 2780 && !H.domains.debts.items.some(i => i.type === 'home_loan'));
+  t('study-item-without-balance-dropped', H.domains.debts.items.length === 1 && H.domains.debts.items[0].type === 'credit_card');
+
+  return { pass: failures.length === 0, total: 80, failures };
 }

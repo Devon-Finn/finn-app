@@ -690,6 +690,42 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
       merged = { ...merged, debts: { ...merged.debts, items: kept } };
     }
   }
+  // The home loan lives in home.*, never as a debt item too (run 10: the
+  // CBA loan was stored twice, so its repayment would count twice in what's
+  // left over). A household home loan item is folded into home and removed;
+  // a split that pointed at it points at the home.
+  if (merged.debts && Array.isArray(merged.debts.items)) {
+    const ENTITY = ["company", "trust", "smsf", "partnership"];
+    const isHomeLoan = it => it && it.type === "home_loan" && it.is_split !== true
+      && !ENTITY.includes(String(it.borrower || "").toLowerCase())
+      && (it.purpose === "owner_occupied" || it.security === "property_home" || it.secured_against_asset_id === "home");
+    const hl = merged.debts.items.filter(isHomeLoan);
+    // A debt item for study that isn't HECS is the HECS mentioned in
+    // passing (run 10: "Jess has some HECS" became a home_loan for
+    // education). New ones are dropped; HECS lives in debts.hecs_balance.
+    const baseIds2 = new Set(((baseDomains.debts && baseDomains.debts.items) || []).map(it => it && it.id).filter(Boolean));
+    const junkHecs = merged.debts.items.filter(it => it && it.purpose === "education" && it.type !== "hecs_help" && !(it.id && baseIds2.has(it.id)) && (it.balance === undefined || it.balance === null));
+    if (hl.length === 1 || junkHecs.length) {
+      let home = { ...(merged.home || {}) };
+      const gone = new Set(junkHecs.map(it => it.id));
+      if (hl.length === 1) {
+        const it = hl[0];
+        const fill = (k, v) => { if ((home[k] === undefined || home[k] === null) && v !== undefined && v !== null) home[k] = v; };
+        fill("mortgage_balance", it.balance);
+        fill("rate_percent", it.rate_percent);
+        fill("repayment_monthly", it.minimum_monthly);
+        fill("lender", it.lender);
+        if (home.owns_home === undefined || home.owns_home === null) home.owns_home = true;
+        gone.add(it.id);
+        anomalies.push(`home loan item ${it.id} folded into home`);
+      }
+      if (junkHecs.length) anomalies.push("study debt item without a balance dropped (HECS lives in hecs_balance)");
+      const items = merged.debts.items.filter(it => !(it && gone.has(it.id)))
+        .map(it => it && gone.has(it.parent_loan_id) ? { ...it, parent_loan_id: "home" } : it);
+      merged = { ...merged, home, debts: { ...merged.debts, items } };
+      if (junkHecs.length && merged.debts.hecs_balance === undefined) merged = { ...merged, debts: { ...merged.debts, hecs_balance: null } };
+    }
+  }
   merged = resolveSecurity(assignAssetIds(merged));
   // A property loan recorded as a debt item links to its property when
   // there is exactly one candidate (same holder, or the only property).
