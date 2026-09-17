@@ -288,6 +288,8 @@ When a user turn contains [TRANSACTION SUMMARY] {json}, code has already parsed 
 - Walk the "outliers" one at a time, one open thread, in plain language. A large_one_off: is it a yearly bill that'll come around again, or a one-off ("there's a $4,000 payment to X in March — a yearly premium that recurs, or a one-off?"). A housing_candidate: is this the mortgage or rent (captured separately, never in living costs)? Any loan repayment (home loan, a split, a car or personal loan) resolves as housing here: repayments are counted from the loan details, never inside living costs. Where several outliers are plainly the same bill (four council rates payments, two rego renewals), ask about them together in one question and resolve them together. A transfer_suspect: is this money moving between their own accounts?
 - As answers land, emit resolve lines, each on its own line immediately BEFORE the [CAPTURE] block: [RESOLVE] {"o1":"one_off","r2":"housing"} — categories are exactly recurring_annual | one_off | housing | internal_transfer. You may batch several answered ids in one line. Never invent an id and never resolve an unanswered outlier. Nothing visible ever follows a [RESOLVE] line: say everything you want to say first, then the [RESOLVE] line(s), then [CAPTURE], and end the reply.
 - If the summary has coverage_short true, say plainly the export covered less than a year and the figure will be an estimate until a fuller export sharpens it.
+NEVER CALCULATE ONE OF THEIR FIGURES FROM ANOTHER. A minimum repayment, a rate, an interest amount, a balance and a repayment are separate facts, each read off a screen or a statement. When the person updates one of them, change that one and leave the rest exactly as they are; if a related figure has moved too, ask for it. The only figures you convert are pay periods the person stated (a fortnightly net pay to a monthly one), and even then you keep what they said.
+
 When a user turn contains [TRANSACTION RESULT] {json}, code has applied their answers and done the division. State the composition plainly, two facts, no adjustment, no verdict, in this shape: "That works out at $X a month across the year. About $Y a month of that was one-off spending — <the one-off labels in plain words> — so a typical month is quieter than that, and a year has things like them in it." (Where one_off_monthly is 0, just state the monthly figure.) Code records the result itself (the monthly figure, includes_housing false, any housing figure, where the money goes by category, the once-a-year bills, the months covered and the confidence), so you capture nothing from it and never recompute it; you don't list categories and you never describe any category as high, low, a lot or too much. You may say the spending tile now shows where it goes. Where coverage_months is under 11, say plainly that a shorter stretch can miss once-a-year costs and that the rest of the year would firm the figure up.`;
 
 /* ════════════════════ Supabase helpers (service role) ════════════════════ */
@@ -374,6 +376,8 @@ function parseCapture(fullText) {
    days are legitimate. Every substitution is counted and logged so the
    leak rate stays visible over time instead of being silently papered
    over. */
+const STOP_WORDS_PLAN = new Set(["whether", "inside", "that", "this", "with", "from", "your", "their", "what", "which", "much", "there", "sits", "partner", "have", "does", "account", "accounts", "still", "lives", "gathered"]);
+
 function emDashScrubStream(onDone, ctx = {}) {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
@@ -491,6 +495,15 @@ function emDashScrubStream(onDone, ctx = {}) {
     other_super: /\b(more than one super|any other super)\b/i,
   };
   const reAsksSweep = (p) => Array.isArray(ctx.sweepsAsked) && Object.entries(COMPOSED).some(([id, re]) => ctx.sweepsAsked.includes(id) && re.test(p));
+  // Two nudges and it's on the list, by code (run 10: Jess's insurance was
+  // asked a third time). A question that names the item and the thing put
+  // off is dropped; the fallback then moves the conversation on.
+  const STOP_WORDS = new Set(["whether", "inside", "that", "this", "with", "from", "your", "their", "what", "which", "much", "there", "sits", "partner", "have", "does", "account", "accounts"]);
+  const closedAsk = (p) => (Array.isArray(ctx.closedAsks) ? ctx.closedAsks : []).some(words => {
+    const low = p.toLowerCase();
+    const hits = words.filter(w => low.includes(w));
+    return words.length >= 2 && hits.length >= 2;
+  });
   // Paragraph discipline (stand-in run 2): a question paragraph written by
   // the model immediately before a code-emitted ask, sweep or nudge is the
   // model asking the same thing twice, or asking something new before a
@@ -521,7 +534,7 @@ function emDashScrubStream(onDone, ctx = {}) {
       // One question per reply (live walk, 17 Sept 2026): a second
       // question paragraph is dropped, so the person is never asked about
       // two things at once and the unasked one comes up on its own turn.
-      if (heldQ !== null || askedQ || reAsksSweep(p)) { droppedQ++; return out; }
+      if (heldQ !== null || askedQ || reAsksSweep(p) || closedAsk(p)) { droppedQ++; return out; }
       // No softeners in a question (Devon: real figures, not guesses).
       heldQ = sub(scrub(oneQuestion(p).replace(/\b(roughly|approximately|ballpark|a rough idea of)\s+/gi, "")));
     } else {
@@ -987,13 +1000,13 @@ async function applyCapture(householdId, capture, logId, sessionId, turn) {
     }
     const recHasGoals = turn.recorder && turn.recorder.goals && typeof turn.recorder.goals === "object" && Object.keys(turn.recorder.goals).length;
     if (turn.recorder && ((turn.recorder.domains && Object.keys(turn.recorder.domains).length) || recHasGoals)) {
-      const pre = applyCaptureCore({ picture, capture: { domains: turn.recorder.domains || {}, ...(recHasGoals ? { goals: turn.recorder.goals } : {}) }, sessionId, servedFields, sweepsServed: [], closeServed: false });
+      const pre = applyCaptureCore({ picture, capture: { domains: turn.recorder.domains || {}, ...(recHasGoals ? { goals: turn.recorder.goals } : {}) }, sessionId, servedFields, sweepsServed: [], closeServed: false, userText: turn.userText });
       recErrors = pre.errors.map(e => "recorder: " + e);
       picture = { ...picture, domains: pre.domains, goals: pre.goals, refusals: pre.refusalsOut !== undefined ? pre.refusalsOut : picture.refusals };
     }
     const result = applyCaptureCore({
       picture, capture, sessionId, servedFields,
-      sweepsServed: turn.sweeps || [], closeServed,
+      sweepsServed: turn.sweeps || [], closeServed, userText: turn.userText,
     });
     result.errors = [...recErrors, ...result.errors];
     for (const a of result.anomalies) console.error(`[Finn clarity] capture anomaly: ${a}.`);
@@ -1260,6 +1273,8 @@ export default async function handler(request, context) {
     const what = cut === -1 ? l : l.slice(0, cut) + " (" + l.slice(cut + 2) + ")";
     return { kind: "plain", id: null, text: `Next on the list is ${what}. What can you tell me about that?` };
   })();
+  const lastUserText = (() => { const u = messages.filter(m => m && m.role === "user").map(m => typeof m.content === "string" ? m.content
+    : Array.isArray(m.content) ? m.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : ""); return u.length ? u[u.length - 1] : ""; })();
   const streamResult = {};
   let resolveWriteAhead;
   const writeAhead = new Promise(resolve => { resolveWriteAhead = resolve; });
@@ -1277,14 +1292,18 @@ export default async function handler(request, context) {
     canClose: plan.can_close,
     sweepsAsked: plan.sweeps_asked || [],
     forceSweep: forceSweepId,
+    // Items put off twice: their distinctive words, so a third ask is cut.
+    closedAsks: (plan.deferred || []).filter(d => (d.nudges || 1) >= 2)
+      .map(d => String(d.label || "").toLowerCase().replace(/[^a-z\s,]/g, " ").split(/[\s,]+/)
+        .filter(w => w.length > 3 && !STOP_WORDS_PLAN.has(w)))
+      .filter(ws => ws.length >= 2),
     fallback,
     // Everything the person has typed this session, for the recap check.
     userCorpus: messages.filter(m => m && m.role === "user").map(m => typeof m.content === "string" ? m.content
       : Array.isArray(m.content) ? m.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : "")
       .filter(t => !/^\[(Session start|TRANSACTION)/.test(t)).join(" \n "),
     prevAssistant: (() => { const a = messages.filter(m => m && m.role === "assistant"); const m = a[a.length - 1]; return !m ? "" : typeof m.content === "string" ? m.content : Array.isArray(m.content) ? m.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : ""; })(),
-    lastUser: (() => { const u = messages.filter(m => m && m.role === "user").map(m => typeof m.content === "string" ? m.content
-      : Array.isArray(m.content) ? m.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : ""); return u.length ? u[u.length - 1] : ""; })(),
+    lastUser: lastUserText,
     result: streamResult,
     isFirstDeferral: (field, itemId) => !(plan.ledger || []).some(e => e && e.field === field
       && (!itemId || !e.item_id || e.item_id === itemId) && (e.nudges || 0) >= 1),
@@ -1431,6 +1450,7 @@ export default async function handler(request, context) {
     try {
       applied = await applyCapture(auth.householdId, capture, logId, sessionId, {
         recorder,
+        userText: lastUserText,
         sweeps: askResult.sweeps,
         closeServedNow: askResult.frames.includes("close") && plan.can_close,
       });

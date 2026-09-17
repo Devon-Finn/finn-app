@@ -319,5 +319,16 @@ export function runPlanTests({ plan, pipeline, tokens }) {
   U = ap(U, { domains: { debts: { items: [{ type: 'home_loan', purpose: 'owner_occupied', borrower: 'joint', balance: 398000, rate_percent: 5.89 }] } } });
   t('updated-home-loan-overwrites-home', U.domains.home.mortgage_balance === 398000 && U.domains.home.rate_percent === 5.89 && U.domains.home.repayment_monthly === 2780);
 
-  return { pass: failures.length === 0, total: 84, failures };
+  // Run 10: a new card balance arrived with an invented minimum (2% of it).
+  const apU = (pic, cap, txt) => { const r = pipeline.applyCaptureCore({ picture: pic, capture: cap, sessionId: 's', servedFields: new Set(), userText: txt }); return { domains: r.domains, goals: r.goals, completed_domains: [], refusals: [], anomalies: r.anomalies }; };
+  const cardBase = () => ({ domains: { debts: { items: [{ id: 'cc1', type: 'credit_card', purpose: 'personal', borrower: 'personal', balance: 2300, rate_percent: 20.99, minimum_monthly: 46 }] } }, goals: {}, completed_domains: [], refusals: [] });
+  const C1 = apU(cardBase(), { domains: { debts: { items: [{ id: 'cc1', balance: 2100, minimum_monthly: 42 }] } } }, "the card balance is $2,100 now, I checked the app");
+  const c1 = C1.domains.debts.items[0];
+  t('stated-figure-updates-invented-one-does-not', c1.balance === 2100 && c1.minimum_monthly === 46);
+  const C2 = apU(cardBase(), { domains: { debts: { items: [{ id: 'cc1', balance: 2100, minimum_monthly: 42 }] } } }, "balance is 2,100 and the minimum is 42 now");
+  t('both-stated-figures-update', C2.domains.debts.items[0].minimum_monthly === 42);
+  const C3 = apU(cardBase(), { domains: { debts: { items: [{ id: 'cc1', balance: 2100, minimum_monthly: 42 }] } } }, "here's the statement");
+  t('no-figures-in-the-words-leaves-the-turn-alone', C3.domains.debts.items[0].minimum_monthly === 42);
+
+  return { pass: failures.length === 0, total: 87, failures };
 }

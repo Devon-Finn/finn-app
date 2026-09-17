@@ -510,7 +510,7 @@ function stripLeaf(patch, s) {
 
 function cloneJson(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }
 
-export function applyCaptureCore({ picture, capture, sessionId, servedFields, sweepsServed, closeServed }) {
+export function applyCaptureCore({ picture, capture, sessionId, servedFields, sweepsServed, closeServed, userText }) {
   const anomalies = [];
   const errors = [];
   const served = servedFields instanceof Set ? servedFields : new Set(servedFields || []);
@@ -672,6 +672,38 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
       .filter(f => typeof f === "string" && FIELD_REGISTRY[f]),
   ]);
   const validRefusals = new Set([...claimedRefusals].filter(f => served.has(f)));
+  // Figures the person did not give are not the model's to work out (run
+  // 10: a new card balance came with a "minimum" of 2% of it). When a patch
+  // updates an existing item, any other number on that item that is not in
+  // what the person just said keeps its stored value.
+  if (typeof userText === "string" && userText) {
+    const said = userText.replace(/[,\s$]/g, "").toLowerCase();
+    const spoken = v => {
+      const n = Math.abs(v);
+      const forms = [String(n), String(Math.round(n)), String(n).replace(/\.0+$/, "")];
+      if (n >= 1000 && n % 100 === 0) forms.push((n / 1000).toString().replace(/\.0$/, "") + "k");
+      return forms.some(f => f && said.includes(f));
+    };
+    for (const [dk, arrKey] of [["debts", "items"], ["super", "funds"], ["investments", "properties"], ["income", "other"]]) {
+      const pd = patch[dk], bd = baseDomains[dk];
+      if (!pd || !Array.isArray(pd[arrKey]) || !bd || !Array.isArray(bd[arrKey])) continue;
+      pd[arrKey] = pd[arrKey].map(item => {
+        if (!item || typeof item !== "object" || !item.id || item._remove) return item;
+        const prior = bd[arrKey].find(b => b && b.id === item.id);
+        if (!prior) return item;
+        const numeric = Object.keys(item).filter(k => typeof item[k] === "number");
+        const changed = numeric.filter(k => typeof prior[k] === "number" && prior[k] !== item[k]);
+        if (!changed.some(k => spoken(item[k]))) return item;   // nothing stated: leave the turn alone
+        const out = { ...item };
+        for (const k of changed) {
+          if (spoken(item[k])) continue;
+          out[k] = prior[k];
+          anomalies.push(`${dk}.${arrKey}[].${k} kept: the new value was not in what the person said`);
+        }
+        return out;
+      });
+    }
+  }
   // A new home value without its own range retires the old range (Devon,
   // 17 Sept: subscribers update the value when a new estimate lands; a
   // stale range beside a new midpoint would misstate the equity spread).

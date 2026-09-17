@@ -162,5 +162,11 @@ export async function runStreamTests(chat, tokens) {
   const gq = await run(f, ["That's fine. Do you have a rough sense of what the company made last year?\n\n[CAPTURE]{}"], { fallback: { kind: 'plain', id: null, text: 'Next on the list is the kids. What can you tell me about that?' } });
   t('guess-question-dropped', !/rough sense/.test(gq.txt) && gq.txt.includes('Next on the list'));
 
-  return { pass: failures.length === 0, total: 46, failures };
+  // Run 10: Jess's Hostplus insurance was asked a third time after two skips.
+  const closed = await run(f, ["Thanks for checking.\n\nAnd while you're in myGov, Jess's Hostplus, does it have insurance inside it?\n\n[CAPTURE]{}"], { closedAsks: [['insurance', 'hostplus']], fallback: { kind: 'plain', id: null, text: 'Next on the list is what the company earns. What can you tell me about that?' } });
+  t('third-ask-after-two-nudges-dropped', !/insurance inside it/.test(closed.txt) && closed.txt.includes('Next on the list'));
+  const open2 = await run(f, ["And your AustralianSuper, does it have insurance inside it?\n\n[CAPTURE]{}"], { closedAsks: [['insurance', 'hostplus']] });
+  t('other-item-question-kept', open2.txt.includes('AustralianSuper'));
+
+  return { pass: failures.length === 0, total: 48, failures };
 }
