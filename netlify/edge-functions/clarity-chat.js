@@ -138,7 +138,7 @@ Extract from that answer whatever it yields: how many adults, children and their
 2. THEN TRIPS. Gather figures one source at a time and take everything that source carries in one visit (the notes group items by source). Don't bounce between sources.
 3. RE-RAISE. Items the person put off come back at natural points, especially when they're already on the right screen. The notes show each item's nudge count.
 4. THE CLOSE. Only when the notes say closing is available: emit [FRAME: close] (code appends the open items and where each lives), add one warm line and what happens next, and set session_complete. Never call the picture complete, never say "well done" or "you're well set up", never say goodbye, and never ask "anything else before we wrap up" while the notes show missing items. If the person says "that's everything" early, tell them plainly a few things are still to cover, and carry on with the NEXT MOVE.
-6. ONE THING AT A TIME, AND NEVER ASSUME (Devon, live walk 17 Sept 2026). Each reply asks about ONE thing: one person, one item, one question. Never bundle "and is Jess...?" onto a question about someone else; ask it on the next turn. If the person answers only part of what you asked, the rest is still open: ask it next, before moving on. Never fill a gap with what seems likely (a teacher is not automatically a PAYE employee; owning a home doesn't mean there's a mortgage; being married doesn't mean joint names), and never restate something as settled that the person didn't say. Your recap reflects only their words.
+6. ONE THING AT A TIME, AND NEVER ASSUME (Devon, live walk 17 Sept 2026). Each reply asks about ONE thing: one person or one item. Several details of that same item belong in one question ("what's the balance, rate and minimum on the card?"), which is better than dribbling them out one by one. Never bundle a second person or a second item onto it ("and is Jess...?"); ask that on the next turn. Before any question, check the picture: anything already there is answered and is never asked again. If the person answers only part of what you asked, the rest is still open: ask it next, before moving on. Never fill a gap with what seems likely (a teacher is not automatically a PAYE employee; owning a home doesn't mean there's a mortgage; being married doesn't mean joint names), and never restate something as settled that the person didn't say. Your recap reflects only their words.
 5. THE GUARDRAIL. What you ask about is driven by the SHAPE of the household (what exists, how many, what's still unanswered), never by the SIZE of a figure. Never probe harder, or choose a topic, because a number looks large, small, good or bad. That would be an opinion about their circumstances.
 
 - Walk naturally through these areas, adapting to what you hear (don't march through a rigid list; let their answers shape the path; go light on areas that clearly don't apply so it never feels like a marathon; anything can be skipped and come back to later):
@@ -260,7 +260,7 @@ Rules for the block:
   context: adults, children (array of {age}), owner_age, partner_age, work_intent ("both continuing"/"one reducing"/"one stopping"/"unsure"), horizon_years
   income: salary_gross_annual, salary_net_monthly, partner_salary_gross_annual, partner_salary_net_monthly (pay may instead be given in the period the person used, e.g. salary_net_fortnightly, partner_salary_gross_fortnightly, salary_net_weekly; code converts, never convert it yourself), other (array of {source, linked_asset_id, entity, amount_annual, basis} — EVERY non-salary regular source lands here, typed, never lumped. source is "rental_residential"/"rental_commercial"/"dividends"/"distributions"/"trust_distribution"/"business_profit"/"director_fee"/"government"/"other". linked_asset_id ties the entry to what produces it: use the producing asset's id exactly as shown in the picture context (every property and debt item carries a system-assigned id), "entity" for the company or trust, "holdings" for the share portfolio, null where nothing in the picture produces it or the producing asset was only captured this turn and has no id yet. entity is whose hands it arrives in: "personal"/"joint"/"company"/"trust"/"smsf"/"unknown". basis is "gross" or "net_of_costs" — always ask which the figure is; never net figures yourself and never characterise the gearing. For a RENTAL at basis "gross", also capture costs_annual — the year's costs on that property (agent fees, rates, insurance, maintenance, interest), read from the agent statement or tax return in the same visit as the rent; where costs are genuinely zero, record costs_annual 0 with costs_note saying why. A gross rental without its costs stays an open item and the income total is not presented as complete), structure ("paye"/"sole_trader"/"company"/"trust"/"mixed": "company" when anyone is paid through a company they own, even as a wage on payroll, and the other partner is a plain employee; "sole_trader" only for an ABN business run in their own name; "mixed" only when self-employment sits alongside a salary and neither of the others fits; never infer self-employment from someone owning a company), entity ({type, name} where a company or trust exists), employer_super_on (array naming the income streams employer super is paid on, e.g. ["salary","partner_salary"])
   expenses: living_monthly (EXCLUDING housing debt repayments), includes_housing (explicit true/false — NEVER omitted or null when living_monthly is captured: false when the figure excludes housing as you asked, true only when the person genuinely can only give an all-in figure), housing_repayment_monthly
-  home: owns_home, value_estimate (the middle figure), value_low and value_high (both ends of the range an online estimate shows; capture both whenever they're given), value_source (plain words, e.g. "realestate.com.au estimate", "lender valuation", "rates notice", "their own estimate"), mortgage_balance, rate_percent, rate_type, lender, with_lender_since, repayment_monthly, term_remaining_years, has_offset (ONLY ever from asking the offset question — never inferred from any balance), offset_balance, package_fee_annual
+  home: owns_home, value_estimate (the middle figure), value_low and value_high (both ends of the range an online estimate shows; capture both whenever they're given), value_source (plain words, e.g. "realestate.com.au estimate", "lender valuation", "rates notice", "their own estimate"), mortgage_balance, rate_percent, rate_type, lender, with_lender_since, repayment_monthly, term_remaining_years, has_offset (only from the person: they answered the offset question or named an offset themselves, e.g. "offset has $38,000 in it", which settles it; never inferred from a balance alone), offset_balance, package_fee_annual
   buffer: accessible_savings, where_held, linked_to_loan, counts_credit_as_buffer
   super: funds (array of {fund, owner, balance, has_insurance}) where owner is "you"/"partner"/the partner's name and has_insurance is whether that fund has insurance attached inside it, multiple_accounts (true ONLY when a single person holds more than one account), extra_contributions
   protection: life / tpd / income_protection / trauma, each exactly {held, amount, inside_super}. held true with amount null is a valid and common state (they have it, they don't know how much).
@@ -391,6 +391,7 @@ function emDashScrubStream(onDone, ctx = {}) {
   let closeRefused = false;   // the model tried to close with areas open
   let askedQ = false;         // a code-emitted ask already went out
   let verdictsDropped = 0;
+  let visibleOut = "";        // the visible reply, sent once at the end
 
   // Verdict and wrap-up sentences (stand-in run 4): "I think we're in good
   // shape", "while we're wrapping up". Finn never gives a verdict, and it
@@ -423,6 +424,31 @@ function emDashScrubStream(onDone, ctx = {}) {
     return r.text;
   }
   const HAS_TOKEN = /\[(ASK|SWEEP|NUDGE):\s*[a-z_]+\s*\]/;
+  // One question per paragraph too (stand-in run 6: "Does Jess's employer
+  // pay super? And does the company pay super too?"). An "Or ...?" that
+  // completes the same question stays.
+  function oneQuestion(p) {
+    const parts = p.split(/(?<=[.!?])\s+/);
+    let seen = false;
+    const keep = [];
+    for (const snt of parts) {
+      const isQ = /\?\s*$/.test(snt);
+      if (isQ && seen && !/^or\b/i.test(snt)) { droppedQ++; continue; }
+      if (isQ) seen = true;
+      if (seen && !isQ && keep.length && /\?\s*$/.test(keep[keep.length - 1])) { keep.push(snt); continue; }
+      keep.push(snt);
+    }
+    return keep.join(" ");
+  }
+  // A composed "anything else?" for a sweep already asked is a re-ask
+  // (stand-in run 6). Dropped.
+  const COMPOSED = {
+    other_income: /\b(anything else (?:coming in|landing)|any other (?:money|income)|does any other money come in)\b/i,
+    other_assets: /\b(anything else you own|what else do you own|any other assets)\b/i,
+    other_debts: /\b(anything else owing|any other debts|any other borrowing)\b/i,
+    other_super: /\b(more than one super|any other super)\b/i,
+  };
+  const reAsksSweep = (p) => Array.isArray(ctx.sweepsAsked) && Object.entries(COMPOSED).some(([id, re]) => ctx.sweepsAsked.includes(id) && re.test(p));
   // Paragraph discipline (stand-in run 2): a question paragraph written by
   // the model immediately before a code-emitted ask, sweep or nudge is the
   // model asking the same thing twice, or asking something new before a
@@ -453,8 +479,8 @@ function emDashScrubStream(onDone, ctx = {}) {
       // One question per reply (live walk, 17 Sept 2026): a second
       // question paragraph is dropped, so the person is never asked about
       // two things at once and the unasked one comes up on its own turn.
-      if (heldQ !== null || askedQ) { droppedQ++; return out; }
-      heldQ = sub(scrub(p));
+      if (heldQ !== null || askedQ || reAsksSweep(p)) { droppedQ++; return out; }
+      heldQ = sub(scrub(oneQuestion(p)));
     } else {
       if (heldQ !== null) { emit(heldQ); heldQ = null; }
       emit(sub(scrub(p)));
@@ -523,8 +549,12 @@ function emDashScrubStream(onDone, ctx = {}) {
             try {
               const evt = JSON.parse(raw);
               if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
-                evt.delta.text = onText(evt.delta.text);
-                outLine = "data: " + JSON.stringify(evt);
+                // The whole visible reply is held and sent once, complete
+                // (stand-in run 6): code can then replace a reply outright,
+                // e.g. with the nudge, instead of contradicting text the
+                // person has already read. The page shows its typing dots.
+                visibleOut += onText(evt.delta.text);
+                continue;
               }
             } catch {}
           }
@@ -565,8 +595,11 @@ function emDashScrubStream(onDone, ctx = {}) {
           .filter(f => f && !valued(f));
         if (!sawNudge && !closeRefused && defs.length && typeof ctx.isFirstDeferral === "function"
             && defs.some(f => ctx.isFirstDeferral(f))) {
-          if (heldQ !== null) { heldQ = null; droppedQ++; }
-          tail += (emittedAny || tail ? "\n\n" : "") + NUDGES.first;
+          // The nudge replaces the model's reply: its acceptance of the skip
+          // and any new question would contradict the nudge.
+          heldQ = null; droppedQ++;
+          visibleOut = "";
+          tail = NUDGES.first;
           nudged = true;
           console.log("[Finn clarity] auto-nudge added for a first-time deferral");
         }
@@ -574,7 +607,8 @@ function emDashScrubStream(onDone, ctx = {}) {
         console.error("[Finn clarity] auto-nudge check failed:", err);
       }
       if (!nudged) tail += flushHeld();
-      if (tail) controller.enqueue(encoder.encode(deltaLine(tail)));
+      const visible = visibleOut + tail;
+      if (visible) controller.enqueue(encoder.encode(deltaLine(visible)));
       if (machineBuf) controller.enqueue(encoder.encode(deltaLine("\n\n" + machineBuf)));
       if (substitutions > 0) console.log(`[Finn clarity] em-dash substitutions in visible reply: ${substitutions}`);
       if (asksServed > 0) console.log(`[Finn clarity] token substitutions in visible reply: ${asksServed}`);
@@ -672,7 +706,7 @@ async function reExtractCapture(apiKey, messages, visibleReply, pictureDomains, 
   const recorder = mode === "recorder";
   const system = recorder
     ? "You are the RECORDER for Finn's Clarity Session. The conversation model often acknowledges facts without recording them, so you record them independently. Read ONLY the person's latest message (and, for context, Finn's reply before it and the picture so far). Emit one [CAPTURE] line holding EVERY fact the PERSON stated or confirmed in that message, following the protocol exactly.\n" +
-      "Rules: (1) Facts only from the person. Something Finn said counts only if the person's message confirms it (\"yes that's right\" confirms Finn's restatement). (2) Record EXISTENCE as soon as something is mentioned, even with no figures: a debt becomes a debts item with the type, purpose and borrower you can tell; a property becomes an investments.properties item with held_in; a super fund becomes a super.funds item with fund and owner; a cover becomes protection.<type> {held:true, inside_super:...}. (3) Every figure goes in its exact schema home: rent and costs of a property go in income.other (source rental_residential/rental_commercial, amount_annual, basis, costs_annual); dividends/distributions go in income.other; never invent fields. (4) For an item already in the picture, echo its id exactly so it updates; for a new item leave id out. (5) _confidence per domain: \"sighted\" when the person is reading the figure off a screen, statement, app or payslip; \"stated\" when from memory or a plain fact; \"estimated\" when they say about/roughly/I think/I reckon; \"document\" ONLY if a file was attached this turn. Items may carry their own _confidence. (6) No arithmetic: give pay in the period the person used (salary_net_fortnightly, partner_salary_gross_fortnightly, salary_net_weekly, and so on); code converts. (6b) If the person puts something off (\"skip that\", \"I'd have to ask the accountant\", \"note it\"), add \"deferrals\": [the field ids from the picture, e.g. \"super.funds[].has_insurance#<id>\", \"income.other.entity\"]. (7) Nothing invented. If the message holds no facts, emit [CAPTURE]{}. Output ONLY the [CAPTURE] line.\n\n" + protocol
+      "Rules: (1) Facts only from the person. Something Finn said counts only if the person's message confirms it (\"yes that's right\" confirms Finn's restatement). (2) Record EXISTENCE as soon as something is mentioned, even with no figures: a debt becomes a debts item with the type, purpose and borrower you can tell (purpose and borrower are \"unknown\" when not said, never left out); a property becomes an investments.properties item with held_in; a super fund becomes a super.funds item with fund and owner; a cover becomes protection.<type> {held:true, inside_super:...}. (3) Every figure goes in its exact schema home: rent and costs of a property go in income.other (source rental_residential/rental_commercial, amount_annual, basis, costs_annual); dividends/distributions go in income.other; never invent fields. (4) For an item already in the picture, echo its id exactly so it updates; for a new item leave id out. (5) _confidence per domain: \"sighted\" when the person is reading the figure off a screen, statement, app or payslip; \"stated\" when from memory or a plain fact; \"estimated\" when they say about/roughly/I think/I reckon; \"document\" ONLY if a file was attached this turn. Items may carry their own _confidence. (6) No arithmetic: give pay in the period the person used (salary_net_fortnightly, partner_salary_gross_fortnightly, salary_net_weekly, and so on); code converts. (6b) If the person puts something off (\"skip that\", \"I'd have to ask the accountant\", \"note it\"), add \"deferrals\": [the field ids from the picture, e.g. \"super.funds[].has_insurance#<id>\", \"income.other.entity\"]. (7) Nothing invented. If the message holds no facts, emit [CAPTURE]{}. Output ONLY the [CAPTURE] line.\n\n" + protocol
     : "You are the capture extractor for Finn's Clarity Session. A reply was produced without its mandatory capture block. Read the single conversation turn below and emit the capture block that reply SHOULD have ended with, following the protocol exactly. Output ONLY the [CAPTURE] line, nothing before or after it. Facts come only from what the person actually said this turn; nothing invented, and [CAPTURE]{} if the turn genuinely captured nothing.\n\n" + protocol;
   const lastAssistantBefore = (() => {
     const ix = messages.map(m => m.role).lastIndexOf("user");
@@ -1049,7 +1083,9 @@ export default async function handler(request, context) {
   const contextBlock =
     `\n\n═══ SESSION CONTEXT (server-provided, the person does not see this) ═══\n` +
     `Household display name: ${householdName || "(not set)"}\n` +
-    `Picture captured so far (domains): ${JSON.stringify(picture.domains ?? {})}\n` +
+    // The ledger is code's; the model sees the facts only (stand-in run 6:
+    // the ledger buried the answers and Finn re-asked settled facts).
+    `Picture captured so far (domains; EVERYTHING HERE IS ALREADY ANSWERED: never ask for it again, only for what is missing or unverified): ${JSON.stringify((() => { const { flags, ...rest } = picture.domains ?? {}; return rest; })())}\n` +
     `Goals captured so far: ${JSON.stringify(picture.goals ?? {})}\n` +
     `Areas covered (decided by code): ${JSON.stringify(plan.covered)}\n` +
     `Snapshot answers (warm start — never re-ask these): ${snapshotAnswers ? JSON.stringify(snapshotAnswers) : "(no linked snapshot)"}\n` +

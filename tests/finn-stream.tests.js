@@ -82,5 +82,15 @@ export async function runStreamTests(chat, tokens) {
   const q2 = await run(f, ["Good, that's helpful.\n\nWhen you say your own company, are you paid a wage through it?\n\nAnd is Jess employed directly by the school?\n\n[CAPTURE]{}"], {});
   t('one-question-per-reply', q2.txt.includes('paid a wage through it?') && !q2.txt.includes('Jess'));
 
-  return { pass: failures.length === 0, total: 20, failures };
+  // Stand-in run 6.
+  const q3 = await run(f, ["Got it.\n\nDoes Jess's employer pay super on her salary? And does the company pay super on yours too?\n\n[CAPTURE]{}"], {});
+  t('second-question-sentence-dropped', q3.txt.includes("Jess's employer") && !q3.txt.includes('company pay super'));
+  const q4 = await run(f, ["Got it.\n\nIs that gross rent? Or is it net of costs?\n\n[CAPTURE]{}"], {});
+  t('or-alternative-kept', q4.txt.includes('Or is it net of costs?'));
+  const q5 = await run(f, ["Noted.\n\nNow, is there anything else coming in regularly that we haven't covered?\n\n[CAPTURE]{}"], { sweepsAsked: ['other_income'] });
+  t('composed-re-ask-of-asked-sweep-dropped', !q5.txt.includes('anything else coming in'));
+  const n2 = await run(f, ["No problem, we can come back to that.\n\nNow the REST account, can you check it?\n\n[CAPTURE]{\"deferrals\":[\"super.funds[].has_insurance#x\"]}"], { isFirstDeferral: () => true });
+  t('nudge-replaces-contradicting-reply', n2.txt.startsWith(NUDGES.first) && !n2.txt.includes('No problem'));
+
+  return { pass: failures.length === 0, total: 24, failures };
 }

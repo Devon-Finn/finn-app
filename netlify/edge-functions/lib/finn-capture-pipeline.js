@@ -680,6 +680,16 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
     errors.push(...gate.errors);
     merged = mergeDomainsById(baseDomains, patch);
   }
+  // A NEW debt item whose type was refused is not an item yet (stand-in
+  // run 6 left a typeless card behind, then added the real one).
+  if (merged.debts && Array.isArray(merged.debts.items)) {
+    const baseIds = new Set(((baseDomains.debts && baseDomains.debts.items) || []).map(it => it && it.id).filter(Boolean));
+    const kept = merged.debts.items.filter(it => !it || it.type || (it.id && baseIds.has(it.id)));
+    if (kept.length !== merged.debts.items.length) {
+      anomalies.push("new debt item without a type dropped");
+      merged = { ...merged, debts: { ...merged.debts, items: kept } };
+    }
+  }
   merged = resolveSecurity(assignAssetIds(merged));
   // A property loan recorded as a debt item links to its property when
   // there is exactly one candidate (same holder, or the only property).

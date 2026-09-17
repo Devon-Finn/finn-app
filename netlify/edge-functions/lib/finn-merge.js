@@ -198,6 +198,25 @@ export function adoptNaturalIds(base, patch) {
       const match = NATURAL_KEYS[domainKey + "." + f];
       if (!match || !Array.isArray(pd[f]) || !Array.isArray(bd[f])) continue;
       const taken = new Set(pd[f].filter(i => isObj(i) && typeof i.id === "string").map(i => i.id));
+      // Children (stand-in run 6: "2 kids" then their ages made six): a
+      // child mentioned again lands on an existing child, never a new one,
+      // while there are untaken children: same age first, then one with no
+      // age yet, then (for a child mentioned without an age) any.
+      if (domainKey === "context" && f === "children") {
+        nd = nd || { ...pd };
+        nd[f] = pd[f].map(item => {
+          if (!isObj(item) || (typeof item.id === "string" && item.id) || item._remove) return item;
+          const free = bd[f].filter(b => isObj(b) && b.id && !taken.has(b.id));
+          const hasAge = typeof item.age === "number";
+          const hit = (hasAge ? free.find(b => b.age === item.age) : null)
+            || free.find(b => typeof b.age !== "number")
+            || (!hasAge ? free[0] : null);
+          if (!hit) return item;
+          taken.add(hit.id);
+          return { ...item, id: hit.id };
+        });
+        continue;
+      }
       const arr = pd[f].map(item => {
         if (!isObj(item) || (typeof item.id === "string" && item.id) || item._remove) return item;
         let hits = bd[f].filter(b => isObj(b) && b.id && !taken.has(b.id) && match(b, item));

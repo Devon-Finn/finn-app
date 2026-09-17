@@ -270,5 +270,15 @@ export function runPlanTests({ plan, pipeline, tokens }) {
   t('categorise-merchants', cat('WOOLWORTHS 3353 TRARALGON') === 'groceries' && cat('UBER *EATS') === 'eating_out'
     && cat('RACV CAR INSURANCE') === 'insurance' && cat('VICROADS REGO RENEWAL') === 'transport' && cat('SOMETHING PTY LTD') === 'other');
 
-  return { pass: failures.length === 0, total: 74, failures };
+
+  /* ── stand-in run 6 ── */
+  let kids = pipeline.applyCaptureCore({ picture: E2, capture: { domains: { context: { adults: 2, children: [{}, {}] } } }, sessionId: 's', servedFields: new Set() });
+  kids = pipeline.applyCaptureCore({ picture: { ...E2, domains: kids.domains }, capture: { domains: { context: { children: [{}, {}] } } }, sessionId: 's', servedFields: new Set() });
+  kids = pipeline.applyCaptureCore({ picture: { ...E2, domains: kids.domains }, capture: { domains: { context: { children: [{ age: 9 }, { age: 6 }] } } }, sessionId: 's', servedFields: new Set() });
+  kids = pipeline.applyCaptureCore({ picture: { ...E2, domains: kids.domains }, capture: { domains: { context: { children: [{ age: 9 }, { age: 6 }] } } }, sessionId: 's', servedFields: new Set() });
+  t('children-never-multiply', kids.domains.context.children.length === 2 && kids.domains.context.children.map(c => c.age).sort().join() === '6,9');
+  const junk = pipeline.applyCaptureCore({ picture: E2, capture: { domains: { debts: { items: [{ type: 'credit_card', borrower: 'unknown', security: 'unsecured' }], _confidence: 'stated' } } }, sessionId: 's', servedFields: new Set() });
+  t('typeless-new-debt-not-kept', !(junk.domains.debts && junk.domains.debts.items && junk.domains.debts.items.length));
+
+  return { pass: failures.length === 0, total: 76, failures };
 }
