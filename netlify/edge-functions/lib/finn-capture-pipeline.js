@@ -672,6 +672,13 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
       .filter(f => typeof f === "string" && FIELD_REGISTRY[f]),
   ]);
   const validRefusals = new Set([...claimedRefusals].filter(f => served.has(f)));
+  // A new home value without its own range retires the old range (Devon,
+  // 17 Sept: subscribers update the value when a new estimate lands; a
+  // stale range beside a new midpoint would misstate the equity spread).
+  if (patch.home && typeof patch.home.value_estimate === "number" && baseDomains.home
+      && typeof baseDomains.home.value_estimate === "number" && patch.home.value_estimate !== baseDomains.home.value_estimate) {
+    for (const k of ["value_low", "value_high"]) if (patch.home[k] === undefined) patch.home[k] = null;
+  }
   let merged = mergeDomainsById(baseDomains, patch);
   const gate = persistenceGate(patch, merged, validRefusals);
   const dropped = [];
@@ -710,7 +717,10 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
       const gone = new Set(junkHecs.map(it => it.id));
       if (hl.length === 1) {
         const it = hl[0];
-        const fill = (k, v) => { if ((home[k] === undefined || home[k] === null) && v !== undefined && v !== null) home[k] = v; };
+        // What this turn said is the latest word (a subscriber's refinance
+        // or new balance updates the home); a stored item only fills gaps.
+        const fresh = !(it.id && baseIds2.has(it.id));
+        const fill = (k, v) => { if (v !== undefined && v !== null && (fresh || home[k] === undefined || home[k] === null)) home[k] = v; };
         fill("mortgage_balance", it.balance);
         fill("rate_percent", it.rate_percent);
         fill("repayment_monthly", it.minimum_monthly);

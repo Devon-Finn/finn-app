@@ -305,5 +305,19 @@ export function runPlanTests({ plan, pipeline, tokens }) {
   t('home-loan-item-folded-into-home', H.domains.home.mortgage_balance === 412000 && H.domains.home.repayment_monthly === 2780 && !H.domains.debts.items.some(i => i.type === 'home_loan'));
   t('study-item-without-balance-dropped', H.domains.debts.items.length === 1 && H.domains.debts.items[0].type === 'credit_card');
 
-  return { pass: failures.length === 0, total: 80, failures };
+  // Subscription: a new valuation without a range clears the old range.
+  let V = { domains: { home: { owns_home: true, value_estimate: 845000, value_low: 790000, value_high: 905000 } }, goals: {}, completed_domains: [], refusals: [] };
+  const V1 = ap(V, { domains: { home: { value_estimate: 880000, value_source: 'realestate.com.au estimate' } } });
+  t('new-value-clears-stale-range', V1.domains.home.value_estimate === 880000 && V1.domains.home.value_low == null && V1.domains.home.value_high == null);
+  const V2 = ap(V, { domains: { home: { value_estimate: 880000, value_low: 830000, value_high: 940000 } } });
+  t('new-value-with-range-keeps-new-range', V2.domains.home.value_low === 830000 && V2.domains.home.value_high === 940000);
+  const V3 = ap(V, { domains: { home: { value_source: 'realestate.com.au estimate' } } });
+  t('unchanged-value-keeps-range', V3.domains.home.value_low === 790000);
+
+  // Subscription: a new balance given as a home-loan item updates the home.
+  let U = { domains: { home: { owns_home: true, mortgage_balance: 412000, repayment_monthly: 2780, rate_percent: 6.09 } }, goals: {}, completed_domains: [], refusals: [] };
+  U = ap(U, { domains: { debts: { items: [{ type: 'home_loan', purpose: 'owner_occupied', borrower: 'joint', balance: 398000, rate_percent: 5.89 }] } } });
+  t('updated-home-loan-overwrites-home', U.domains.home.mortgage_balance === 398000 && U.domains.home.rate_percent === 5.89 && U.domains.home.repayment_monthly === 2780);
+
+  return { pass: failures.length === 0, total: 84, failures };
 }
