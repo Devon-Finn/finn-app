@@ -554,7 +554,17 @@ function fmt$(n) { const r = Math.round(n); return (r < 0 ? '-$' + Math.abs(r).t
 
 // The badge reports the gathering, never the money. The colour class
 // (flag / calm / building) is unchanged; the words come from `reached`.
-function badgeLabel(reached) { return reached ? 'Complete' : 'Still gathering'; }
+function badgeLabel(complete) { return complete ? 'Complete' : 'Still gathering'; }
+// "Complete" means CODE counts every collection area behind the tile as
+// covered (picture.completed_domains, written by the plan), never merely
+// that something was said (live walk, 17 Sept 2026: "both employed" made
+// the income tile read Complete with no figures).
+const TILE_AREAS = { 1: ['assets', 'liabilities'], 2: ['income'], 3: ['buffer'], 4: ['super'], 5: ['protection'], 6: ['estate'], 7: ['assets'], 8: ['liabilities'], 9: ['income'] };
+function tileComplete(tileNo, picture) {
+  const done = Array.isArray(picture && picture.completed_domains) ? picture.completed_domains : [];
+  const need = TILE_AREAS[tileNo] || [];
+  return need.length > 0 && need.every(a => done.includes(a));
+}
 function questionPointer(count) {
   return count > 0
     ? { text: count + (count === 1 ? ' question' : ' questions') + ' for your situation', cls: 'route' }
@@ -659,23 +669,24 @@ function renderTiles(picture) {
   for (const t of triggers.tiles) {
     if (!t.visible) continue;
     const reached = tileReached(t.tile, d);
-    const state = t.insights.length ? 'flag' : (reached ? 'calm' : 'building');
+    const complete = tileComplete(t.tile, picture);
+    const state = t.insights.length ? 'flag' : (complete ? 'calm' : 'building');
     const head = tileHeadline(t.tile, d, derived);
     const title = FINN_LIBRARY && FINN_LIBRARY.tiles[String(t.tile)] ? FINN_LIBRARY.tiles[String(t.tile)].title : 'Tile ' + t.tile;
     const pointer = questionPointer(t.insights.length);
     const el = document.createElement('div');
-    el.className = 'tile s-' + state + (reached ? ' done' : '');
+    el.className = 'tile s-' + state + (complete ? ' done' : '');
     el.setAttribute('data-tile', t.tile);
     el.onclick = () => openDetail(t.tile);
     el.innerHTML =
-      '<div class="status-row"><span class="badge ' + state + '"><span class="d"></span>' + badgeLabel(reached) + '</span><span class="ico">' + CHEV + '</span></div>' +
+      '<div class="status-row"><span class="badge ' + state + '"><span class="d"></span>' + badgeLabel(complete) + '</span><span class="ico">' + CHEV + '</span></div>' +
       '<div class="name">' + esc(title) + '</div>' +
       (head
         ? '<div class="metric">' + esc(head.metric) + (head.unit ? ' <span class="unit">' + esc(head.unit) + '</span>' : '') + '</div>' +
           (head.facts ? '<div class="facts">' + esc(head.facts) + '</div>' : '')
         : '<div class="metric empty">Still gathering<span class="ctx">fills in as you talk with Finn</span></div>') +
       '<div class="' + pointer.cls + '"><span>' + esc(pointer.text) + '</span>' + ROUTE_ARROW + '</div>' +
-      '<div class="complete"><div class="cf" style="width:' + (reached ? 100 : 0) + '%"></div></div>';
+      '<div class="complete"><div class="cf" style="width:' + (complete ? 100 : (reached ? 50 : 0)) + '%"></div></div>';
     grid.appendChild(el);
   }
 }
@@ -744,13 +755,14 @@ function openDetail(tileNo) {
   const tileResult = lastTriggers.tiles.find(x => x.tile === tileNo);
   if (!tileResult) return;
   const reached = tileReached(tileNo, d);
-  const state = tileResult.insights.length ? 'flag' : (reached ? 'calm' : 'building');
+  const complete = tileComplete(tileNo, lastPicture);
+  const state = tileResult.insights.length ? 'flag' : (complete ? 'calm' : 'building');
   const tileMeta = FINN_LIBRARY.tiles[String(tileNo)];
 
   document.getElementById('dpTitle').textContent = tileMeta ? tileMeta.title : 'Tile ' + tileNo;
   const badge = document.getElementById('dpBadge');
   badge.className = 'dp-badge badge ' + state;
-  badge.innerHTML = '<span class="d"></span>' + badgeLabel(reached);
+  badge.innerHTML = '<span class="d"></span>' + badgeLabel(complete);
 
   const firstVisit = !sectionBSeen[String(tileNo)];
   let html = '<div class="dp-inner">' +
@@ -758,7 +770,7 @@ function openDetail(tileNo) {
   if (tileMeta && typeof tileMeta.section_b === 'string' && !tileMeta.section_b.startsWith('[Not provided')) {
     markSectionBSeen(tileNo);
   }
-  if (state === 'building') {
+  if (!complete) {
     html += '<div class="dp-section"><div class="dp-building">This area is still being gathered. The figures fill in as the conversation covers it.</div></div>';
   }
   html += '</div>';

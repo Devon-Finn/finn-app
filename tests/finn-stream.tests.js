@@ -73,5 +73,9 @@ export async function runStreamTests(chat, tokens) {
   const n = await run(f, ["Good.\n\nAre there any other debts in the picture? Things like car loans or cards.\n\n[SWEEP: other_debts]\n\n[CAPTURE]{}"], {});
   t('mid-paragraph-question-dropped-before-sweep', !n.txt.includes('any other debts in the picture') && n.txt.includes('Now the borrowing side'));
 
-  return { pass: failures.length === 0, total: 18, failures };
+  // Live walk, 17 Sept 2026: internal words leaked ("A few quick sweep questions:").
+  const j = await run(f, ["Good.\n\nBefore we gather figures, a few quick sweep questions:\n\n[SWEEP: other_income]\n\n[CAPTURE]{}"], {});
+  t('internal-jargon-sentence-removed', !/sweep/i.test(j.txt) && j.txt.includes('does any other money come in'));
+
+  return { pass: failures.length === 0, total: 19, failures };
 }
