@@ -77,5 +77,10 @@ export async function runStreamTests(chat, tokens) {
   const j = await run(f, ["Good.\n\nBefore we gather figures, a few quick sweep questions:\n\n[SWEEP: other_income]\n\n[CAPTURE]{}"], {});
   t('internal-jargon-sentence-removed', !/sweep/i.test(j.txt) && j.txt.includes('does any other money come in'));
 
-  return { pass: failures.length === 0, total: 19, failures };
+  // Live walk, 17 Sept 2026: two questions in one reply, and the second
+  // part was later assumed. Only the first question goes out.
+  const q2 = await run(f, ["Good, that's helpful.\n\nWhen you say your own company, are you paid a wage through it?\n\nAnd is Jess employed directly by the school?\n\n[CAPTURE]{}"], {});
+  t('one-question-per-reply', q2.txt.includes('paid a wage through it?') && !q2.txt.includes('Jess'));
+
+  return { pass: failures.length === 0, total: 20, failures };
 }

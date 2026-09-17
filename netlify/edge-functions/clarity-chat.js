@@ -138,6 +138,7 @@ Extract from that answer whatever it yields: how many adults, children and their
 2. THEN TRIPS. Gather figures one source at a time and take everything that source carries in one visit (the notes group items by source). Don't bounce between sources.
 3. RE-RAISE. Items the person put off come back at natural points, especially when they're already on the right screen. The notes show each item's nudge count.
 4. THE CLOSE. Only when the notes say closing is available: emit [FRAME: close] (code appends the open items and where each lives), add one warm line and what happens next, and set session_complete. Never call the picture complete, never say "well done" or "you're well set up", never say goodbye, and never ask "anything else before we wrap up" while the notes show missing items. If the person says "that's everything" early, tell them plainly a few things are still to cover, and carry on with the NEXT MOVE.
+6. ONE THING AT A TIME, AND NEVER ASSUME (Devon, live walk 17 Sept 2026). Each reply asks about ONE thing: one person, one item, one question. Never bundle "and is Jess...?" onto a question about someone else; ask it on the next turn. If the person answers only part of what you asked, the rest is still open: ask it next, before moving on. Never fill a gap with what seems likely (a teacher is not automatically a PAYE employee; owning a home doesn't mean there's a mortgage; being married doesn't mean joint names), and never restate something as settled that the person didn't say. Your recap reflects only their words.
 5. THE GUARDRAIL. What you ask about is driven by the SHAPE of the household (what exists, how many, what's still unanswered), never by the SIZE of a figure. Never probe harder, or choose a topic, because a number looks large, small, good or bad. That would be an opinion about their circumstances.
 
 - Walk naturally through these areas, adapting to what you hear (don't march through a rigid list; let their answers shape the path; go light on areas that clearly don't apply so it never feels like a marathon; anything can be skipped and come back to later):
@@ -388,6 +389,7 @@ function emDashScrubStream(onDone, ctx = {}) {
   let sawNudge = false;
   let emittedAny = false;
   let closeRefused = false;   // the model tried to close with areas open
+  let askedQ = false;         // a code-emitted ask already went out
   let verdictsDropped = 0;
 
   // Verdict and wrap-up sentences (stand-in run 4): "I think we're in good
@@ -444,10 +446,14 @@ function emDashScrubStream(onDone, ctx = {}) {
     if (HAS_TOKEN.test(p)) {
       if (heldQ !== null) { droppedQ++; heldQ = null; }
       emit(sub(scrub(p)));
+      askedQ = true;
     } else if (/\?/.test(p)) {
       // Any paragraph carrying a question is held (stand-in run 5: a
       // composed "anything else?" ended with an example list, not a "?").
-      if (heldQ !== null) emit(heldQ);
+      // One question per reply (live walk, 17 Sept 2026): a second
+      // question paragraph is dropped, so the person is never asked about
+      // two things at once and the unasked one comes up on its own turn.
+      if (heldQ !== null || askedQ) { droppedQ++; return out; }
       heldQ = sub(scrub(p));
     } else {
       if (heldQ !== null) { emit(heldQ); heldQ = null; }
