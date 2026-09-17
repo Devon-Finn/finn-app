@@ -164,8 +164,14 @@ function normName(s) {
 const same = (a, b) => !a || !b || a === b || a === "unknown" || b === "unknown";
 const sourceFamily = v => (v === "dividends" || v === "distributions") ? "div" : v;
 const NATURAL_KEYS = {
-  "super.funds": (b, p) => p.fund && b.fund && normName(b.fund) === normName(p.fund)
-    && (!p.owner || !b.owner || String(b.owner).toLowerCase() === String(p.owner).toLowerCase()),
+  "super.funds": (b, p) => {
+    const named = v => v && String(v).toLowerCase() !== "unknown";
+    const sameOwner = !p.owner || !b.owner || String(b.owner).toLowerCase() === String(p.owner).toLowerCase();
+    if (named(p.fund) && named(b.fund)) return normName(b.fund) === normName(p.fund) && sameOwner;
+    // A fund with no name yet (walk 8: "Jess just has the one" stored a
+    // nameless stub, then a second one as "unknown") matches on its owner.
+    return !!(p.owner && b.owner) && sameOwner;
+  },
   "debts.items": (b, p) => p.type && b.type === p.type
     && same(b.borrower, p.borrower) && same(b.purpose, p.purpose),
   "investments.properties": (b, p) => (p.held_in && b.held_in && String(b.held_in).toLowerCase() === String(p.held_in).toLowerCase()
@@ -217,11 +223,23 @@ export function adoptNaturalIds(base, patch) {
         });
         continue;
       }
+      const known = new Set(bd[f].filter(b => isObj(b) && b.id).map(b => b.id));
       const arr = pd[f].map(item => {
-        if (!isObj(item) || (typeof item.id === "string" && item.id) || item._remove) return item;
+        if (!isObj(item) || item._remove) return item;
+        // An id the picture has never held is one the model made up (walk
+        // 8: the split arrived as "442c90bf" and sat beside the split
+        // already stored). It matches on the natural key like no id at all.
+        if (typeof item.id === "string" && item.id && known.has(item.id)) return item;
         let hits = bd[f].filter(b => isObj(b) && b.id && !taken.has(b.id) && match(b, item));
         const relaxed = RELAXED_KEYS[domainKey + "." + f];
         if (hits.length === 0 && relaxed) hits = bd[f].filter(b => isObj(b) && b.id && !taken.has(b.id) && relaxed(b, item));
+        if (hits.length > 1) {
+          // Several candidates: the one agreeing on the most stated values
+          // wins; a tie never guesses.
+          const score = b => Object.keys(item).filter(k => !k.startsWith("_") && k !== "id" && item[k] !== null && item[k] !== undefined && b[k] === item[k]).length;
+          const scored = hits.map(b => [b, score(b)]).sort((x, y) => y[1] - x[1]);
+          hits = scored[0][1] > scored[1][1] ? [scored[0][0]] : hits;
+        }
         if (hits.length !== 1) return item;
         taken.add(hits[0].id);
         return { ...item, id: hits[0].id };

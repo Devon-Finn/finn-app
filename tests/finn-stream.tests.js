@@ -119,13 +119,29 @@ export async function runStreamTests(chat, tokens) {
   const fb = {};
   const empty = await run(f, ["[SWEEP: other_income]\n\n[CAPTURE]{}"], { sweepsAsked: ['other_income'], fallback: { kind: 'ask', id: 'loan_details', text: 'Next, the loan. What does the loan screen show?' }, result: fb });
   t('empty-reply-gets-fallback-question', empty.txt.startsWith('Next, the loan.') && fb.fallbackAsk === 'loan_details');
-  const noq = await run(f, ["Thanks, noted.\n\n[CAPTURE]{}"], { fallback: { kind: 'plain', id: null, text: 'Next, the balance for the car loan. What can you tell me about that?' } });
-  t('statement-only-reply-gets-fallback', noq.txt.startsWith('Thanks, noted.\n\nNext, the balance'));
+  const noq = await run(f, ["Thanks, noted.\n\nIs there anything else coming in regularly?\n\n[CAPTURE]{}"], { sweepsAsked: ['other_income'], fallback: { kind: 'plain', id: null, text: 'Next on the list is the car loan. What can you tell me about that?' } });
+  t('removed-question-gets-fallback', noq.txt.startsWith('Thanks, noted.\n\nNext on the list is the car loan'));
+  // Live walk 8b: "hang on, I'll open the app" got a question stapled to the wait.
+  const wait = await run(f, ["Take your time, I'll be right here.\n\n[CAPTURE]{}"], { fallback: { kind: 'plain', id: null, text: 'FALLBACK' } });
+  t('waiting-reply-left-alone', wait.txt.startsWith("Take your time") && !wait.txt.includes('FALLBACK'));
   const hasq = await run(f, ["What does Jess earn?\n\n[CAPTURE]{}"], { fallback: { kind: 'plain', id: null, text: 'FALLBACK' } });
   t('reply-with-question-no-fallback', !hasq.txt.includes('FALLBACK'));
 
   const served = await run(f, ["[ASK: living_costs]\n\n[CAPTURE]{}"], { fallback: { kind: 'plain', id: null, text: 'FALLBACK' } });
   t('code-ask-without-question-mark-no-fallback', !served.txt.includes('FALLBACK'));
 
-  return { pass: failures.length === 0, total: 35, failures };
+  // Walk 8: a first skip on one fund is still first after another fund's skip.
+  const seen = [];
+  const per = await run(f, ["Of course.\n\n[CAPTURE]{\"deferrals\":[\"super.funds[].has_insurance#hp1\"]}"], { isFirstDeferral: (fl, it) => { seen.push(fl + '#' + it); return it === 'hp1'; } });
+  t('first-deferral-checked-per-item', seen.includes('super.funds[].has_insurance#hp1') && per.txt.startsWith(NUDGES.first));
+
+  const composed = await run(f, ["In that case a payslip will have everything we need.\n\nHave your most recent one in front of you. Attach it here or read the figures to me.\n\nIs there anything else coming in regularly?\n\n[CAPTURE]{}"], { sweepsAsked: ['other_income'], fallback: { kind: 'plain', id: null, text: 'FALLBACK' } });
+  t('composed-ask-without-question-mark-no-fallback', !composed.txt.includes('FALLBACK') && composed.txt.includes('read the figures to me') && !composed.txt.includes('anything else coming in'));
+
+  const src = await run(f, ["And is that the payslip in front of you right now, or a figure you know from memory?\n\n[CAPTURE]{}"], { lastUser: "ok got the payslip. gross is 118k", fallback: { kind: 'plain', id: null, text: 'Next on the list is what lands in your partner\'s account. What can you tell me about that?' } });
+  t('source-question-already-answered-dropped', !src.txt.includes('from memory') && src.txt.startsWith('Next on the list'));
+  const src2 = await run(f, ["Is that from the statement or from memory?\n\n[CAPTURE]{}"], { lastUser: "it's 9 grand" });
+  t('source-question-kept-when-unsaid', src2.txt.startsWith('Is that from the statement'));
+
+  return { pass: failures.length === 0, total: 40, failures };
 }

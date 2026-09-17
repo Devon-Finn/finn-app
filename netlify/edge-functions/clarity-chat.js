@@ -394,6 +394,7 @@ function emDashScrubStream(onDone, ctx = {}) {
   let visibleOut = "";        // the visible reply, sent once at the end
   let sawSweep = false;
   let sawFrame = false;       // a code-authored open/close frame went out
+  let sweepRefused = false;   // the model re-emitted a sweep already asked
 
   // Verdict and wrap-up sentences (stand-in run 4): "I think we're in good
   // shape", "while we're wrapping up". Finn never gives a verdict, and it
@@ -413,6 +414,8 @@ function emDashScrubStream(onDone, ctx = {}) {
   // routinely abbreviated by the person ("P&I", "IO") and recapped in full.
   const STATUS_WORDS = ["paye", "employee", "employed", "employer", "director", "dividend", "trust", "joint", "binding", "non-binding", "self-employed", "sole trader", "contractor", "casual", "part-time", "full-time", "renting"];
   const corpus = String(ctx.userCorpus || "").toLowerCase();
+  const SOURCE_Q = /\b(from memory|off the top of your head|in front of you (?:right )?now|did (?:you|she|he) (?:check|look)|checked (?:it )?just now)\b/i;
+  const SOURCE_SAID = /\b(payslip|statement|screen|app|portal|mygov|in front of me|checked|looked (?:it )?up|just looked|from memory|off the top of my head|roughly|about|around|guess)\b/i;
   function unsupportedRecap(snt) {
     if (!ctx.userCorpus || !RECAP.test(snt)) return false;
     const low = snt.toLowerCase();
@@ -425,6 +428,9 @@ function emDashScrubStream(onDone, ctx = {}) {
       if (VERDICT.test(snt) || JARGON.test(snt) || (ctx.canClose === false && WRAPUP.test(snt))) { verdictsDropped++; return false; }
       // "A rough sense is fine" invites a guess (walk 8).
       if (/\b(rough (?:sense|figure|idea|estimate|number)|ballpark|best guess|roughly)\b[^.?!]*\b(fine|okay|ok|works|will do|is enough)\b/i.test(snt)) { verdictsDropped++; return false; }
+      // "Is that from the payslip or from memory?" when the person just said
+      // where it came from (walk 8b: "ok got the payslip. gross is...").
+      if (ctx.lastUser && SOURCE_Q.test(snt) && SOURCE_SAID.test(ctx.lastUser)) { verdictsDropped++; droppedQ++; return false; }
       if (unsupportedRecap(snt)) { verdictsDropped++; console.log('[Finn clarity] recap with unsaid status dropped: "' + snt.slice(0, 120) + '"'); return false; }
       return true;
     });
@@ -441,6 +447,7 @@ function emDashScrubStream(onDone, ctx = {}) {
     if (r.nudges.length) sawNudge = true;
     if (r.sweeps.length) sawSweep = true;
     if (r.frames.length) sawFrame = true;
+    if (r.unknown.some(u => /already asked/.test(u))) sweepRefused = true;
     if (r.served.length || r.sweeps.length || r.frames.length || r.nudges.length) asksServed++;
     return r.text;
   }
@@ -612,11 +619,13 @@ function emDashScrubStream(onDone, ctx = {}) {
           for (const k of parts) node = node && typeof node === "object" ? node[k] : undefined;
           return node !== null && node !== undefined;
         };
+        // Kept per item (walk 8: Jess's insurance was put off after Sam's
+        // REST insurance had been nudged, so the field looked "not first").
         const defs = (cap && Array.isArray(cap.deferrals) ? cap.deferrals : [])
-          .map(d => typeof d === "string" ? d.split("#")[0] : d && d.field)
-          .filter(f => f && !valued(f));
+          .map(d => typeof d === "string" ? { field: d.split("#")[0], item: d.includes("#") ? d.split("#")[1] : null } : d && { field: d.field, item: d.item_id || null })
+          .filter(d => d && d.field && !valued(d.field));
         if (!sawNudge && !closeRefused && defs.length && typeof ctx.isFirstDeferral === "function"
-            && defs.some(f => ctx.isFirstDeferral(f))) {
+            && defs.some(d => ctx.isFirstDeferral(d.field, d.item))) {
           // The nudge replaces the model's reply: its acceptance of the skip
           // and any new question would contradict the nudge.
           heldQ = null; droppedQ++;
@@ -644,10 +653,17 @@ function emDashScrubStream(onDone, ctx = {}) {
         if (ctx.result) { ctx.result.forcedSweep = ctx.forceSweep; ctx.result.suppressAsks = true; }
         console.log("[Finn clarity] shape phase: reply replaced with sweep " + ctx.forceSweep);
       }
-      // Never end a turn without a question (walk 8: the model's only line
-      // was an already-asked sweep, so the person saw an empty reply). Code
-      // adds the next open item from the plan.
-      if (ctx.fallback && ctx.fallback.text && !nudged && !closeRefused && !sawFrame && asksServed === 0
+      // A hole code made gets filled by code (walk 8: the model's only line
+      // was an already-asked sweep, so the person saw an empty reply). When
+      // the reply is empty, or code removed its question, the next open item
+      // from the plan is asked. A reply that is simply waiting ("take your
+      // time") is left alone.
+      // A reply that asks without a question mark ("Attach it here or read
+      // the figures to me") or is waiting ("take your time") already has
+      // its ask (walk 8b).
+      const ASKISH = /\b(attach|read (?:them|it|the (?:figures?|numbers?)|those)|tell me|let me know|send (?:me|it|them|those)|in front of you|take your time|when you're ready|no rush|i'll be (?:right )?here)\b/i;
+      const codeMadeHole = !visible.trim() || ((droppedQ > 0 || sweepRefused) && !ASKISH.test(visible));
+      if (ctx.fallback && ctx.fallback.text && codeMadeHole && !nudged && !closeRefused && !sawFrame && asksServed === 0
           && !(ctx.result && ctx.result.forcedSweep) && !/\?/.test(visible)) {
         visible = (visible ? visible + "\n\n" : "") + ctx.fallback.text;
         if (ctx.result && ctx.fallback.kind === "ask") ctx.result.fallbackAsk = ctx.fallback.id;
@@ -1195,8 +1211,8 @@ export default async function handler(request, context) {
     const item = trip.items.find(i => i.status === "missing");
     const l = String(item.label || "").replace(/\s*\([^)]*\)\s*$/, "");
     const cut = l.lastIndexOf(", ");
-    const what = cut === -1 ? l.toLowerCase() : l.slice(0, cut).toLowerCase() + " for the " + l.slice(cut + 2);
-    return { kind: "plain", id: null, text: `Next, the ${what}. What can you tell me about that?` };
+    const what = cut === -1 ? l : l.slice(0, cut) + " (" + l.slice(cut + 2) + ")";
+    return { kind: "plain", id: null, text: `Next on the list is ${what}. What can you tell me about that?` };
   })();
   const streamResult = {};
   let resolveWriteAhead;
@@ -1220,8 +1236,11 @@ export default async function handler(request, context) {
     userCorpus: messages.filter(m => m && m.role === "user").map(m => typeof m.content === "string" ? m.content
       : Array.isArray(m.content) ? m.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : "")
       .filter(t => !/^\[(Session start|TRANSACTION)/.test(t)).join(" \n "),
+    lastUser: (() => { const u = messages.filter(m => m && m.role === "user").map(m => typeof m.content === "string" ? m.content
+      : Array.isArray(m.content) ? m.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : ""); return u.length ? u[u.length - 1] : ""; })(),
     result: streamResult,
-    isFirstDeferral: (field) => !(plan.ledger || []).some(e => e && e.field === field && (e.nudges || 0) >= 1),
+    isFirstDeferral: (field, itemId) => !(plan.ledger || []).some(e => e && e.field === field
+      && (!itemId || !e.item_id || e.item_id === itemId) && (e.nudges || 0) >= 1),
   }));
 
   context.waitUntil((async () => {

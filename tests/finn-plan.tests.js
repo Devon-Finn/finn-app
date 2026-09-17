@@ -280,5 +280,20 @@ export function runPlanTests({ plan, pipeline, tokens }) {
   const junk = pipeline.applyCaptureCore({ picture: E2, capture: { domains: { debts: { items: [{ type: 'credit_card', borrower: 'unknown', security: 'unsecured' }], _confidence: 'stated' } } }, sessionId: 's', servedFields: new Set() });
   t('typeless-new-debt-not-kept', !(junk.domains.debts && junk.domains.debts.items && junk.domains.debts.items.length));
 
-  return { pass: failures.length === 0, total: 76, failures };
+  /* ── live walk 8 ── */
+  const ap = (pic, cap) => { const r = pipeline.applyCaptureCore({ picture: pic, capture: cap, sessionId: 's', servedFields: new Set() }); return { domains: r.domains, goals: r.goals, completed_domains: [], refusals: [] }; };
+  let W = { domains: {}, goals: {}, completed_domains: [], refusals: [] };
+  W = ap(W, { domains: { debts: { items: [{ type: 'loan_split', purpose: 'investment_shares', borrower: 'joint', is_split: true, parent_loan_id: 'home' }] } } });
+  W = ap(W, { domains: { debts: { items: [{ id: 'madeup01', type: 'loan_split', purpose: 'investment_shares', borrower: 'joint', is_split: true, parent_loan_id: 'home', balance: 60000, rate_percent: 6.24 }] } } });
+  W = ap(W, { domains: { debts: { items: [{ type: 'loan_split', purpose: 'investment_shares', borrower: 'joint', is_split: true, parent_loan_id: 'home', balance: 60000, minimum_monthly: 312 }] } } });
+  const splits = W.domains.debts.items.filter(i => i.type === 'loan_split');
+  t('invented-id-lands-on-stored-split', splits.length === 1 && splits[0].balance === 60000 && splits[0].minimum_monthly === 312);
+  let S = { domains: {}, goals: {}, completed_domains: [], refusals: [] };
+  S = ap(S, { domains: { super: { funds: [{ fund: 'REST', owner: 'you' }, { owner: 'partner' }] } } });
+  S = ap(S, { domains: { super: { funds: [{ fund: 'unknown', owner: 'partner' }] } } });
+  S = ap(S, { domains: { super: { funds: [{ fund: 'Hostplus', owner: 'partner', balance: 121000 }] } } });
+  const pf = S.domains.super.funds.filter(x => x.owner === 'partner');
+  t('nameless-partner-fund-filled-not-duplicated', pf.length === 1 && pf[0].fund === 'Hostplus' && S.domains.super.funds.length === 2);
+
+  return { pass: failures.length === 0, total: 78, failures };
 }
