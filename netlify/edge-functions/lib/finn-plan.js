@@ -104,8 +104,14 @@ function tripFor(field, item) {
   return "conversation";
 }
 
+const COVER_WORDS = { life: "life cover", tpd: "TPD cover", income_protection: "income protection", trauma: "trauma cover" };
+// The person's own name for their partner, when they gave one: the close
+// reads "Jess" rather than "(partner)" (Devon, 17 Sept).
+let PARTNER_NAME = null;
+const whose = owner => owner === "partner" ? (PARTNER_NAME || "partner") : owner === "you" ? "you" : owner;
 function itemLabel(domain, item) {
-  if (domain === "super") return (item.fund || "a super account") + (item.owner ? " (" + item.owner + ")" : "");
+  if (domain === "protection") return (COVER_WORDS[item.type] || "cover") + " (" + whose(item.owner || "you") + ")";
+  if (domain === "super") return (item.fund || "a super account") + (item.owner ? " (" + whose(item.owner) + ")" : "");
   if (domain === "debts") return String(item.type || "a debt").replace(/_/g, " ") + (item.borrower ? " (" + item.borrower + ")" : "");
   if (domain === "investments") return "property" + (item.held_in ? " held in " + item.held_in : "") + (item.use ? ", " + item.use : "");
   if (domain === "income") return String(item.source || "income").replace(/_/g, " ");
@@ -126,6 +132,7 @@ export function buildPlan(domains, goals, opts = {}) {
   const ctx = d.context || {}, inc = d.income || {}, exp = d.expenses || {}, home = d.home || {};
   const buf = d.buffer || {}, sup = d.super || {}, prot = d.protection || {}, est = d.estate || {};
   const inv = d.investments || {}, debts = d.debts || {};
+  PARTNER_NAME = typeof ctx.partner_name === "string" && ctx.partner_name.trim() ? ctx.partner_name.trim() : null;
   const flags = isObj(d.flags) ? d.flags : {};
   const sweepsAsked = new Set(Array.isArray(flags.sweeps_asked) ? flags.sweeps_asked : []);
   const { idx: ledger, list: ledgerList } = ledgerIndex(d);
@@ -311,18 +318,24 @@ export function buildPlan(domains, goals, opts = {}) {
   sweep("super", "other_super");
 
   /* ── protection ── */
+  // Per person (Devon, 17 Sept): each adult's four covers are their own
+  // facts, so one person's gap is visible instead of averaged away.
   const covers = ["life", "tpd", "income_protection", "trauma"];
-  for (const c of covers) {
-    const cv = isObj(prot[c]) ? prot[c] : {};
-    need("protection", `protection.${c}.held`, typeof cv.held === "boolean");
-    if (cv.held === true) {
-      need("protection", `protection.${c}.amount`, has(cv.amount));
-      need("protection", `protection.${c}.inside_super`, typeof cv.inside_super === "boolean");
+  const coverList = Array.isArray(prot.covers) ? prot.covers.filter(isObj) : [];
+  const people = num(ctx.adults) !== null && ctx.adults >= 2 ? ["you", "partner"] : ["you"];
+  for (const who of people) {
+    for (const c of covers) {
+      const cv = coverList.find(x => x.type === c && (x.owner || "you") === who) || { owner: who, type: c };
+      need("protection", "protection.covers[].held", typeof cv.held === "boolean", cv, "protection");
+      if (cv.held === true) {
+        need("protection", "protection.covers[].amount", has(cv.amount), cv, "protection");
+        need("protection", "protection.covers[].inside_super", typeof cv.inside_super === "boolean", cv, "protection");
+      }
     }
   }
   // A fund with insurance inside it means some cover is held inside super.
   // If nothing in protection says so, the picture contradicts itself.
-  if (funds.some(f => f.has_insurance === true) && !covers.some(c => isObj(prot[c]) && prot[c].held === true && prot[c].inside_super === true)) {
+  if (funds.some(f => f.has_insurance === true) && !coverList.some(c => c.held === true && c.inside_super === true)) {
     need("protection", "protection.inside_super_detail", false);
   }
 
@@ -331,7 +344,16 @@ export function buildPlan(domains, goals, opts = {}) {
   if (isObj(est.will) && est.will.in_place === true) need("estate", "estate.will.last_updated", has(est.will.last_updated));
   need("estate", "estate.poa.in_place", isObj(est.poa) && has(est.poa.in_place));
   if (kids && kids.length) need("estate", "estate.guardianship.in_place", isObj(est.guardianship) && has(est.guardianship.in_place));
-  if (funds.length) need("estate", "estate.super_nomination.in_place", isObj(est.super_nomination) && has(est.super_nomination.in_place));
+  // A nomination per fund (Devon, 17 Sept): one household answer used to
+  // overwrite the other fund's.
+  for (const f of funds) {
+    const nom = isObj(f.nomination) ? f.nomination : (funds.length === 1 && isObj(est.super_nomination) ? est.super_nomination : {});
+    need("estate", "super.funds[].nomination.in_place", has(nom.in_place), f, "super");
+    if (nom.in_place === true) {
+      need("estate", "super.funds[].nomination.binding", typeof nom.binding === "boolean", f, "super");
+      need("estate", "super.funds[].nomination.last_updated", has(nom.last_updated), f, "super");
+    }
+  }
 
   /* ── goals ── */
   need("goals", "goals.directions", Array.isArray(g.directions) && g.directions.length > 0);

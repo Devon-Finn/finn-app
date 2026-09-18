@@ -327,8 +327,8 @@
       "route_primary": "insurance_specialist",
       "route_also": ["financial_planner"],
       "position_line": {
-        "template": "Cover recorded: life {life_display}, income protection {ip_display}, TPD {tpd_display}, trauma {trauma_display}.",
-        "fields": ["protection.life", "protection.income_protection", "protection.tpd", "protection.trauma", "context", "home.mortgage_balance"]
+        "template": "Cover recorded, {cover_display}.",
+        "fields": ["protection.covers", "context", "home.mortgage_balance"]
       },
       "blocks": {
         "why": "Protection is the cover that steps in if something serious happens, if you couldn't work for a long stretch, or if you weren't around anymore. For a household with a mortgage and people who depend on that income, it's what stands between a hard situation and a much harder one. It's also one of the most commonly skipped corners of a household's finances, not because people don't care, but because it's uncomfortable to think about and easy to leave for another day.",
@@ -349,7 +349,7 @@
       "route_also": [],
       "position_line": {
         "template": "Recorded: will {will_display}, power of attorney {poa_display}, guardianship {guardianship_display}, super nomination {nomination_display}.",
-        "fields": ["estate.will", "estate.poa", "estate.guardianship", "estate.super_nomination", "context.children"]
+        "fields": ["estate.will", "estate.poa", "estate.guardianship", "super.funds[].nomination", "context.children"]
       },
       "blocks": {
         "why": "This is the paperwork that decides what happens to your money, your home, and, if you have children, who looks after them, if something happened to you. A will, an enduring power of attorney, guardianship for the kids, and the nomination on your super. Almost everyone means to get these sorted. Most haven't, and most underestimate how much simpler it is than they fear.",

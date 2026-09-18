@@ -67,6 +67,41 @@
     return s;
   }
 
+  // Cover is stored per person (Devon, 17 Sept). These read protection
+  // .covers[], falling back to the four legacy objects for older rows.
+  const COVER_TYPES = ['life', 'tpd', 'income_protection', 'trauma'];
+  const COVER_WORDS = { life: 'life', tpd: 'TPD', income_protection: 'income protection', trauma: 'trauma' };
+  const personWord = (owner, ctx) => owner === 'partner'
+    ? (text(ctx && ctx.partner_name) ? esc(text(ctx.partner_name)) : 'your partner') : 'you';
+  function coverFor(prot, owner, type) {
+    const list = Array.isArray(prot && prot.covers) ? prot.covers.filter(c => c && typeof c === 'object') : [];
+    const hit = list.find(c => c.type === type && (c.owner || 'you') === owner);
+    if (hit) return hit;
+    return owner === 'you' && prot && typeof prot[type] === 'object' ? prot[type] : null;
+  }
+  function coverOwners(prot, ctx) {
+    const list = Array.isArray(prot && prot.covers) ? prot.covers.filter(c => c && typeof c === 'object') : [];
+    const seen = new Set(list.map(c => c.owner || 'you'));
+    if (num(ctx && ctx.adults) !== null && ctx.adults >= 2) seen.add('you').add('partner');
+    if (!seen.size) seen.add('you');
+    return ['you', 'partner'].filter(o => seen.has(o));
+  }
+  function coverSummary(prot, ctx) {
+    const parts = coverOwners(prot, ctx).map(owner => {
+      const held = COVER_TYPES.map(t => [t, coverFor(prot, owner, t)])
+        .filter(([, c]) => c && c.held !== null && c.held !== undefined);
+      if (!held.length) return personWord(owner, ctx) + ': none recorded';
+      const words = held.map(([t, c]) => c.held === false ? 'no ' + COVER_WORDS[t]
+        : COVER_WORDS[t] + ' ' + (num(c.amount) !== null ? money(c.amount) : 'held, amount not recorded') + (c.inside_super === true ? ' inside super' : ''));
+      return personWord(owner, ctx) + ': ' + words.join(', ');
+    });
+    return parts.length ? parts.join('; ') : null;
+  }
+  function fundNominations(sup) {
+    return arr(sup && sup.funds).filter(f => f && typeof f === 'object')
+      .map(f => [esc(text(f.fund) || 'a super account') + (f.owner ? ' (' + esc(text(f.owner)) + ')' : ''), f.nomination]);
+  }
+
   function estateDisplay(doc) {
     if (!doc || typeof doc !== 'object' || doc.in_place === null || doc.in_place === undefined) return null;
     if (doc.in_place === false) return 'not in place';
@@ -178,14 +213,19 @@
       // omitted rather than rendering "none recorded" twice. 4.1 still fires.
       owner_display: multiOwner ? (multiOwner[0] === 'you' ? 'You hold' : esc(multiOwner[0]) + ' holds') : undefined,
       fund_count_display: multiOwner ? String(multiOwner[1]) : undefined,
-      life_display: coverDisplay(prot.life) ?? undefined,
-      ip_display: coverDisplay(prot.income_protection) ?? undefined,
-      tpd_display: coverDisplay(prot.tpd) ?? undefined,
-      trauma_display: coverDisplay(prot.trauma) ?? undefined,
+      cover_display: coverSummary(prot, d.context || {}) ?? undefined,
+      life_display: coverDisplay(coverFor(prot, 'you', 'life')) ?? undefined,
+      ip_display: coverDisplay(coverFor(prot, 'you', 'income_protection')) ?? undefined,
+      tpd_display: coverDisplay(coverFor(prot, 'you', 'tpd')) ?? undefined,
+      trauma_display: coverDisplay(coverFor(prot, 'you', 'trauma')) ?? undefined,
       will_display: estateDisplay(est.will) ?? undefined,
       poa_display: estateDisplay(est.poa) ?? undefined,
       guardianship_display: estateDisplay(est.guardianship) ?? undefined,
-      nomination_display: estateDisplay(est.super_nomination) ?? undefined,
+      nomination_display: (function () {
+        const noms = fundNominations(sup).filter(([, n]) => estateDisplay(n) !== null);
+        if (noms.length) return noms.map(([label, n]) => label + ': ' + estateDisplay(n) + (n && n.in_place === true && typeof n.binding === 'boolean' ? (n.binding ? ', binding' : ', non-binding') : '')).join('; ');
+        return estateDisplay(est.super_nomination) ?? undefined;
+      })(),
       property_value: firstProp ? money(firstProp.value_estimate) : null,
       property_loan: firstProp ? money(firstProp.loan_balance) : null,
       rental_income_annual: (function () {
@@ -400,12 +440,17 @@
     }
 
     else if (tileNo === 5) {
-      html += '<div class="fp-teach"><h4 class="fp-calchead">The cover you hold</h4>' + statusList([
-        [conf(prot, 'Life cover'), coverDisplay(prot.life)],
-        [conf(prot, 'TPD cover'), coverDisplay(prot.tpd)],
-        [conf(prot, 'Income protection'), coverDisplay(prot.income_protection)],
-        [conf(prot, 'Trauma cover'), coverDisplay(prot.trauma)],
-      ]) + '</div>';
+      // A row each, so one person's gap is visible (Devon, 17 Sept).
+      for (const owner of coverOwners(prot, ctx)) {
+        const head = owner === 'you' ? 'The cover you hold'
+          : (text(ctx.partner_name) ? esc(text(ctx.partner_name)) + "'s cover" : "Your partner's cover");
+        html += '<div class="fp-teach"><h4 class="fp-calchead">' + head + '</h4>' + statusList([
+          [conf(prot, 'Life cover'), coverDisplay(coverFor(prot, owner, 'life'))],
+          [conf(prot, 'TPD cover'), coverDisplay(coverFor(prot, owner, 'tpd'))],
+          [conf(prot, 'Income protection'), coverDisplay(coverFor(prot, owner, 'income_protection'))],
+          [conf(prot, 'Trauma cover'), coverDisplay(coverFor(prot, owner, 'trauma'))],
+        ]) + '</div>';
+      }
       const kids = arr(ctx.children);
       const hh = [];
       if (num(ctx.adults) !== null) hh.push(ctx.adults + (ctx.adults === 1 ? ' adult' : ' adults'));
@@ -421,13 +466,17 @@
         ['Will', estateDisplay(est.will)],
         ['Enduring power of attorney', estateDisplay(est.poa)],
         ['Guardianship for the children', estateDisplay(est.guardianship)],
-        ['Super death benefit nomination', (function () {
-          const base = estateDisplay(est.super_nomination);
+      ].concat((function () {
+        const nomRow = n => {
+          const base = estateDisplay(n);
           if (base === null) return null;
-          const n = est.super_nomination;
           return n && n.in_place === true && typeof n.binding === 'boolean' ? base + (n.binding ? ' · binding' : ' · non-binding') : base;
-        })()],
-      ]) + '</div>';
+        };
+        const noms = fundNominations(sup);
+        // One row per fund (Devon, 17 Sept): a nomination belongs to a fund.
+        if (noms.length) return noms.map(([label, n]) => ['Nomination on ' + label, nomRow(n)]);
+        return [['Super death benefit nomination', nomRow(est.super_nomination)]];
+      })())) + '</div>';
       const kids = arr(ctx.children);
       html += refBlock('The household this covers', [
         ['Children', kids.length ? kids.length + (kids.length === 1 ? ' child' : ' children') + (kids.every(c => c && num(c.age) !== null) ? ', aged ' + kids.map(c => c.age).join(' and ') : '') : null],

@@ -24,6 +24,7 @@
 const ARRAY_ITEM_FIELDS = {
   context: ["children"],
   super: ["funds"],
+  protection: ["covers"],
   investments: ["properties"],
   debts: ["items"],
   income: ["other"],
@@ -181,6 +182,9 @@ const NATURAL_KEYS = {
     && (!p.linked_asset_id || !b.linked_asset_id || b.linked_asset_id === p.linked_asset_id)
     && same(b.entity, p.entity),
   "context.children": (b, p) => typeof p.age === "number" && b.age === p.age,
+  // One cover of each type per person: the pair is the natural key.
+  "protection.covers": (b, p) => p.type && b.type === p.type
+    && (!p.owner || !b.owner || String(b.owner).toLowerCase() === String(p.owner).toLowerCase()),
 };
 // A second, looser pass for debts: the recorder and the model can disagree
 // on whether a household loan is "personal" or "joint" (stand-in run 5

@@ -24,14 +24,19 @@ function fullHousehold() {
       home: { owns_home: true, value_estimate: 820000, value_source: 'lender valuation', mortgage_balance: 412000, rate_percent: 6.09, rate_type: 'variable', lender: 'CBA', repayment_monthly: 2780, term_remaining_years: 22, has_offset: true, offset_balance: 38000, _confidence: 'document' },
       buffer: { accessible_savings: 38000, where_held: 'offset', linked_to_loan: true, _confidence: 'document' },
       super: { funds: [
-        { id: 's1', fund: 'AustralianSuper', owner: 'you', balance: 186000, has_insurance: true },
-        { id: 's2', fund: 'Hostplus', owner: 'partner', balance: 121000, has_insurance: false },
+        { id: 's1', fund: 'AustralianSuper', owner: 'you', balance: 186000, has_insurance: true, nomination: { in_place: true, binding: true, last_updated: '2021' } },
+        { id: 's2', fund: 'Hostplus', owner: 'partner', balance: 121000, has_insurance: false, nomination: { in_place: true, binding: false, last_updated: '2016' } },
       ], extra_contributions: false, _confidence: 'document' },
-      protection: {
-        life: { held: true, amount: 750000, inside_super: true }, tpd: { held: true, amount: 500000, inside_super: true },
-        income_protection: { held: false, amount: null, inside_super: null }, trauma: { held: false, amount: null, inside_super: null },
-        _confidence: 'document',
-      },
+      protection: { covers: [
+        { id: 'cv1', owner: 'you', type: 'life', held: true, amount: 750000, inside_super: true },
+        { id: 'cv2', owner: 'you', type: 'tpd', held: true, amount: 500000, inside_super: true },
+        { id: 'cv3', owner: 'you', type: 'income_protection', held: false },
+        { id: 'cv4', owner: 'you', type: 'trauma', held: false },
+        { id: 'cv5', owner: 'partner', type: 'life', held: true, amount: 200000, inside_super: true },
+        { id: 'cv6', owner: 'partner', type: 'tpd', held: true, amount: 200000, inside_super: true },
+        { id: 'cv7', owner: 'partner', type: 'income_protection', held: true, amount: 4500, inside_super: true },
+        { id: 'cv8', owner: 'partner', type: 'trauma', held: false },
+      ], _confidence: 'document' },
       estate: { will: { in_place: true, last_updated: '2017' }, poa: { in_place: false }, guardianship: { in_place: true }, super_nomination: { in_place: false }, _confidence: 'stated' },
       investments: { shares_value: 71500, held_in: 'joint', properties: [
         { id: 'p1', value_estimate: 640000, loan_balance: null, held_in: 'company', use: 'investment' },
@@ -102,7 +107,7 @@ export function runPlanTests({ plan, pipeline, tokens }) {
 
   /* ── insurance inside super contradicted by "none held" ── */
   const contra = fullHousehold();
-  for (const c of ['life', 'tpd', 'income_protection', 'trauma']) contra.domains.protection[c] = { held: false, amount: null, inside_super: null };
+  contra.domains.protection = { covers: contra.domains.protection.covers.map(c => ({ ...c, held: false, amount: null, inside_super: null })), _confidence: 'document' };
   t('inside-super-contradiction-is-open', buildPlan(contra.domains, contra.goals).missing.some(m => m.field === 'protection.inside_super_detail'));
 
   /* ── deferrals count as handled, with their nudge count shown ── */
@@ -330,5 +335,39 @@ export function runPlanTests({ plan, pipeline, tokens }) {
   const C3 = apU(cardBase(), { domains: { debts: { items: [{ id: 'cc1', balance: 2100, minimum_monthly: 42 }] } } }, "here's the statement");
   t('no-figures-in-the-words-leaves-the-turn-alone', C3.domains.debts.items[0].minimum_monthly === 42);
 
-  return { pass: failures.length === 0, total: 87, failures };
+  /* ── cover per person, nominations per fund (Devon, 17 Sept) ── */
+  const noPartnerCover = fullHousehold();
+  noPartnerCover.domains.protection.covers = noPartnerCover.domains.protection.covers.filter(c => c.owner === 'you');
+  const npc = buildPlan(noPartnerCover.domains, noPartnerCover.goals);
+  t('partner-cover-is-its-own-question', npc.missing.some(m => m.field === 'protection.covers[].held' && /life cover \(partner\)/.test(m.label)));
+  t('partner-cover-gap-blocks-close', npc.can_close === false);
+  const named = fullHousehold();
+  named.domains.context.partner_name = 'Jess';
+  named.domains.protection.covers = named.domains.protection.covers.filter(c => c.owner === 'you');
+  t('partner-name-used-in-labels', buildPlan(named.domains, named.goals).missing.some(m => /life cover \(Jess\)/.test(m.label)));
+  const oneNom = fullHousehold();
+  delete oneNom.domains.super.funds[1].nomination;
+  const on = buildPlan(oneNom.domains, oneNom.goals);
+  t('each-fund-needs-its-own-nomination', on.missing.some(m => m.field === 'super.funds[].nomination.in_place' && m.item_id === 's2'));
+  t('other-fund-nomination-not-re-asked', !on.missing.some(m => m.field === 'super.funds[].nomination.in_place' && m.item_id === 's1'));
+
+  // Old-shape replies still land: cover as the person's own, a nomination on
+  // the one fund in the picture.
+  const L1 = ap({ domains: { context: { adults: 2 } }, goals: {}, completed_domains: [], refusals: [] },
+    { domains: { protection: { life: { held: true, amount: 750000, inside_super: true } } } });
+  const lc = L1.domains.protection.covers || [];
+  t('legacy-cover-folded-into-covers', lc.length === 1 && lc[0].type === 'life' && lc[0].owner === 'you' && lc[0].amount === 750000 && !L1.domains.protection.life);
+  const L2 = ap({ domains: { super: { funds: [{ id: 'f1', fund: 'Hostplus', owner: 'partner' }] } }, goals: {}, completed_domains: [], refusals: [] },
+    { domains: { estate: { super_nomination: { in_place: true, binding: false, last_updated: '2016' } } } });
+  t('legacy-nomination-lands-on-the-one-fund', L2.domains.super.funds[0].nomination.binding === false && !(L2.domains.estate && L2.domains.estate.super_nomination));
+  const L3 = ap({ domains: { super: { funds: [{ id: 'f1', fund: 'Hostplus', owner: 'partner' }, { id: 'f2', fund: 'REST', owner: 'you' }] } }, goals: {}, completed_domains: [], refusals: [] },
+    { domains: { estate: { super_nomination: { in_place: true } } } });
+  t('legacy-nomination-with-two-funds-not-guessed', !L3.domains.super.funds.some(f => f.nomination));
+  const P1 = ap({ domains: { context: { adults: 2 }, protection: { covers: [{ id: 'x1', owner: 'you', type: 'life', held: true, amount: 750000 }] } }, goals: {}, completed_domains: [], refusals: [] },
+    { domains: { protection: { covers: [{ owner: 'partner', type: 'life', held: true, amount: 200000 }] } } });
+  t('each-person-keeps-their-own-cover', P1.domains.protection.covers.length === 2
+    && P1.domains.protection.covers.find(c => c.owner === 'you').amount === 750000
+    && P1.domains.protection.covers.find(c => c.owner === 'partner').amount === 200000);
+
+  return { pass: failures.length === 0, total: 96, failures };
 }

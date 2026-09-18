@@ -354,6 +354,22 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
       }
       return node !== null && node !== undefined;
     };
+    // Two shapes the pipeline moves on write (Devon, 17 Sept): cover given
+    // in the old per-household shape lands in protection.covers[] as the
+    // person's own, and a nomination lands on its fund.
+    const movedHome = (id, doms) => {
+      let m = /^protection\.(life|tpd|income_protection|trauma)\.(held|amount|inside_super)$/.exec(id);
+      if (m) {
+        const covers = doms.protection && Array.isArray(doms.protection.covers) ? doms.protection.covers : [];
+        return covers.some(c => c && c.type === m[1] && (c.owner || "you") === "you" && c[m[2]] !== null && c[m[2]] !== undefined);
+      }
+      m = /^estate\.super_nomination\.(in_place|binding|last_updated)$/.exec(id);
+      if (m) {
+        const funds = doms.super && Array.isArray(doms.super.funds) ? doms.super.funds : [];
+        return funds.some(f => f && f.nomination && f.nomination[m[1]] !== null && f.nomination[m[1]] !== undefined);
+      }
+      return false;
+    };
     const seen = new Set();
     for (const r of captureRows) {
       const capDomains = r.capture && r.capture.domains ? r.capture.domains : {};
@@ -365,7 +381,7 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
         if (!registry || !registry[w.id]) continue;
         // A field the pipeline re-homed to its owning domain counts where it landed.
         const rest = w.id.slice(w.id.indexOf(".") + 1);
-        const landed = present(w.id) || Object.keys(domains).some(d => d !== w.domain && present(d + "." + rest));
+        const landed = present(w.id) || movedHome(w.id, domains) || Object.keys(domains).some(d => d !== w.domain && present(d + "." + rest));
         if (!landed && !deferred.has(w.id)) details.push(`${w.id} was given but is not in the picture`);
       }
     }

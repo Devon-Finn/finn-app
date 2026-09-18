@@ -60,8 +60,15 @@ const V2_ENUMS = {
   other_income_source: ["rental_residential", "rental_commercial", "dividends", "distributions", "trust_distribution", "business_profit", "director_fee", "government", "other"],
   income_entity: ["personal", "joint", "company", "trust", "smsf", "unknown"],
   income_basis: ["gross", "net_of_costs"],
+  // Cover is held by a person, not by a household (Devon, 17 Sept): one
+  // partner's cover and the other's are separate facts, and a gap only
+  // shows when they are stored apart.
+  cover_type: ["life", "tpd", "income_protection", "trauma"],
+  cover_owner: ["you", "partner"],
 };
 const COVER = { held: BOOL, amount: MONEY, inside_super: BOOL };
+const COVER_TYPES = ["life", "tpd", "income_protection", "trauma"];
+const isObj = v => !!v && typeof v === "object" && !Array.isArray(v);
 const SPEND_CATS = Object.fromEntries(SPEND_CATEGORY_KEYS.map(k => [k, MONEY]));
 const ESTATE_DOC = { in_place: "docstate", last_updated: STR };
 
@@ -70,7 +77,8 @@ const V2_SCHEMA = {
   // (lib/finn-merge.js), echoed by the model when correcting an existing
   // item. Never positional, never derived from capture order, never
   // reused after deletion.
-  context: { adults: INT, children: { array: { id: STR, age: INT } }, owner_age: INT, partner_age: INT, work_intent: { enum: "work_intent" }, horizon_years: INT },
+  // partner_name: so the tiles and the close say "Jess", not "(partner)".
+  context: { adults: INT, partner_name: STR, children: { array: { id: STR, age: INT } }, owner_age: INT, partner_age: INT, work_intent: { enum: "work_intent" }, horizon_years: INT },
   // Legacy business_income_annual / rental_income_annual scalars are gone
   // from the schema (field-spec Part 2 fold): every non-salary source is a
   // typed income.other[] entry. Stored scalars migrate via
@@ -87,8 +95,14 @@ const V2_SCHEMA = {
   // 16 Sept: the portal estimate is the default source, range kept).
   home: { owns_home: BOOL, value_estimate: MONEY, value_low: MONEY, value_high: MONEY, value_source: STR, mortgage_balance: MONEY, rate_percent: RATE, rate_type: STR, lender: STR, with_lender_since: STR, repayment_monthly: MONEY, term_remaining_years: INT, has_offset: BOOL, offset_balance: MONEY, package_fee_annual: MONEY },
   buffer: { accessible_savings: MONEY, where_held: STR, linked_to_loan: BOOL, counts_credit_as_buffer: BOOL, other_cash: MONEY, other_cash_where_held: STR },
-  super: { funds: { array: { id: STR, fund: STR, owner: STR, balance: MONEY, has_insurance: BOOL } }, multiple_accounts: BOOL, extra_contributions: BOOL },
-  protection: { life: { object: COVER }, tpd: { object: COVER }, income_protection: { object: COVER }, trauma: { object: COVER } },
+  // A nomination belongs to its fund (Devon, 17 Sept): one household-level
+  // nomination meant the second fund's answer overwrote the first's.
+  super: { funds: { array: { id: STR, fund: STR, owner: STR, balance: MONEY, has_insurance: BOOL, nomination: { object: { ...ESTATE_DOC, binding: BOOL } } } }, multiple_accounts: BOOL, extra_contributions: BOOL },
+  // covers[] is the live shape; the four legacy objects are still accepted
+  // (older rows, and a model reply in the old shape) and are folded into
+  // covers as the person's own cover.
+  protection: { covers: { array: { id: STR, owner: { enum: "cover_owner" }, type: { enum: "cover_type" }, held: BOOL, amount: MONEY, inside_super: BOOL, fund_id: STR } },
+    life: { object: COVER }, tpd: { object: COVER }, income_protection: { object: COVER }, trauma: { object: COVER } },
   estate: { will: { object: ESTATE_DOC }, poa: { object: ESTATE_DOC }, guardianship: { object: ESTATE_DOC }, super_nomination: { object: { ...ESTATE_DOC, binding: BOOL } } },
   investments: { shares_value: MONEY, held_in: STR, managed_funds_value: MONEY, properties: { array: { id: STR, value_estimate: MONEY, loan_balance: MONEY, rate_percent: RATE, repayment_type: STR, rent_monthly: MONEY, held_in: STR, use: { enum: "property_use" } } } },
   debts: { items: { array: { id: STR, type: { enum: "debt_type" }, purpose: { enum: "debt_purpose" }, borrower: { enum: "debt_borrower" }, security: { enum: "debt_security" }, secured_against_asset_id: STR, is_split: BOOL, parent_loan_id: STR, cleared_monthly: BOOL, balance: MONEY, rate_percent: RATE, minimum_monthly: MONEY } }, hecs_balance: MONEY },
@@ -672,6 +686,41 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
       .filter(f => typeof f === "string" && FIELD_REGISTRY[f]),
   ]);
   const validRefusals = new Set([...claimedRefusals].filter(f => served.has(f)));
+  // The four legacy cover objects become covers[] entries for the person
+  // themselves: a reply in the old shape, and any row written before the
+  // per-person change, still land in one place.
+  if (patch.protection && COVER_TYPES.some(t => isObj(patch.protection[t]))) {
+    const existing = (baseDomains.protection && Array.isArray(baseDomains.protection.covers) ? baseDomains.protection.covers : []);
+    const incoming = Array.isArray(patch.protection.covers) ? patch.protection.covers.slice() : [];
+    for (const t of COVER_TYPES) {
+      const legacy = patch.protection[t];
+      if (!isObj(legacy)) continue;
+      delete patch.protection[t];
+      if (incoming.some(c => c && c.type === t)) continue;
+      const prior = existing.find(c => c && c.type === t && (c.owner || "you") === "you");
+      incoming.push({ ...(prior ? { id: prior.id } : {}), owner: "you", type: t, ...legacy });
+    }
+    if (incoming.length) patch.protection = { ...patch.protection, covers: incoming };
+    anomalies.push("cover written in the old shape folded into protection.covers for you");
+  }
+  // A household nomination with exactly one fund in the picture belongs to
+  // that fund; with several, whose it is has to be asked.
+  if (patch.estate && isObj(patch.estate.super_nomination)) {
+    const fundsNow = (patch.super && Array.isArray(patch.super.funds) ? patch.super.funds : [])
+      .concat(baseDomains.super && Array.isArray(baseDomains.super.funds) ? baseDomains.super.funds : [])
+      .filter(f => f && f.id);
+    const ids = [...new Set(fundsNow.map(f => f.id))];
+    if (ids.length === 1) {
+      const nom = patch.estate.super_nomination;
+      delete patch.estate.super_nomination;
+      const funds = Array.isArray(patch.super && patch.super.funds) ? patch.super.funds.slice() : [];
+      const ix = funds.findIndex(f => f && f.id === ids[0]);
+      if (ix === -1) funds.push({ id: ids[0], nomination: nom });
+      else funds[ix] = { ...funds[ix], nomination: { ...(funds[ix].nomination || {}), ...nom } };
+      patch.super = { ...(patch.super || {}), funds };
+      anomalies.push("nomination recorded against the one fund in the picture");
+    }
+  }
   // Figures the person did not give are not the model's to work out (run
   // 10: a new card balance came with a "minimum" of 2% of it). When a patch
   // updates an existing item, any other number on that item that is not in

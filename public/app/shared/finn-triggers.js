@@ -117,14 +117,16 @@
     // conversation never got there, not that they hold nothing, and no
     // insight fires on a domain that was never reached (explicit
     // non-trigger). held false IS a reached answer and fires.
-    fires['5.1'] = ['life', 'tpd', 'income_protection', 'trauma'].some(k => {
-      const cover = (d.protection || {})[k];
-      return cover && typeof cover === 'object'
-        && ['held', 'amount', 'inside_super'].some(f => cover[f] !== null && cover[f] !== undefined);
-    });
+    // Cover lives in protection.covers[] per person (Devon, 17 Sept); the
+    // four legacy objects are still read for rows written before that.
+    const reached = c => c && typeof c === 'object'
+      && ['held', 'amount', 'inside_super'].some(f => c[f] !== null && c[f] !== undefined);
+    fires['5.1'] = arr((d.protection || {}).covers).some(reached)
+      || ['life', 'tpd', 'income_protection', 'trauma'].some(k => reached((d.protection || {})[k]));
 
     const willYear = est.will && est.will.in_place === true ? yearOf(est.will.last_updated) : null;
     fires['6.1'] = [est.will, est.poa, est.guardianship, est.super_nomination].some(estateDocFires)
+      || arr(sup.funds).some(f => f && estateDocFires(f.nomination))
       || (willYear !== null && (yearNow - willYear) > 5);
 
     fires['7.1'] = arr(inv.properties).length > 0;

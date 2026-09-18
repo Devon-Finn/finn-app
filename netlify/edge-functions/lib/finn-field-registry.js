@@ -141,6 +141,14 @@ export const FIELD_REGISTRY = {
   "super.extra_contributions": { label: "whether extra is going in", retrieval: "required", evidence: ["payslip", "super_statement"], paths: ["payslip"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
 
   /* ── protection ── */
+  // Cover is per person (Devon, 17 Sept). The legacy per-household entries
+  // below are kept so old rows still resolve.
+  "protection.covers[].held": { label: "whether that cover is held", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
+  "protection.covers[].amount": { label: "what that cover would pay", retrieval: "required", evidence: ["policy_schedule", "super_statement"], paths: ["policy_schedule"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
+  "protection.covers[].inside_super": { label: "whether it sits inside super", retrieval: "required", evidence: ["policy_schedule", "super_statement"], paths: ["policy_schedule"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
+  "super.funds[].nomination.in_place": { label: "whether a nomination is in place on that fund", retrieval: "required", evidence: ["fund_portal", "super_statement"], paths: ["super_statement"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
+  "super.funds[].nomination.binding": { label: "whether that nomination is binding", retrieval: "required", evidence: ["fund_portal", "super_statement"], paths: ["super_statement"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
+  "super.funds[].nomination.last_updated": { label: "when that nomination was made", retrieval: "required", evidence: ["fund_portal", "super_statement"], paths: ["super_statement"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
   "protection.life.held": { label: "whether life cover is held", retrieval: "none", confidence_floor: "stated", softeners: "forbidden" },
   "protection.life.amount": { label: "what the life cover would pay", retrieval: "required", evidence: ["policy_schedule", "super_statement"], paths: ["policy_schedule"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },
   "protection.life.inside_super": { label: "whether it sits inside super", retrieval: "required", evidence: ["policy_schedule", "super_statement"], paths: ["policy_schedule"], accepts_upload: true, confidence_floor: "document", softeners: "forbidden" },

@@ -544,11 +544,31 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
     t('where-it-goes-no-judgement', !/\b(high|low|too much|a lot|overspend)\b/i.test(html2.slice(html2.indexOf('Where it goes'), html2.indexOf('The rest of the income details'))));
     const html1 = panels.renderTile(1, D, der, evaluate(D, { derived: der }).tiles.find(x => x.tile === 1), library, {});
     t('every-tile-has-questions-to-ask', html1.includes('Questions to ask') && !html1.includes('Worth a conversation'));
+    // Cover per person, nominations per fund (Devon, 17 Sept).
+    const D5 = JSON.parse(JSON.stringify(D));
+    D5.context = { ...(D5.context || {}), adults: 2, partner_name: 'Jess' };
+    D5.protection = { covers: [
+      { id: 'c1', owner: 'you', type: 'life', held: true, amount: 500000, inside_super: true },
+      { id: 'c2', owner: 'you', type: 'trauma', held: false },
+      { id: 'c3', owner: 'partner', type: 'life', held: false },
+    ], _confidence: 'document' };
+    D5.super = { ...(D5.super || {}), funds: (D5.super.funds || []).map((f, i) => i === 0
+      ? { ...f, nomination: { in_place: true, binding: true, last_updated: '2021' } }
+      : { ...f, nomination: { in_place: false } }) };
+    const der5 = derive(D5);
+    const ev5 = evaluate(D5, { derived: der5 });
+    const html5 = panels.renderTile(5, D5, der5, ev5.tiles.find(x => x.tile === 5), library, {});
+    t('tile5-a-row-each', html5.includes('The cover you hold') && html5.includes("Jess's cover"));
+    t('tile5-partner-gap-visible', /Jess's cover[\s\S]{0,400}none held/.test(html5));
+    const pos5 = panels.fillPositionLine(library.insights.find(i => i.id === '5.1').position_line, D5, der5);
+    t('tile5-position-line-names-both', typeof pos5 === 'string' && pos5.includes('you:') && pos5.includes('Jess:'));
+    const html6 = panels.renderTile(6, D5, der5, ev5.tiles.find(x => x.tile === 6), library, {});
+    t('tile6-nomination-per-fund', (html6.match(/Nomination on /g) || []).length === (D5.super.funds || []).length);
   }
 
   return {
     pass: failures.length === 0,
-    total: 118,
+    total: 123,
     failures,
     hand_computed: {
       home_equity: 410000, lvr_percent: 56.8, surplus_monthly: 3450, buffer_months: 2.7,
