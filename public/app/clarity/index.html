@@ -608,17 +608,33 @@ function tileHeadline(tileNo, d, der) {
     return null;
   }
   if (tileNo === 5) {
-    const covers = [['life', prot.life], ['income protection', prot.income_protection], ['TPD', prot.tpd], ['trauma', prot.trauma]];
-    let held = 0, absent = 0; const absentNames = [];
-    for (const [label, c] of covers) {
-      if (!c || typeof c !== 'object' || c.held === null || c.held === undefined) continue;
-      if (c.held === true) held++; else { absent++; absentNames.push(label); }
-    }
-    if (!held && !absent) return null;
-    return { metric: held + ' in place' + (absent ? ' · ' + absent + ' none held' : ''), unit: '', facts: absentNames.length ? 'none held: ' + absentNames.join(', ') : '' };
+    // Cover is per person (Devon, 17 Sept): count each person's, and say
+    // whose has none. The four legacy objects still count as the person's.
+    const WORDS = { life: 'life', tpd: 'TPD', income_protection: 'income protection', trauma: 'trauma' };
+    const list = Array.isArray(prot.covers) ? prot.covers.filter(c => c && typeof c === 'object') : [];
+    const legacy = ['life', 'tpd', 'income_protection', 'trauma']
+      .filter(k => prot[k] && typeof prot[k] === 'object')
+      .map(k => ({ owner: 'you', type: k, ...prot[k] }));
+    const all = list.length ? list : legacy;
+    const answered = all.filter(c => c.held === true || c.held === false);
+    if (!answered.length) return null;
+    const held = answered.filter(c => c.held === true);
+    const owners = [...new Set(answered.map(c => c.owner || 'you'))];
+    const name = o => o === 'partner' ? (d.context && d.context.partner_name ? d.context.partner_name : 'your partner') : 'you';
+    const noneFor = owners.filter(o => !held.some(c => (c.owner || 'you') === o));
+    const facts = noneFor.length
+      ? 'no cover recorded for ' + noneFor.map(name).join(' or ')
+      : owners.map(o => name(o) + ': ' + held.filter(c => (c.owner || 'you') === o).map(c => WORDS[c.type] || c.type).join(', ')).join(' · ');
+    return { metric: held.length + ' cover' + (held.length === 1 ? '' : 's') + ' in place', unit: owners.length > 1 ? 'across both of you' : '', facts };
   }
   if (tileNo === 6) {
-    const docs = [['will', est.will], ['power of attorney', est.poa], ['guardianship', est.guardianship], ['super nomination', est.super_nomination]];
+    // A nomination belongs to its fund (Devon, 17 Sept); the household-level
+    // one is still read for pictures written before that.
+    const funds = Array.isArray(sup.funds) ? sup.funds.filter(f => f && typeof f === 'object') : [];
+    const noms = funds.some(f => f.nomination)
+      ? funds.filter(f => f.nomination).map(f => [(f.fund || 'a fund') + ' nomination', f.nomination])
+      : [['super nomination', est.super_nomination]];
+    const docs = [['will', est.will], ['power of attorney', est.poa], ['guardianship', est.guardianship]].concat(noms);
     let inPlace = 0, gaps = 0; const gapNames = [];
     for (const [label, doc] of docs) {
       if (!doc || typeof doc !== 'object' || doc.in_place === null || doc.in_place === undefined) continue;
