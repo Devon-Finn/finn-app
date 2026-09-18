@@ -369,5 +369,18 @@ export function runPlanTests({ plan, pipeline, tokens }) {
     && P1.domains.protection.covers.find(c => c.owner === 'you').amount === 750000
     && P1.domains.protection.covers.find(c => c.owner === 'partner').amount === 200000);
 
-  return { pass: failures.length === 0, total: 96, failures };
+  // Run 11: covers arrived with "id": null, so nothing matched and each
+  // turn stored a second copy.
+  let N = { domains: { context: { adults: 2 } }, goals: {}, completed_domains: [], refusals: [] };
+  N = ap(N, { domains: { protection: { covers: [{ id: null, owner: 'you', type: 'life', held: true, amount: 750000 }] } } });
+  t('null-id-gets-a-real-id', typeof N.domains.protection.covers[0].id === 'string' && N.domains.protection.covers[0].id.length > 0);
+  N = ap(N, { domains: { protection: { covers: [{ id: null, owner: 'you', type: 'life', held: true, amount: 750000, inside_super: true }] } } });
+  t('same-cover-again-does-not-duplicate', N.domains.protection.covers.length === 1 && N.domains.protection.covers[0].inside_super === true);
+  const dupes = ap({ domains: { context: { adults: 2 }, protection: { covers: [
+    { id: 'a', owner: 'you', type: 'life', held: true, amount: 750000 },
+    { id: 'b', owner: 'you', type: 'life', held: true, amount: 750000, inside_super: true },
+  ] } }, goals: {}, completed_domains: [], refusals: [] }, { domains: { context: { adults: 2 } } });
+  t('stored-duplicate-covers-collapse', dupes.domains.protection.covers.length === 1 && dupes.domains.protection.covers[0].inside_super === true);
+
+  return { pass: failures.length === 0, total: 99, failures };
 }

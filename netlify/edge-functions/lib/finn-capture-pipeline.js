@@ -817,6 +817,21 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
       if (junkHecs.length && merged.debts.hecs_balance === undefined) merged = { ...merged, debts: { ...merged.debts, hecs_balance: null } };
     }
   }
+  // One cover per person per type: any doubles (from rows written before
+  // ids were reliable) collapse, latest values winning.
+  if (merged.protection && Array.isArray(merged.protection.covers)) {
+    const byKey = new Map();
+    for (const c of merged.protection.covers) {
+      if (!isObj(c) || !c.type) continue;
+      const key = (c.owner || "you") + "|" + c.type;
+      const prev = byKey.get(key);
+      byKey.set(key, prev ? { ...prev, ...Object.fromEntries(Object.entries(c).filter(([k, v]) => v !== null && v !== undefined)), id: prev.id || c.id } : c);
+    }
+    if (byKey.size !== merged.protection.covers.length) {
+      anomalies.push("duplicate covers for the same person and type collapsed");
+      merged = { ...merged, protection: { ...merged.protection, covers: [...byKey.values()] } };
+    }
+  }
   merged = resolveSecurity(assignAssetIds(merged));
   // A property loan recorded as a debt item links to its property when
   // there is exactly one candidate (same holder, or the only property).

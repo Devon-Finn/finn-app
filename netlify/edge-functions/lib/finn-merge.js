@@ -52,7 +52,11 @@ export function assignAssetIds(domains) {
         if (!isObj(item)) return item;
         if (typeof item.id === "string" && item.id) return item;
         changed = true;
-        return { id: newAssetId(), ...item };
+        // An explicit "id": null must not survive the spread and blank the
+        // new id (run 11: every cover landed with a null id, so nothing
+        // could ever match it and each turn stored a second copy).
+        const { id, ...rest } = item;
+        return { id: newAssetId(), ...rest };
       });
     }
     if (changed) out[domainKey] = nd;
