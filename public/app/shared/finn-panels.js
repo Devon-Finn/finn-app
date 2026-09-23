@@ -955,5 +955,123 @@
     return html;
   }
 
-  window.finnPanels = { renderDashboard, renderTile, renderWhoToSee, tileReached, fillPositionLine, slotValues };
+  /* ══════════ the tile grid's badge, pointer and headline ══════════
+     Moved out of app/clarity/index.html (run 11) so the suites cover them. */
+  // The badge reports the gathering, never the money. The colour class
+  // (flag / calm / building) is unchanged; the words come from `reached`.
+  function badgeLabel(complete) { return complete ? 'Complete' : 'Still gathering'; }
+  // "Complete" means CODE counts every collection area behind the tile as
+  // covered (picture.completed_domains, written by the plan), never merely
+  // that something was said (live walk, 17 Sept 2026: "both employed" made
+  // the income tile read Complete with no figures).
+  const TILE_AREAS = { 1: ['assets', 'liabilities'], 2: ['income'], 3: ['buffer'], 4: ['super'], 5: ['protection'], 6: ['estate'], 7: ['assets'], 8: ['liabilities'], 9: ['income'] };
+  function tileComplete(tileNo, picture) {
+    const done = Array.isArray(picture && picture.completed_domains) ? picture.completed_domains : [];
+    const need = TILE_AREAS[tileNo] || [];
+    return need.length > 0 && need.every(a => done.includes(a));
+  }
+  function questionPointer(count) {
+    return count > 0
+      ? { text: count + (count === 1 ? ' question' : ' questions') + ' for your situation', cls: 'route' }
+      : { text: 'Questions to ask', cls: 'route neutral' };
+  }
+
+  // Compact headline per tile for the grid card. Deterministic formatting of
+  // captured facts and read-time derivations only — never a characterisation.
+  function tileHeadline(tileNo, d, der) {
+    const home = d.home || {}, inc = d.income || {}, exp = d.expenses || {};
+    const buf = d.buffer || {}, sup = d.super || {}, inv = d.investments || {};
+    const debts = d.debts || {}, prot = d.protection || {}, est = d.estate || {};
+    if (tileNo === 1) {
+      if (num(der.home_equity) !== null) return { metric: money(der.home_equity), unit: 'equity in the home', facts: money(home.mortgage_balance) + ' owing' + (num(home.rate_percent) !== null ? ' at ' + home.rate_percent + '%' : '') };
+      if (num(home.value_estimate) !== null) return { metric: money(home.value_estimate), unit: 'home value', facts: '' };
+      return null;
+    }
+    if (tileNo === 2) {
+      if (num(der.surplus_monthly) !== null) {
+        const inTotal = [inc.salary_net_monthly, inc.partner_salary_net_monthly].filter(v => num(v) !== null).reduce((a, b) => a + b, 0);
+        return { metric: money(der.surplus_monthly), unit: '/month left over', facts: money(inTotal) + ' in each month' };
+      }
+      if (num(exp.living_monthly) !== null) return { metric: money(exp.living_monthly), unit: '/month living costs', facts: '' };
+      return null;
+    }
+    if (tileNo === 3) {
+      if (num(der.buffer_months) !== null) return { metric: der.buffer_months + (der.buffer_months === 1 ? ' month' : ' months'), unit: 'cover if income paused', facts: num(buf.accessible_savings) !== null ? 'accessible savings ' + money(buf.accessible_savings) : '' };
+      if (num(buf.accessible_savings) !== null) return { metric: money(buf.accessible_savings), unit: 'accessible savings', facts: '' };
+      return null;
+    }
+    if (tileNo === 4) {
+      const n = Array.isArray(sup.funds) ? sup.funds.length : 0;
+      if (num(der.super_total) !== null) return { metric: money(der.super_total), unit: n > 1 ? 'total across ' + n + ' accounts' : 'in super', facts: sup.extra_contributions === true ? 'extra contributions' : '' };
+      if (n) return { metric: n + (n === 1 ? ' account' : ' accounts'), unit: '', facts: '' };
+      if (sup.multiple_accounts === true) return { metric: 'more than one account', unit: 'details still to gather', facts: '' };
+      return null;
+    }
+    if (tileNo === 5) {
+      // Cover is per person (Devon, 17 Sept): count each person's, and say
+      // whose has none. The four legacy objects still count as the person's.
+      const WORDS = { life: 'life', tpd: 'TPD', income_protection: 'income protection', trauma: 'trauma' };
+      const list = Array.isArray(prot.covers) ? prot.covers.filter(c => c && typeof c === 'object') : [];
+      const legacy = ['life', 'tpd', 'income_protection', 'trauma']
+        .filter(k => prot[k] && typeof prot[k] === 'object')
+        .map(k => ({ owner: 'you', type: k, ...prot[k] }));
+      const all = list.length ? list : legacy;
+      const answered = all.filter(c => c.held === true || c.held === false);
+      if (!answered.length) return null;
+      const held = answered.filter(c => c.held === true);
+      const owners = [...new Set(answered.map(c => c.owner || 'you'))];
+      const name = o => o === 'partner' ? (d.context && d.context.partner_name ? d.context.partner_name : 'your partner') : 'you';
+      const noneFor = owners.filter(o => !held.some(c => (c.owner || 'you') === o));
+      const facts = noneFor.length
+        ? 'no cover recorded for ' + noneFor.map(name).join(' or ')
+        : owners.map(o => name(o) + ': ' + held.filter(c => (c.owner || 'you') === o).map(c => WORDS[c.type] || c.type).join(', ')).join(' · ');
+      return { metric: held.length + ' cover' + (held.length === 1 ? '' : 's') + ' in place', unit: owners.length > 1 ? 'across both of you' : '', facts };
+    }
+    if (tileNo === 6) {
+      // A nomination belongs to its fund (Devon, 17 Sept); the household-level
+      // one is still read for pictures written before that.
+      const funds = Array.isArray(sup.funds) ? sup.funds.filter(f => f && typeof f === 'object') : [];
+      const noms = funds.some(f => f.nomination)
+        ? funds.filter(f => f.nomination).map(f => [(f.fund || 'a fund') + ' nomination', f.nomination])
+        : [['super nomination', est.super_nomination]];
+      const docs = [['will', est.will], ['power of attorney', est.poa], ['guardianship', est.guardianship]].concat(noms);
+      let inPlace = 0, gaps = 0; const gapNames = [];
+      for (const [label, doc] of docs) {
+        if (!doc || typeof doc !== 'object' || doc.in_place === null || doc.in_place === undefined) continue;
+        if (doc.in_place === true) inPlace++;
+        else if (doc.in_place === 'na') continue;
+        else { gaps++; gapNames.push(label + (doc.in_place === 'unsure' ? '?' : '')); }
+      }
+      if (!inPlace && !gaps) return null;
+      return { metric: inPlace + ' in place' + (gaps ? ' · ' + gaps + ' not in place' : ''), unit: '', facts: gapNames.length ? 'not in place: ' + gapNames.join(', ') : '' };
+    }
+    if (tileNo === 7) {
+      const props = Array.isArray(inv.properties) ? inv.properties : [];
+      const holdings = [inv.shares_value, inv.managed_funds_value].filter(v => num(v) !== null);
+      const total = holdings.length ? holdings.reduce((a, b) => a + b, 0) : null;
+      const bits = [];
+      if (props.length) bits.push(props.length + (props.length === 1 ? ' investment property' : ' investment properties'));
+      if (total !== null) return { metric: money(total), unit: 'in shares and funds', facts: bits.join(' · ') };
+      if (props.length) return { metric: bits[0], unit: '', facts: num(props[0].value_estimate) !== null ? 'valued around ' + money(props[0].value_estimate) : '' };
+      return null;
+    }
+    if (tileNo === 8) {
+      if (num(der.debts_total) !== null) {
+        const n = debts.items.length;
+        return { metric: money(der.debts_total), unit: 'across ' + n + (n === 1 ? ' item' : ' items'), facts: num(debts.hecs_balance) !== null && debts.hecs_balance > 0 ? 'HECS held separately' : '' };
+      }
+      return null;
+    }
+    if (tileNo === 9) {
+      const structure = inc.structure != null ? ({ paye: 'salary (PAYE)', sole_trader: 'sole trader', company: 'through a company', trust: 'through a trust', mixed: 'salary + self-employed' })[inc.structure] || inc.structure : null;
+      if (num(der.income_total_annual) !== null) return { metric: money(der.income_total_annual), unit: '/yr household', facts: structure || '' };
+      const netTotal = [inc.salary_net_monthly, inc.partner_salary_net_monthly].filter(v => num(v) !== null);
+      if (netTotal.length) return { metric: money(netTotal.reduce((a, b) => a + b, 0)), unit: '/month take-home', facts: structure || '' };
+      if (structure) return { metric: structure, unit: '', facts: '' };
+      return null;
+    }
+    return null;
+  }
+
+  window.finnPanels = { renderDashboard, renderTile, renderWhoToSee, tileReached, fillPositionLine, slotValues, badgeLabel, tileComplete, questionPointer, tileHeadline };
 })();

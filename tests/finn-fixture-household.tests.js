@@ -564,11 +564,34 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
     t('tile5-position-line-names-both', typeof pos5 === 'string' && pos5.includes('you:') && pos5.includes('Jess:'));
     const html6 = panels.renderTile(6, D5, der5, ev5.tiles.find(x => x.tile === 6), library, {});
     t('tile6-nomination-per-fund', (html6.match(/Nomination on /g) || []).length === (D5.super.funds || []).length);
+
+    /* ── the tile GRID: badge, pointer and headline (run 11: this code sat
+       in app/clarity/index.html where no suite reached it, and tile 5 read
+       "Still gathering" with every cover recorded) ── */
+    const heads = {};
+    for (let n = 1; n <= 9; n++) heads[n] = panels.tileHeadline(n, D5, der5);
+    t('every-tile-has-a-headline', Object.values(heads).every(h => h && typeof h.metric === 'string' && h.metric.length > 0));
+    t('tile5-headline-counts-each-person', /1 cover in place/.test(heads[5].metric) && heads[5].unit === 'across both of you');
+    t('tile5-headline-names-who-has-none', /no cover recorded for Jess/.test(heads[5].facts));
+    const D5b = JSON.parse(JSON.stringify(D5));
+    D5b.protection.covers.push({ id: 'c4', owner: 'partner', type: 'tpd', held: true, amount: 200000, inside_super: true });
+    const h5b = panels.tileHeadline(5, D5b, derive(D5b));
+    t('tile5-headline-lists-both-when-both-hold', /you: life/.test(h5b.facts) && /Jess: TPD/.test(h5b.facts));
+    t('tile6-headline-counts-each-fund', /in place/.test(heads[6].metric) && /not in place/.test(heads[6].facts));
+    t('tile-headline-null-before-anything-said', panels.tileHeadline(5, {}, {}) === null && panels.tileHeadline(6, {}, {}) === null);
+    // The badge reports the gathering, never the money.
+    t('badge-complete-only-from-completed-domains',
+      panels.badgeLabel(panels.tileComplete(5, { completed_domains: ['protection'] })) === 'Complete'
+      && panels.badgeLabel(panels.tileComplete(5, { completed_domains: [] })) === 'Still gathering'
+      && panels.tileComplete(1, { completed_domains: ['assets'] }) === false);
+    t('question-pointer-wording', panels.questionPointer(0).text === 'Questions to ask'
+      && panels.questionPointer(1).text === '1 question for your situation'
+      && panels.questionPointer(3).text === '3 questions for your situation');
   }
 
   return {
     pass: failures.length === 0,
-    total: 123,
+    total: 130,
     failures,
     hand_computed: {
       home_equity: 410000, lvr_percent: 56.8, surplus_monthly: 3450, buffer_months: 2.7,
