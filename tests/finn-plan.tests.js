@@ -116,7 +116,9 @@ export function runPlanTests({ plan, pipeline, tokens }) {
   def.domains.flags.to_verify = [{ field: 'income.salary_net_monthly', item_id: null, confidence: null, floor: null, reason: 'deferred', nudges: 2 }];
   const dp = buildPlan(def.domains, def.goals);
   t('deferred-counts-as-handled', dp.covered.includes('income') && dp.deferred.some(d => d.field === 'income.salary_net_monthly' && d.nudges === 2));
-  t('deferred-shows-in-notes', planPromptSection(dp).includes('nudges 2/2'));
+  // Two nudges: the notes now tell the model it is CLOSED rather than
+  // leaving code to cut a third ask (decision of 24 Sept).
+  t('deferred-shows-in-notes', /CLOSED, do not ask about these again/.test(planPromptSection(dp)));
 
   /* ── stored but unverified counts as handled, listed by source ── */
   const tv = fullHousehold();

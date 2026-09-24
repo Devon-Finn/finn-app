@@ -471,10 +471,23 @@ export function planPromptSection(plan, opts = {}) {
     }
   }
   if (plan.deferred.length) {
-    L.push("Put off by the person (re-raise when it's easy to grab, e.g. they're already on that source; never push an item with 2 nudges): " +
-      plan.deferred.map(x => x.label + " [nudges " + (x.nudges || 1) + "/2, field " + x.field + (x.item_id ? ", item " + x.item_id : "") + "]").slice(0, 14).join("; ") + ".");
+    const twice = plan.deferred.filter(x => (x.nudges || 1) >= 2);
+    const once = plan.deferred.filter(x => (x.nudges || 1) < 2);
+    if (once.length) {
+      L.push("Put off once, raise again only when they're already on that source: " +
+        once.map(x => x.label + " {" + x.field + (x.item_id ? "#" + x.item_id : "") + "}").slice(0, 14).join("; ") + ".");
+    }
+    if (twice.length) {
+      L.push("CLOSED, do not ask about these again in this session; they are on the list for the close: " +
+        twice.map(x => x.label).slice(0, 14).join("; ") + ".");
+    }
   }
-  if (plan.sweeps_pending.length) L.push("Sweeps not yet asked: " + plan.sweeps_pending.map(s => "[SWEEP: " + s + "]").join(" ") + ".");
+  if (plan.sweeps_pending.length) {
+    L.push("Not yet asked, and each must be asked WITH ITS TOKEN, never in your own words, before you chase figures in that area: " +
+      plan.sweeps_pending.map(s => "[SWEEP: " + s + "]").join(" ") + ".");
+  }
+  const asked = Array.isArray(plan.sweeps_asked) ? plan.sweeps_asked : [];
+  if (asked.length) L.push("Already asked, never ask again in any words: " + asked.map(s => "[SWEEP: " + s + "]").join(" ") + ".");
   // The next move, stated plainly (the stand-in run showed the model
   // composing sweeps in its own words, which never count).
   const basicsKnown = !plan.shapeOpen.some(x => !x.startsWith("[SWEEP"));

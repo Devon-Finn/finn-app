@@ -139,6 +139,8 @@ Extract from that answer whatever it yields: how many adults, children and their
 3. RE-RAISE. Items the person put off come back at natural points, especially when they're already on the right screen. The notes show each item's nudge count.
 4. THE CLOSE. Only when the notes say closing is available: emit [FRAME: close] (code appends the open items and where each lives), add one warm line and what happens next, and set session_complete. Never call the picture complete, never say "well done" or "you're well set up", never say goodbye, and never ask "anything else before we wrap up" while the notes show missing items. If the person says "that's everything" early, tell them plainly a few things are still to cover, and carry on with the NEXT MOVE.
 6. ONE THING AT A TIME, AND NEVER ASSUME (Devon, live walk 17 Sept 2026). Each reply asks about ONE thing: one person or one item. Several details of that same item belong in one question ("what's the balance, rate and minimum on the card?"), which is better than dribbling them out one by one. Never bundle a second person or a second item onto it ("and is Jess...?"); ask that on the next turn. Before any question, check the picture: anything already there is answered and is never asked again. If the person answers only part of what you asked, the rest is still open: ask it next, before moving on. Never fill a gap with what seems likely (a teacher is not automatically a PAYE employee; owning a home doesn't mean there's a mortgage; being married doesn't mean joint names), and never restate something as settled that the person didn't say. Your recap reflects only their words.
+7. HOW A TURN READS (these used to be enforced by code editing your replies; they are yours now, and the person notices every one of them). One question per reply, at the end of it, so they always know what to answer. Answer what they ask you before you ask anything. Say nothing about sweeps, phases, working notes, trips, the ledger or confidence: those are internal words. No softeners on a figure that has a document behind it ("roughly", "a rough sense", "ballpark", "best guess"), and never invite a guess when a screen has the answer. Never ask where a figure came from when they've just told you. Don't fill space: no "that's helpful to know", no "great question". Never repeat a question they have answered, in any wording, and never re-ask something the notes mark CLOSED. When the working notes list a sweep as not yet asked, ask it with its token, never in your own words.
+
 5. THE GUARDRAIL. What you ask about is driven by the SHAPE of the household (what exists, how many, what's still unanswered), never by the SIZE of a figure. Never probe harder, or choose a topic, because a number looks large, small, good or bad. That would be an opinion about their circumstances.
 
 - Walk naturally through these areas, adapting to what you hear (don't march through a rigid list; let their answers shape the path; go light on areas that clearly don't apply so it never feels like a marathon; anything can be skipped and come back to later):
@@ -289,6 +291,8 @@ When a user turn contains [TRANSACTION SUMMARY] {json}, code has already parsed 
 - Walk the "outliers" one at a time, one open thread, in plain language. A large_one_off: is it a yearly bill that'll come around again, or a one-off ("there's a $4,000 payment to X in March — a yearly premium that recurs, or a one-off?"). A housing_candidate: is this the mortgage or rent (captured separately, never in living costs)? Any loan repayment (home loan, a split, a car or personal loan) resolves as housing here: repayments are counted from the loan details, never inside living costs. Where several outliers are plainly the same bill (four council rates payments, two rego renewals), ask about them together in one question and resolve them together. A transfer_suspect: is this money moving between their own accounts?
 - As answers land, emit resolve lines, each on its own line immediately BEFORE the [CAPTURE] block: [RESOLVE] {"o1":"one_off","r2":"housing"} — categories are exactly recurring_annual | one_off | housing | internal_transfer. You may batch several answered ids in one line. Never invent an id and never resolve an unanswered outlier. Nothing visible ever follows a [RESOLVE] line: say everything you want to say first, then the [RESOLVE] line(s), then [CAPTURE], and end the reply.
 - If the summary has coverage_short true, say plainly the export covered less than a year and the figure will be an estimate until a fuller export sharpens it.
+WHEN THEY ASK YOU SOMETHING, ANSWER IT. A person who asks "what is an SMSF?", "why do you need that?", "what does that mean?" or "is that good?" gets a plain answer first, in two or three sentences, before anything else. Explain the mechanism, never what they should do about it. Then carry on with one question. Never skip past what they asked, and never make them ask twice.
+
 NEVER CALCULATE ONE OF THEIR FIGURES FROM ANOTHER. A minimum repayment, a rate, an interest amount, a balance and a repayment are separate facts, each read off a screen or a statement. When the person updates one of them, change that one and leave the rest exactly as they are; if a related figure has moved too, ask for it. The only figures you convert are pay periods the person stated (a fortnightly net pay to a monthly one), and even then you keep what they said.
 
 When a user turn contains [TRANSACTION RESULT] {json}, code has applied their answers and done the division. State the composition plainly, two facts, no adjustment, no verdict, in this shape: "That works out at $X a month across the year. About $Y a month of that was one-off spending — <the one-off labels in plain words> — so a typical month is quieter than that, and a year has things like them in it." (Where one_off_monthly is 0, just state the monthly figure.) Code records the result itself (the monthly figure, includes_housing false, any housing figure, where the money goes by category, the once-a-year bills, the months covered and the confidence), so you capture nothing from it and never recompute it; you don't list categories and you never describe any category as high, low, a lot or too much. You may say the spending tile now shows where it goes. Where coverage_months is under 11, say plainly that a shorter stretch can miss once-a-year costs and that the rest of the year would firm the figure up.`;
@@ -379,218 +383,102 @@ function parseCapture(fullText) {
    over. */
 const STOP_WORDS_PLAN = new Set(["whether", "inside", "that", "this", "with", "from", "your", "their", "what", "which", "much", "there", "sits", "partner", "have", "does", "account", "accounts", "still", "lives", "gathered"]);
 
+/* The reply stream (rebuilt 24 September 2026, after Devon's decision).
+
+   Code no longer rewrites what Finn says. It does four things:
+     1. substitutes the code-authored copy behind [ASK:]/[SWEEP:]/[NUDGE:]/
+        [FRAME:] tokens, so those words are always the checked ones;
+     2. replaces em-dashes, a brand rule and pure formatting;
+     3. cuts a reply that tries to close while areas are open, and says so;
+     4. checks the finished reply against THE ABSOLUTE LIST and, when it
+        trips, hands it back to the model once instead of deleting words.
+
+   Everything else — one question at a time, no jargon, no softeners, no
+   guessing, no re-asking what was answered — lives in the briefing the
+   model gets, where it belongs. A guard may take away a question, an
+   unsupported claim, a verdict or a softener. If it can take away an
+   explanation, it is wrong. */
+
+// THE ABSOLUTE LIST: the only things code stops. Each entry says what the
+// model is told when its reply is handed back.
+const ABSOLUTE = [
+  {
+    id: "verdict",
+    test: /\b(in good shape|solid (?:start|foundation|starting point|position|direction)|decent (?:runway|buffer|position)|healthy (?:buffer|position|balance)|a good position|well set up|well placed|on track|nothing to worry about|you're fine|you are fine|looking good|that's (?:reassuring|a relief))\b/i,
+    why: "You gave the household a verdict. Finn never says whether someone is doing well or badly. State what is there and let them draw the conclusion.",
+  },
+  {
+    id: "recommendation",
+    test: /\b(you should(?:n't)?|you really should|i'd recommend|i would recommend|i recommend|my advice|you need to (?:consolidate|switch|move|refinance|cancel|increase|reduce)|it'd be worth (?:consolidating|switching|refinancing|moving)|you'd be better off|consider (?:consolidating|switching|refinancing)|make sure you (?:get|take out|switch))\b/i,
+    why: "You told them what to do. Finn explains how something works and names the kind of professional; it never prescribes an action or a product.",
+  },
+  {
+    id: "wrapping_up",
+    test: /\b(wrapping up|wrap (?:things )?up|that's everything we need|we're (?:all )?done|we're finished|you now have the complete picture)\b/i,
+    when: ctx => ctx.canClose === false,
+    why: "You talked about finishing while areas of the picture are still open. Keep going: the working notes list what is still missing.",
+  },
+];
+
+function absoluteFailures(text, ctx) {
+  const out = [];
+  for (const rule of ABSOLUTE) {
+    if (rule.when && !rule.when(ctx)) continue;
+    if (rule.test.test(text)) out.push(rule);
+  }
+  return out;
+}
+
 function emDashScrubStream(onDone, ctx = {}) {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   let lineBuf = "";
   let seenText = "";      // cumulative raw model text (visible + machine)
-  let pending = "";       // visible text not yet emitted (incomplete paragraph)
-  let heldQ = null;       // a finished question paragraph, held one step
+  let visibleRaw = "";    // the visible half, unscrubbed
   let machineBuf = "";    // [CAPTURE]/[RESOLVE] text, held until flush
   let inMachine = false;
   let substitutions = 0;
   let asksServed = 0;
-  let droppedQ = 0;
-  let sawNudge = false;
-  let emittedAny = false;
-  let closeRefused = false;   // the model tried to close with areas open
-  let askedQ = false;         // a code-emitted ask already went out
-  let verdictsDropped = 0;
-  let visibleOut = "";        // the visible reply, sent once at the end
-  let sawSweep = false;
-  let sawFrame = false;       // a code-authored open/close frame went out
-  let sweepRefused = false;   // the model re-emitted a sweep already asked
-  let supersededQ = null;     // the model's question a token displaced
+  let closeRefused = false;
 
-  // Verdict and wrap-up sentences (stand-in run 4): "I think we're in good
-  // shape", "while we're wrapping up". Finn never gives a verdict, and it
-  // never talks about finishing while the plan has areas open. These
-  // sentences are removed mechanically, like the em-dash.
-  const VERDICT = /\b(in good shape|solid (?:start|foundation|starting point|position|direction)|decent (?:runway|buffer|position)|healthy (?:buffer|position|balance)|a good position|well set up|well placed|on track|nothing to worry about|good to have (?:those|that|it|them) in place|that's (?:reassuring|a relief))\b/i;
-  // Internal words never reach the person (live walk, 17 Sept 2026: "A few
-  // quick sweep questions").
-  // "shape" alone is plain English ("the shape of the household"); only the
-  // internal phrases go (run 10 lost a whole question to the bare word).
-  const JARGON = /\b(sweeps?|sweep questions?|shape (?:phase|questions?)|trips? phase|working notes|the plan says|capture block|ledger|to_verify|confidence level|in the picture at)\b/i;
-  const WRAPUP = /\b(wrapping up|wrap (?:things )?up|pull together what we've built|pretty close to having the full picture|clear enough to hand to a professional|that's everything we need|we're (?:all )?done|we're finished|complete picture)\b/i;
-  // Recaps that add what the person never said (walk 8: "So Jess is
-  // employed by a school, PAYE, employer pays her super" after "Jess is a
-  // teacher"). A recap sentence carrying a status word the person has not
-  // used anywhere in the session is dropped.
-  const RECAP = /^(?:so|got it,? so|right,? so|ok(?:ay)?,? so|that means|which means)\b|\bso (?:you're|you are|that's|that is|she's|she is|he's|he is|your|jess|they)\b/i;
-  // Status words about people and ownership only: loan-screen terms are
-  // routinely abbreviated by the person ("P&I", "IO") and recapped in full.
-  const STATUS_WORDS = ["paye", "employee", "employed", "employer", "director", "dividend", "trust", "joint", "binding", "non-binding", "self-employed", "sole trader", "contractor", "casual", "part-time", "full-time", "renting"];
-  const corpus = String(ctx.userCorpus || "").toLowerCase();
-  const SOURCE_Q = /\b(from memory|off the top of your head|in front of you (?:right )?now|did (?:you|she|he) (?:check|look)|checked (?:it )?just now)\b/i;
-  const SOURCE_SAID = /\b(payslip|statement|screen|app|portal|mygov|in front of me|checked|looked (?:it )?up|just looked|from memory|off the top of my head|my guess|a guess)\b/i;
-  function unsupportedRecap(snt) {
-    if (!ctx.userCorpus || !RECAP.test(snt)) return false;
-    const low = snt.toLowerCase();
-    return STATUS_WORDS.some(w => new RegExp("\\b" + w.replace(/[-\s]/g, "[-\\s]") + "\\b").test(low) && !corpus.includes(w.split(" ")[0].replace(/-.*/, "")));
-  }
-  function dropSentences(p) {
-    const parts = p.split(/(?<=[.!?])\s+/);
-    const keep = parts.filter(snt => {
-      const k = keepSentence(snt);
-      // A question removed here leaves a hole code must fill (run 10).
-      if (!k && /\?\s*$/.test(snt)) droppedQ++;
-      return k;
-    });
-    return keep.length === parts.length ? p : keep.join(" ");
-  }
-  function keepSentence(snt) {
-    {
-      if (/\[(ASK|SWEEP|FRAME|NUDGE):/.test(snt)) return true; // code's own tokens
-      if (VERDICT.test(snt) || JARGON.test(snt) || (ctx.canClose === false && WRAPUP.test(snt))) { verdictsDropped++; return false; }
-      // "Do you have a rough sense of what the company made?" asks for a
-      // guess (run 10). Finn asks for the figure or nudges; never a guess.
-      if (/\?\s*$/.test(snt) && /\b(rough (?:sense|figure|idea|estimate|number)|ballpark|best guess|a guess|guesstimate)\b/i.test(snt)) { verdictsDropped++; return false; }
-      // "A rough sense is fine" invites a guess (walk 8).
-      if (/\b(rough (?:sense|figure|idea|estimate|number)|ballpark|best guess|roughly)\b[^.?!]*\b(fine|okay|ok|works|will do|is enough)\b/i.test(snt)) { verdictsDropped++; return false; }
-      // "Is that from the payslip or from memory?" when the person just said
-      // where it came from (walk 8b: "ok got the payslip. gross is...").
-      if (ctx.lastUser && SOURCE_Q.test(snt) && SOURCE_SAID.test(ctx.lastUser)) { verdictsDropped++; return false; }
-      if (unsupportedRecap(snt)) { verdictsDropped++; console.log('[Finn clarity] recap with unsaid status dropped: "' + snt.slice(0, 120) + '"'); return false; }
-      return true;
-    }
-  }
-  function scrub(s) {
-    return dropSentences(s).replace(/\s*—\s*/g, () => { substitutions++; return ", "; });
-  }
   function sub(s) {
     const r = substituteTokens(s, { closeList: ctx.closeList, canClose: ctx.canClose, sweepsAsked: ctx.sweepsAsked });
     for (const id of r.unknown) {
-      console.error(`[Finn clarity] TOKEN FAULT — trigger token "${id}" is not recognised and emitted nothing`);
+      console.error(`[Finn clarity] TOKEN FAULT — trigger token "${id}" emitted nothing`);
     }
-    if (r.nudges.length) sawNudge = true;
-    if (r.sweeps.length) sawSweep = true;
-    if (r.frames.length) sawFrame = true;
-    if (r.unknown.some(u => /already asked/.test(u))) sweepRefused = true;
     if (r.served.length || r.sweeps.length || r.frames.length || r.nudges.length) asksServed++;
     return r.text;
   }
-  const HAS_TOKEN = /\[(ASK|SWEEP|NUDGE):\s*[a-z_]+\s*\]/;
-  // One question per paragraph too (stand-in run 6: "Does Jess's employer
-  // pay super? And does the company pay super too?"). An "Or ...?" that
-  // completes the same question stays.
-  function oneQuestion(p) {
-    const parts = p.split(/(?<=[.!?])\s+/);
-    let seen = false;
-    const keep = [];
-    for (const snt of parts) {
-      const isQ = /\?\s*$/.test(snt);
-      if (isQ && seen && !/^or\b/i.test(snt)) { droppedQ++; continue; }
-      if (isQ) seen = true;
-      if (seen && !isQ && keep.length && /\?\s*$/.test(keep[keep.length - 1])) { keep.push(snt); continue; }
-      keep.push(snt);
-    }
-    return keep.join(" ");
-  }
-  // A composed "anything else?" for a sweep already asked is a re-ask
-  // (stand-in run 6). Dropped.
-  const COMPOSED = {
-    other_income: /\b(anything else (?:coming in|landing)|any other (?:money|income)|does any other money come in)\b/i,
-    other_assets: /\b(anything else you own|what else do you own|any other assets)\b/i,
-    other_debts: /\b(anything else owing|any other debts|any other borrowing)\b/i,
-    other_super: /\b(more than one super|any other super)\b/i,
-  };
-  const reAsksSweep = (p) => Array.isArray(ctx.sweepsAsked) && Object.entries(COMPOSED).some(([id, re]) => ctx.sweepsAsked.includes(id) && re.test(p));
-  // Two nudges and it's on the list, by code (run 10: Jess's insurance was
-  // asked a third time). A question that names the item and the thing put
-  // off is dropped; the fallback then moves the conversation on.
-  const STOP_WORDS = new Set(["whether", "inside", "that", "this", "with", "from", "your", "their", "what", "which", "much", "there", "sits", "partner", "have", "does", "account", "accounts"]);
-  const closedAsk = (p) => (Array.isArray(ctx.closedAsks) ? ctx.closedAsks : []).some(words => {
-    const low = p.toLowerCase();
-    const hits = words.filter(w => low.includes(w));
-    return words.length >= 2 && hits.length >= 2;
-  });
-  // Paragraph discipline (stand-in run 2): a question paragraph written by
-  // the model immediately before a code-emitted ask, sweep or nudge is the
-  // model asking the same thing twice, or asking something new before a
-  // nudge. It is held one paragraph and dropped when a token follows.
-  function para(p) {
-    let out = "";
-    const sep = () => (emittedAny || out ? "\n\n" : "");
-    const emit = (t) => { if (!t.trim()) return; out += sep() + t; };
-    // A refused close ends the visible reply: nothing after it is shown,
-    // and code says plainly that the session carries on.
-    if (closeRefused) return "";
-    if (ctx.canClose === false && /\[FRAME:\s*close\s*\]/.test(p)) {
+  const scrub = (s) => s.replace(/\s*—\s*/g, () => { substitutions++; return ", "; });
+
+  // The close frame with areas open is the one cut that stays: nothing of
+  // value follows an attempt to finish early, and code says plainly that
+  // the session carries on.
+  function compose(raw) {
+    let text = raw;
+    if (ctx.canClose === false && /\[FRAME:\s*close\s*\]/.test(text)) {
       closeRefused = true;
-      const before = p.split(/\[FRAME:\s*close\s*\]/)[0];
-      if (heldQ !== null) { droppedQ++; heldQ = null; }
-      if (before.trim()) emit(sub(scrub(before.trim())));
+      text = text.split(/\[FRAME:\s*close\s*\]/)[0].trimEnd() + "\n\n[FRAME: not_yet]";
       console.error("[Finn clarity] close attempted with areas open; reply cut at the frame");
-      if (out) emittedAny = true;
-      return out;
     }
-    if (HAS_TOKEN.test(p)) {
-      if (heldQ !== null) { droppedQ++; supersededQ = heldQ; heldQ = null; }
-      emit(sub(scrub(p)));
-      askedQ = true;
-    } else if (/\?/.test(p)) {
-      // Any paragraph carrying a question is held (stand-in run 5: a
-      // composed "anything else?" ended with an example list, not a "?").
-      // One question per reply (live walk, 17 Sept 2026): a second
-      // question paragraph is dropped, so the person is never asked about
-      // two things at once and the unasked one comes up on its own turn.
-      if (heldQ !== null || askedQ || reAsksSweep(p) || closedAsk(p)) { droppedQ++; return out; }
-      // No softeners in a question (Devon: real figures, not guesses).
-      heldQ = sub(scrub(oneQuestion(p).replace(/\b(roughly|approximately|ballpark|a rough idea of)\s+/gi, "")));
-    } else {
-      if (heldQ !== null) { emit(heldQ); heldQ = null; }
-      emit(sub(scrub(p)));
-    }
-    if (out) emittedAny = true;
-    return out;
+    return sub(scrub(text)).replace(/\n{3,}/g, "\n\n").trim();
   }
-  function flushHeld() {
-    if (heldQ === null) return "";
-    const t = (emittedAny ? "\n\n" : "") + heldQ;
-    heldQ = null; emittedAny = true;
-    return t;
-  }
+
   function machineIx(s) {
     const cuts = [s.indexOf("[CAPTURE]"), s.indexOf("[RESOLVE]")].filter(i => i !== -1);
     return cuts.length ? Math.min(...cuts) : -1;
   }
-
   function onText(text) {
     seenText += text;
-    if (inMachine) { machineBuf += text; return ""; }
-    pending += text;
-    let out = "";
-    const mi = machineIx(pending);
-    if (mi !== -1) {
-      const vis = pending.slice(0, mi);
-      machineBuf += pending.slice(mi);
-      pending = "";
-      inMachine = true;
-      for (const p of vis.split(/\n{2,}/)) if (p.trim()) out += para(p.trim());
-      // A held question waits for flush: the auto-nudge may supersede it.
-      return out;
-    }
-    // Emit complete paragraphs; keep the tail (it may still grow, and it
-    // may be the start of a machine marker).
-    const parts = pending.split(/\n{2,}/);
-    pending = parts.pop();
-    for (const p of parts) if (p.trim()) out += para(p.trim());
-    return out;
+    if (inMachine) { machineBuf += text; return; }
+    const mi = machineIx(visibleRaw + text);
+    if (mi === -1) { visibleRaw += text; return; }
+    const all = visibleRaw + text;
+    visibleRaw = all.slice(0, mi);
+    machineBuf += all.slice(mi);
+    inMachine = true;
   }
 
-  /* Rule-1 softener detector — LOG ONLY. */
-  const SOFTENERS = /\b(roughly|approximately|ballpark|a rough (?:idea|sense|figure)|rough sense|about how much|if you know it)\b/i;
-  const FACT_KEYWORDS = /\b(rate|balance|owing|term|repayment|cover|super|rent|costs?|worth|value|bring in|earn|pays?|income|fees?)\b/i;
-  function logSofteners() {
-    const ix = machineIx(seenText);
-    const visible = ix === -1 ? seenText : seenText.slice(0, ix);
-    for (const sentence of visible.split(/(?<=[.!?])\s+/)) {
-      if (SOFTENERS.test(sentence) && FACT_KEYWORDS.test(sentence)) {
-        console.log('[Finn clarity] rule-1 softener on retrievable-fact ask: "' + sentence.trim().slice(0, 160) + '"');
-      }
-    }
-  }
   const deltaLine = (text) => "data: " + JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text } }) + "\n";
 
   return new TransformStream({
@@ -606,11 +494,9 @@ function emDashScrubStream(onDone, ctx = {}) {
             try {
               const evt = JSON.parse(raw);
               if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
-                // The whole visible reply is held and sent once, complete
-                // (stand-in run 6): code can then replace a reply outright,
-                // e.g. with the nudge, instead of contradicting text the
-                // person has already read. The page shows its typing dots.
-                visibleOut += onText(evt.delta.text);
+                // The visible reply is held and sent whole: the absolute
+                // check needs the finished reply before the person sees it.
+                onText(evt.delta.text);
                 continue;
               }
             } catch {}
@@ -621,108 +507,49 @@ function emDashScrubStream(onDone, ctx = {}) {
     },
     async flush(controller) {
       if (lineBuf) controller.enqueue(encoder.encode(lineBuf));
-      let tail = "";
-      if (!inMachine) {
-        for (const p of pending.split(/\n{2,}/)) if (p.trim()) tail += para(p.trim());
-        pending = "";
-      }
-      // Auto-nudge: the person put something off for the first time and the
-      // model accepted it without the nudge. Code adds it (and a question
-      // the model tacked on is dropped: one thread at a time).
-      let nudged = false;
-      if (closeRefused) {
-        heldQ = null;
-        tail += (emittedAny || tail ? "\n\n" : "") + FRAMES.not_yet;
-        emittedAny = true;
-      }
-      try {
-        const cap = parseCapture(machineBuf);
-        // A "deferral" of a field the same capture gives a value for is a
-        // figure from memory, not a skip (stand-in run 4: HECS got a nudge).
-        const valued = (field) => {
-          const doms = cap && cap.domains && typeof cap.domains === "object" ? cap.domains : {};
-          const parts = String(field || "").split(".");
-          if (parts.some(x => x.includes("[]"))) return false;
-          let node = doms;
-          for (const k of parts) node = node && typeof node === "object" ? node[k] : undefined;
-          return node !== null && node !== undefined;
-        };
-        // Kept per item (walk 8: Jess's insurance was put off after Sam's
-        // REST insurance had been nudged, so the field looked "not first").
-        const defs = (cap && Array.isArray(cap.deferrals) ? cap.deferrals : [])
-          .map(d => typeof d === "string" ? { field: d.split("#")[0], item: d.includes("#") ? d.split("#")[1] : null } : d && { field: d.field, item: d.item_id || null })
-          .filter(d => d && d.field && !valued(d.field));
-        if (!sawNudge && !closeRefused && defs.length && typeof ctx.isFirstDeferral === "function"
-            && defs.some(d => ctx.isFirstDeferral(d.field, d.item))) {
-          // The nudge replaces the model's reply: its acceptance of the skip
-          // and any new question would contradict the nudge.
-          heldQ = null; droppedQ++;
-          visibleOut = "";
-          tail = NUDGES.first;
-          nudged = true;
-          console.log("[Finn clarity] auto-nudge added for a first-time deferral");
-        }
-      } catch (err) {
-        console.error("[Finn clarity] auto-nudge check failed:", err);
-      }
-      if (!nudged) tail += flushHeld();
-      let visible = visibleOut + tail;
-      // A lead-in left hanging by a dropped question ("just to make sure the
-      // picture is complete:") goes too (walk 8).
-      visible = visible.replace(/(?:\n\n)?[^\n]*:\s*$/, "").replace(/\s+$/, "");
-      // Shape first, by code (stand-in run 7: Finn jumped to the loan screen
-      // with the four "anything else?" questions unasked). While the plan is
-      // mapping the household and a sweep is pending, the reply's question
-      // becomes that sweep; any figure ask in it is withheld.
-      if (ctx.forceSweep && SWEEPS[ctx.forceSweep] && !sawSweep && !nudged && !closeRefused) {
-        const first = visible.split(/\n{2,}/)[0] || "";
-        const ack = first && !/\?/.test(first) && first.length <= 240 ? first + "\n\n" : "";
-        visible = ack + SWEEPS[ctx.forceSweep].text;
-        if (ctx.result) { ctx.result.forcedSweep = ctx.forceSweep; ctx.result.suppressAsks = true; }
-        console.log("[Finn clarity] shape phase: reply replaced with sweep " + ctx.forceSweep);
-      }
-      // A second first-nudge on the same thing (run 10: "note it and come
-      // back" got the whole nudge again) becomes the acceptance, and the
-      // conversation moves on with the model's own next question.
-      if (!nudged && visible.includes(NUDGES.first)) {
-        // The capture's deferrals decide when it names them (all already
-        // nudged = a repeat); otherwise the previous reply being the nudge.
-        const repeat = (() => {
-          let ds = [];
-          try { const c = parseCapture(machineBuf); ds = (c && Array.isArray(c.deferrals) ? c.deferrals : []).map(d => typeof d === "string" ? { f: d.split("#")[0], i: d.split("#")[1] || null } : { f: d && d.field, i: d && d.item_id }).filter(d => d.f); } catch { ds = []; }
-          if (ds.length && typeof ctx.isFirstDeferral === "function") return ds.every(d => !ctx.isFirstDeferral(d.f, d.i));
-          return !!(ctx.prevAssistant && ctx.prevAssistant.includes(NUDGES.first.slice(0, 60)));
-        })();
-        if (repeat) {
-          const next = supersededQ || (ctx.fallback && ctx.fallback.text) || "";
-          visible = visible.replace(NUDGES.first, NUDGES.accept + (next ? "\n\n" + next : ""));
-          if (!supersededQ && ctx.fallback && ctx.fallback.kind === "ask" && ctx.result) ctx.result.fallbackAsk = ctx.fallback.id;
-          console.log("[Finn clarity] repeated first nudge turned into the acceptance");
+      let visible = compose(visibleRaw);
+      if (typeof ctx.onFirstReply === "function") ctx.onFirstReply(seenText);
+      let failures = absoluteFailures(visible, ctx);
+      // Hand it back once, naming what it broke. An empty reply is a broken
+      // turn, not a judgement call, so it goes back too.
+      if ((failures.length || !visible) && typeof ctx.retry === "function") {
+        const why = failures.length
+          ? failures.map(f => f.why).join(" ")
+          : "Your last reply had nothing in it for the person to read.";
+        console.error("[Finn clarity] absolute rule tripped (" + (failures.map(f => f.id).join(", ") || "empty") + "); handing the reply back");
+        try {
+          const second = await ctx.retry(why);
+          if (second && second.text) {
+            const mi = machineIx(second.text);
+            const retryVisible = compose(mi === -1 ? second.text : second.text.slice(0, mi));
+            const retryMachine = mi === -1 ? "" : second.text.slice(mi);
+            const stillFailing = absoluteFailures(retryVisible, ctx);
+            if (retryVisible && !stillFailing.length) {
+              visible = retryVisible;
+              if (retryMachine) machineBuf = retryMachine;
+              seenText = second.text;
+              if (ctx.result) { ctx.result.retried = true; ctx.result.rawRetry = second.text; }
+              console.log("[Finn clarity] retry accepted");
+            } else {
+              console.error("[Finn clarity] retry still failing (" + stillFailing.map(f => f.id).join(", ") + "); falling back");
+              if (ctx.result) ctx.result.retryFailed = true;
+              visible = retryVisible && !stillFailing.length ? retryVisible : (visible || FRAMES.not_yet);
+              if (stillFailing.length) visible = ctx.fallbackLine || FRAMES.not_yet;
+            }
+          }
+        } catch (err) {
+          console.error("[Finn clarity] retry failed:", err);
         }
       }
-      // A hole code made gets filled by code (walk 8: the model's only line
-      // was an already-asked sweep, so the person saw an empty reply). When
-      // the reply is empty, or code removed its question, the next open item
-      // from the plan is asked. A reply that is simply waiting ("take your
-      // time") is left alone.
-      // A reply that asks without a question mark ("Attach it here or read
-      // the figures to me") or is waiting ("take your time") already has
-      // its ask (walk 8b).
-      const ASKISH = /\b(attach|read (?:them|it|the (?:figures?|numbers?)|those)|tell me|let me know|send (?:me|it|them|those)|in front of you|take your time|when you're ready|no rush|i'll be (?:right )?here)\b/i;
-      const codeMadeHole = !visible.trim() || ((droppedQ > 0 || sweepRefused) && !ASKISH.test(visible));
-      if (ctx.fallback && ctx.fallback.text && codeMadeHole && !nudged && !closeRefused && !sawFrame && asksServed === 0
-          && !(ctx.result && ctx.result.forcedSweep) && !/\?/.test(visible)) {
-        visible = (visible ? visible + "\n\n" : "") + ctx.fallback.text;
-        if (ctx.result && ctx.fallback.kind === "ask") ctx.result.fallbackAsk = ctx.fallback.id;
-        console.log("[Finn clarity] reply had no question: fallback added (" + (ctx.fallback.id || "plain") + ")");
+      if (ctx.result) {
+        ctx.result.absoluteFailures = failures.map(f => f.id);
+        ctx.result.visible = visible;
+        ctx.result.machine = machineBuf;
       }
       if (visible) controller.enqueue(encoder.encode(deltaLine(visible)));
       if (machineBuf) controller.enqueue(encoder.encode(deltaLine("\n\n" + machineBuf)));
-      if (substitutions > 0) console.log(`[Finn clarity] em-dash substitutions in visible reply: ${substitutions}`);
-      if (asksServed > 0) console.log(`[Finn clarity] token substitutions in visible reply: ${asksServed}`);
-      if (droppedQ > 0) console.log(`[Finn clarity] dropped ${droppedQ} model question paragraph(s) superseded by a code-emitted ask`);
-      if (verdictsDropped > 0) console.log(`[Finn clarity] verdict or wrap-up sentences removed from visible reply: ${verdictsDropped}`);
-      logSofteners();
+      if (substitutions > 0) console.log(`[Finn clarity] em-dash substitutions: ${substitutions}`);
+      if (asksServed > 0) console.log(`[Finn clarity] code-authored copy served: ${asksServed}`);
       if (typeof onDone === "function") {
         try {
           await onDone(seenText);
@@ -1243,42 +1070,31 @@ export default async function handler(request, context) {
   // but the tee'd save branch still drains the full model output — the
   // fallback below inserts the raw row itself before applying, so the
   // disconnect-still-saves property is preserved.
-  // Shape phase: the household basics are known and an "anything else?"
-  // sweep is still pending, so the next question is that sweep.
-  const basicsKnown = !(plan.shapeOpen || []).some(x => !String(x).startsWith("[SWEEP"));
-  const forceSweepId = plan.phase === "shape" && basicsKnown
-    ? ["other_assets", "other_debts", "other_super", "other_income"].find(id => (plan.sweeps_pending || []).includes(id)) || null
-    : null;
-  // The fallback question, for a reply that would otherwise end without one.
-  const fallback = (() => {
-    if (forceSweepId || plan.can_close) return null;
-    // Mapping the household: the next open shape question (run 10: the
-    // tenure question was lost and the reply stalled).
-    const SHAPE_ASKS = {
-      "who is in the household": "Who's in your household?",
-      "children and ages": "Do you have children, and how old are they?",
-      "how each income is earned": "How does each of you earn: employed by someone else, through your own company, as a sole trader, or through a trust?",
-      "whether they own the home": "Do you own the home you live in, or rent?",
-    };
-    const shapeNext = (plan.shapeOpen || []).find(x => !String(x).startsWith("[SWEEP"));
-    if (shapeNext) {
-      const key = Object.keys(SHAPE_ASKS).find(k => String(shapeNext).startsWith(k));
-      if (key) return { kind: "plain", id: null, text: SHAPE_ASKS[key] };
-    }
-    const trip = (plan.trips || []).find(t => t.items.some(i => i.status === "missing"));
-    if (!trip) return null;
-    if (RETRIEVAL_PATHS[trip.id] && !servedPaths.includes(trip.id)) return { kind: "ask", id: trip.id, text: askFor(trip.id) };
-    const item = trip.items.find(i => i.status === "missing");
-    const l = String(item.label || "").replace(/\s*\([^)]*\)\s*$/, "");
-    const cut = l.lastIndexOf(", ");
-    const what = cut === -1 ? l : l.slice(0, cut) + " (" + l.slice(cut + 2) + ")";
-    return { kind: "plain", id: null, text: `Next on the list is ${what}. What can you tell me about that?` };
-  })();
-  const lastUserText = (() => { const u = messages.filter(m => m && m.role === "user").map(m => typeof m.content === "string" ? m.content
-    : Array.isArray(m.content) ? m.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : ""); return u.length ? u[u.length - 1] : ""; })();
   const streamResult = {};
   let resolveWriteAhead;
   const writeAhead = new Promise(resolve => { resolveWriteAhead = resolve; });
+  // The retry: one more call, with the rule the reply broke named plainly.
+  // Not streamed — the person is waiting on the finished reply either way.
+  const retryOnce = async (why) => {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01", "x-api-key": apiKey },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1000,
+        system: CLARITY_SYSTEM_PROMPT + bankExportsPromptSection() + retrievalPromptSection() + promptTokenSection() + contextBlock,
+        messages: [...messages,
+          { role: "assistant", content: seenFirstReply() || "(empty reply)" },
+          { role: "user", content: `[SYSTEM CHECK, the person has not seen your last reply] ${why}\n\nWrite that turn again, keeping everything you had right, and send the [CAPTURE] block as usual. The person is waiting: no apology, no mention of this note.` }],
+      }),
+    });
+    if (!res.ok) { console.error("[Finn clarity] retry call failed: " + res.status); return null; }
+    const body = await res.json();
+    const text = Array.isArray(body.content) ? body.content.filter(b => b && b.type === "text").map(b => b.text).join("") : "";
+    return { text };
+  };
+  let firstReply = "";
+  const seenFirstReply = () => firstReply;
   const scrubbed = clientStream.pipeThrough(emDashScrubStream(async fullText => {
     const idx = fullText.indexOf("[CAPTURE]");
     if (idx === -1) { resolveWriteAhead({ logId: null, capture: null, hasMarker: false }); return; }
@@ -1292,28 +1108,18 @@ export default async function handler(request, context) {
     closeList: closeListText(plan),
     canClose: plan.can_close,
     sweepsAsked: plan.sweeps_asked || [],
-    forceSweep: forceSweepId,
-    // Items put off twice: their distinctive words, so a third ask is cut.
-    closedAsks: (plan.deferred || []).filter(d => (d.nudges || 1) >= 2)
-      .map(d => String(d.label || "").toLowerCase().replace(/[^a-z\s,]/g, " ").split(/[\s,]+/)
-        .filter(w => w.length > 3 && !STOP_WORDS_PLAN.has(w)))
-      .filter(ws => ws.length >= 2),
-    fallback,
-    // Everything the person has typed this session, for the recap check.
-    userCorpus: messages.filter(m => m && m.role === "user").map(m => typeof m.content === "string" ? m.content
-      : Array.isArray(m.content) ? m.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : "")
-      .filter(t => !/^\[(Session start|TRANSACTION)/.test(t)).join(" \n "),
-    prevAssistant: (() => { const a = messages.filter(m => m && m.role === "assistant"); const m = a[a.length - 1]; return !m ? "" : typeof m.content === "string" ? m.content : Array.isArray(m.content) ? m.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : ""; })(),
-    lastUser: lastUserText,
     result: streamResult,
-    isFirstDeferral: (field, itemId) => !(plan.ledger || []).some(e => e && e.field === field
-      && (!itemId || !e.item_id || e.item_id === itemId) && (e.nudges || 0) >= 1),
+    onFirstReply: (t) => { firstReply = t; },
+    retry: retryOnce,
   }));
 
   context.waitUntil((async () => {
     // Always drain the save branch: it is the source of truth when the
     // client disconnects, and an undrained tee branch buffers forever.
-    const fullText = await accumulateStreamText(saveStream);
+    let fullText = await accumulateStreamText(saveStream);
+    // A retried turn: what the person saw is the second reply, so that is
+    // the one the tokens, the capture and the log all read from.
+    if (streamResult.retried && streamResult.rawRetry) fullText = streamResult.rawRetry;
     const flushRes = await Promise.race([
       writeAhead,
       new Promise(resolve => setTimeout(() => resolve(null), 2000)),
@@ -1488,4 +1294,4 @@ export default async function handler(request, context) {
 }
 
 // Exposed for the local stream test only (tests/finn-stream.tests.js).
-export { emDashScrubStream as __streamForTests };
+export { emDashScrubStream as __streamForTests, ABSOLUTE as __absoluteForTests, SWEEPS as __sweepsForTests };

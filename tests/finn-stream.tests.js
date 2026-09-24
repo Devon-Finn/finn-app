@@ -1,4 +1,11 @@
-/* The reply stream — paragraph discipline, code-emitted copy, auto-nudge.
+/* The reply stream, rebuilt 24 September 2026.
+
+   Code no longer edits Finn's words. What is tested here is the whole of
+   what it still does: serve the code-authored copy behind tokens, replace
+   em-dashes, cut a close attempted with areas open, and check the finished
+   reply against the ABSOLUTE LIST, handing it back to the model once
+   instead of deleting anything.
+
    Run with the clarity-chat module (it exports __streamForTests):
      await runStreamTests(chatModule, tokensModule) */
 
@@ -20,7 +27,7 @@ async function run(streamFactory, chunks, ctx) {
     if (!line.startsWith("data: ")) continue;
     try { const e = JSON.parse(line.slice(6)); if (e.delta && e.delta.text) txt += e.delta.text; } catch {}
   }
-  return { txt, done };
+  return { txt, visible: txt.split("[CAPTURE]")[0].trim(), done };
 }
 
 export async function runStreamTests(chat, tokens) {
@@ -28,145 +35,81 @@ export async function runStreamTests(chat, tokens) {
   const t = (name, cond) => { if (!cond) failures.push(name); };
   const f = chat.__streamForTests;
   const { NUDGES, FRAMES } = tokens;
+  const SWEEPS = chat.__sweepsForTests;
 
-  const a = await run(f, ["Good, noted.\n\nAny other assets", " worth knowing about?\n\n[SWE", "EP: other_assets]\n\n[CAPTURE]{\"domains\":{}}"], {});
-  t('composed-question-before-sweep-dropped', !a.txt.includes('Any other assets worth') && a.txt.includes('Beyond the home and super'));
-  t('token-split-across-deltas-substitutes', !a.txt.includes('[SWE'));
-  t('capture-block-still-delivered', a.txt.endsWith('[CAPTURE]{"domains":{}}'));
-  t('raw-text-handed-to-save-unchanged', a.done.includes('Any other assets worth knowing about?') && a.done.includes('[SWEEP: other_assets]'));
+  /* ── 1. the code-authored copy, served by token ── */
+  const ask = await run(f, ["Let's get the loan screen.\n\n[ASK: loan_details]\n\n[CAPTURE]{}"], {});
+  t('ask-token-becomes-the-checked-copy', ask.visible.startsWith("Let's get the loan screen.") && /banking app|internet banking/i.test(ask.visible) && !ask.visible.includes('[ASK:'));
+  const sweep = await run(f, ["[SWEEP: other_debts]\n\n[CAPTURE]{}"], {});
+  t('sweep-token-becomes-the-checked-copy', sweep.visible === SWEEPS.other_debts.text);
+  const nudge = await run(f, ["[NUDGE: first]\n\n[CAPTURE]{}"], {});
+  t('nudge-token-becomes-the-checked-copy', nudge.visible === NUDGES.first);
+  const already = await run(f, ["[SWEEP: other_income]\n\n[CAPTURE]{}"], { sweepsAsked: ['other_income'] });
+  t('a-sweep-already-asked-emits-nothing', already.visible === '');
 
-  const b = await run(f, ["Of course.\n\nNow the Hostplus balance?\n\n[CAPTURE]{\"deferrals\":[\"super.funds[].has_insurance#x\"]}"], { isFirstDeferral: () => true });
-  t('auto-nudge-on-first-deferral', b.txt.includes(NUDGES.first));
-  t('auto-nudge-drops-new-question', !b.txt.includes('Hostplus balance'));
-  const b2 = await run(f, ["Of course.\n\n[CAPTURE]{\"deferrals\":[\"x.y\"]}"], { isFirstDeferral: () => false });
-  t('no-auto-nudge-on-repeat', !b2.txt.includes(NUDGES.first));
-  const b3 = await run(f, ["[NUDGE: accept]\n\n[CAPTURE]{\"deferrals\":[\"x.y\"]}"], { isFirstDeferral: () => true });
-  t('no-double-nudge-when-model-nudged', b3.txt.includes(NUDGES.accept) && !b3.txt.includes(NUDGES.first));
+  /* ── 2. em-dashes, a brand rule ── */
+  const dash = await run(f, ["The offset — an account against the loan — cuts the interest.\n\n[CAPTURE]{}"], {});
+  t('em-dash-replaced', !dash.visible.includes('—') && dash.visible.includes('offset, an account'));
 
-  const c = await run(f, ["Here we go — nearly there.\n\n[FRAME: close]\n\nThanks.\n\n[CAPTURE]{\"session_complete\":true}"], { closeList: "- an open item: where it lives." });
-  t('close-frame-carries-code-list', c.txt.includes(FRAMES.close + "\n\n- an open item: where it lives."));
-  t('em-dash-scrubbed', !c.txt.includes('—'));
+  /* ── 3. the close, with areas open ── */
+  const early = await run(f, ["Here's where you've landed.\n\n[FRAME: close]\n\nEverything is saved.\n\n[CAPTURE]{}"], { canClose: false });
+  t('early-close-cut-at-the-frame', early.visible.startsWith("Here's where you've landed.") && early.visible.includes(FRAMES.not_yet) && !early.visible.includes('Everything is saved'));
+  const proper = await run(f, ["[FRAME: close]\n\n[CAPTURE]{}"], { canClose: true, closeList: '- The company profit.' });
+  t('close-allowed-when-code-says-so', proper.visible.startsWith(FRAMES.close) && proper.visible.includes('The company profit'));
 
-  const d = await run(f, ["What is the ", "balance?"], {});
-  t('trailing-question-delivered', d.txt === 'What is the balance?');
-  const e = await run(f, ["First.\n\nIs it joint?\n\nThanks for that.\n\n[CAPTURE]{}"], {});
-  t('question-not-before-token-kept', e.txt.startsWith('First.\n\nIs it joint?\n\nThanks for that.'));
-
-  const g = await run(f, ["Wrapping up.\n\n[FRAME: close]\n\n[CAPTURE]{}"], { closeList: "- x", canClose: false });
-  t('close-frame-refused-when-plan-open', !g.txt.includes(FRAMES.close) && !g.txt.includes('[FRAME'));
-
-  // Stand-in run 4: the model dropped the opening {"domains": key.
-  const h = await run(f, ["Of course.\n\n[CAPTURE]{},\"deferrals\":[\"x.y\"]}"], { isFirstDeferral: () => true });
-  t('malformed-block-missing-domains-salvaged', h.txt.includes(NUDGES.first));
-
-  // Stand-in run 4: a close attempted with areas open is cut at the frame,
-  // wrap-up and verdict sentences go, and code says the session carries on.
-  const k = await run(f, ["Other than those, I think we're in good shape. Let me pull together what we've built.\n\n[FRAME: close]\n\nThe picture is now clear enough to hand to a professional.\n\n[CAPTURE]{}"], { closeList: "- x", canClose: false });
-  t('refused-close-cuts-reply', !k.txt.includes('clear enough') && k.txt.includes(FRAMES.not_yet));
-  t('verdict-and-wrapup-sentences-removed', !/good shape|pull together/.test(k.txt));
-  // A figure given from memory is not a skip: no nudge.
-  const m = await run(f, ["Noted, about 9,000.\n\n[CAPTURE]{\"domains\":{\"debts\":{\"hecs_balance\":9000}},\"deferrals\":[\"debts.hecs_balance\"]}"], { isFirstDeferral: () => true });
-  t('no-nudge-when-deferred-field-has-value', !m.txt.includes(NUDGES.first));
-
-  // Stand-in run 5: a composed "anything else?" whose paragraph does not end
-  // with "?" is still dropped before the sweep.
-  const n = await run(f, ["Good.\n\nAre there any other debts in the picture? Things like car loans or cards.\n\n[SWEEP: other_debts]\n\n[CAPTURE]{}"], {});
-  t('mid-paragraph-question-dropped-before-sweep', !n.txt.includes('any other debts in the picture') && n.txt.includes('What do you owe, all of it in one go?'));
-
-  // Live walk, 17 Sept 2026: internal words leaked ("A few quick sweep questions:").
-  const j = await run(f, ["Good.\n\nBefore we gather figures, a few quick sweep questions:\n\n[SWEEP: other_income]\n\n[CAPTURE]{}"], {});
-  t('internal-jargon-sentence-removed', !/sweep/i.test(j.txt) && j.txt.includes('does any other money come in'));
-
-  // Live walk, 17 Sept 2026: two questions in one reply, and the second
-  // part was later assumed. Only the first question goes out.
-  const q2 = await run(f, ["Good, that's helpful.\n\nWhen you say your own company, are you paid a wage through it?\n\nAnd is Jess employed directly by the school?\n\n[CAPTURE]{}"], {});
-  t('one-question-per-reply', q2.txt.includes('paid a wage through it?') && !q2.txt.includes('Jess'));
-
-  // Stand-in run 6.
-  const q3 = await run(f, ["Got it.\n\nDoes Jess's employer pay super on her salary? And does the company pay super on yours too?\n\n[CAPTURE]{}"], {});
-  t('second-question-sentence-dropped', q3.txt.includes("Jess's employer") && !q3.txt.includes('company pay super'));
-  const q4 = await run(f, ["Got it.\n\nIs that gross rent? Or is it net of costs?\n\n[CAPTURE]{}"], {});
-  t('or-alternative-kept', q4.txt.includes('Or is it net of costs?'));
-  const q5 = await run(f, ["Noted.\n\nNow, is there anything else coming in regularly that we haven't covered?\n\n[CAPTURE]{}"], { sweepsAsked: ['other_income'] });
-  t('composed-re-ask-of-asked-sweep-dropped', !q5.txt.includes('anything else coming in'));
-  const n2 = await run(f, ["No problem, we can come back to that.\n\nNow the REST account, can you check it?\n\n[CAPTURE]{\"deferrals\":[\"super.funds[].has_insurance#x\"]}"], { isFirstDeferral: () => true });
-  t('nudge-replaces-contradicting-reply', n2.txt.startsWith(NUDGES.first) && !n2.txt.includes('No problem'));
-
-  // Stand-in run 7: shape first, by code.
-  const fs = {};
-  const sw = await run(f, ["Good, thanks.\n\n[ASK: loan_details]\n\n[CAPTURE]{}"], { forceSweep: 'other_assets', result: fs });
-  t('shape-phase-sweep-replaces-figure-ask', sw.txt.startsWith('Good, thanks.') && sw.txt.includes('Beyond the home and super') && !sw.txt.includes('loan account') && fs.forcedSweep === 'other_assets');
-
+  /* ── 4. what code no longer touches (the decision of 24 Sept) ── */
+  const answer = await run(f, ["An SMSF is a Self-Managed Super Fund, a fund you run yourself rather than having a big fund manage it.\n\nSo you've got ETFs. Are those held in your name, Jess's name, or jointly?\n\n[CAPTURE]{}"], { canClose: false });
+  t('an-answer-and-its-question-both-stand', answer.visible.includes('Self-Managed Super Fund') && answer.visible.includes('held in your name'));
+  const two = await run(f, ["What does Jess earn?\n\nAnd what do you earn?\n\n[CAPTURE]{}"], {});
+  t('two-questions-are-the-models-business-now', two.visible.includes('What does Jess earn?') && two.visible.includes('And what do you earn?'));
   const soft = await run(f, ["And roughly how much do the distributions come to each year?\n\n[CAPTURE]{}"], {});
-  t('softener-removed-from-question', soft.txt.startsWith('And how much do the distributions come to each year?'));
+  t('softeners-are-the-models-business-now', soft.visible.includes('roughly'));
+  const recap = await run(f, ["So Jess is PAYE, employed by a school.\n\nDo you own the home?\n\n[CAPTURE]{}"], { userCorpus: 'jess is a teacher' });
+  t('recaps-are-the-models-business-now', recap.visible.includes('PAYE'));
 
-  // Walk 8: a recap that adds what the person never said is dropped.
-  const rc = await run(f, ["Good, that's helpful. So Jess is employed by a school, PAYE, employer pays her super.\n\nFor you, are you paid a wage through the company?\n\n[CAPTURE]{}"], { userCorpus: "I work for my own company, jess is a teacher" });
-  t('unsupported-recap-dropped', !rc.txt.includes('PAYE') && rc.txt.includes("Good, that's helpful.") && rc.txt.includes('paid a wage'));
-  const rc2 = await run(f, ["So that's you, Jess and two kids.\n\n[CAPTURE]{}"], { userCorpus: "me, my wife jess and our 2 kids" });
-  t('supported-recap-kept', rc2.txt.startsWith("So that's you, Jess and two kids."));
+  /* ── 5. THE ABSOLUTE LIST: handed back, never cut ── */
+  const r1 = {};
+  const verdict = await run(f, ["You're in good shape here.\n\nWhat's the balance?\n\n[CAPTURE]{}"], {
+    result: r1, canClose: false,
+    retry: async (why) => { r1.why = why; return { text: "The offset holds $38,000 against the loan.\n\nWhat's the balance on the card?\n\n[CAPTURE]{}" }; },
+  });
+  t('verdict-is-handed-back-not-cut', r1.absoluteFailures[0] === 'verdict' && /verdict/i.test(r1.why) && r1.retried === true);
+  t('the-rewrite-is-what-the-person-sees', verdict.visible.includes('$38,000') && !verdict.visible.includes('good shape'));
+  const r2 = {};
+  await run(f, ["You should consolidate those accounts.\n\n[CAPTURE]{}"], {
+    result: r2, canClose: false,
+    retry: async () => ({ text: "Super accounts each charge their own fees.\n\nWhich funds are they?\n\n[CAPTURE]{}" }),
+  });
+  t('recommendation-is-handed-back', r2.absoluteFailures[0] === 'recommendation' && r2.retried === true);
+  const r3 = {};
+  await run(f, ["We're pretty much done, that's everything we need.\n\n[CAPTURE]{}"], {
+    result: r3, canClose: false,
+    retry: async () => ({ text: "There are a few areas still open.\n\nWhat's in the offset?\n\n[CAPTURE]{}" }),
+  });
+  t('wrapping-up-with-areas-open-is-handed-back', r3.absoluteFailures[0] === 'wrapping_up' && r3.retried === true);
+  const r3b = {};
+  await run(f, ["That's everything we need.\n\n[CAPTURE]{}"], { result: r3b, canClose: true, retry: async () => ({ text: 'x' }) });
+  t('wrapping-up-allowed-once-code-says-it-can-close', !r3b.absoluteFailures.length && !r3b.retried);
+  const r4 = {};
+  const empty = await run(f, ["[SWEEP: other_income]\n\n[CAPTURE]{}"], {
+    result: r4, sweepsAsked: ['other_income'],
+    retry: async () => ({ text: "What else comes in each month?\n\n[CAPTURE]{}" }),
+  });
+  t('an-empty-reply-is-handed-back-too', r4.retried === true && empty.visible.includes('What else comes in'));
+  const r5 = {};
+  await run(f, ["You're on track.\n\n[CAPTURE]{}"], {
+    result: r5, canClose: false,
+    retry: async () => ({ text: "You're on track and well placed.\n\n[CAPTURE]{}" }),
+  });
+  t('a-second-failure-falls-back-to-checked-copy', r5.retryFailed === true && !r5.visible.includes('on track'));
+  const clean = {};
+  await run(f, ["The loan sits at $412,000 against a home worth $845,000.\n\nWhat's in the offset?\n\n[CAPTURE]{}"], { result: clean, canClose: false, retry: async () => ({ text: 'should not be called' }) });
+  t('a-clean-reply-is-never-handed-back', !clean.retried && !clean.absoluteFailures.length);
 
-  const rc3 = await run(f, ["So the home loan is $412,000 at 6.09% variable, principal and interest, with an offset.\n\n[CAPTURE]{}"], { userCorpus: "412k, 6.09% variable, P&I, offset has 38k" });
-  t('loan-recap-with-expanded-terms-kept', rc3.txt.startsWith('So the home loan is $412,000'));
+  /* ── 6. the machine block always survives ── */
+  const cap = await run(f, ['Noted.\n\n[CAPTURE]{"domains":{"home":{"owns_home":true}}}'], {});
+  t('capture-block-passes-through', cap.txt.includes('"owns_home":true'));
+  t('capture-block-reaches-the-save-path', typeof cap.done === 'string' && cap.done.includes('[CAPTURE]'));
 
-  const rough = await run(f, ["What does it pay out to you beyond the wage? Your accountant's figures would have it, but a rough sense is fine if that's what you have handy.\n\n[CAPTURE]{}"], {});
-  t('guess-invitation-dropped', !/rough sense/.test(rough.txt) && rough.txt.includes('beyond the wage?'));
-
-  const colon = await run(f, ["Noted, that's one for the accountant.\n\nBefore we move on, just to make sure the picture is complete:\n\nIs there anything else coming in regularly?\n\n[CAPTURE]{}"], { sweepsAsked: ['other_income'] });
-  t('dangling-lead-in-removed', colon.txt.startsWith("Noted, that's one for the accountant.") && !colon.txt.includes('complete:'));
-
-  // Walk 8: the only line was an already-asked sweep, so the reply was empty.
-  const fb = {};
-  const empty = await run(f, ["[SWEEP: other_income]\n\n[CAPTURE]{}"], { sweepsAsked: ['other_income'], fallback: { kind: 'ask', id: 'loan_details', text: 'Next, the loan. What does the loan screen show?' }, result: fb });
-  t('empty-reply-gets-fallback-question', empty.txt.startsWith('Next, the loan.') && fb.fallbackAsk === 'loan_details');
-  const noq = await run(f, ["Thanks, noted.\n\nIs there anything else coming in regularly?\n\n[CAPTURE]{}"], { sweepsAsked: ['other_income'], fallback: { kind: 'plain', id: null, text: 'Next on the list is the car loan. What can you tell me about that?' } });
-  t('removed-question-gets-fallback', noq.txt.startsWith('Thanks, noted.\n\nNext on the list is the car loan'));
-  // Live walk 8b: "hang on, I'll open the app" got a question stapled to the wait.
-  const wait = await run(f, ["Take your time, I'll be right here.\n\n[CAPTURE]{}"], { fallback: { kind: 'plain', id: null, text: 'FALLBACK' } });
-  t('waiting-reply-left-alone', wait.txt.startsWith("Take your time") && !wait.txt.includes('FALLBACK'));
-  const hasq = await run(f, ["What does Jess earn?\n\n[CAPTURE]{}"], { fallback: { kind: 'plain', id: null, text: 'FALLBACK' } });
-  t('reply-with-question-no-fallback', !hasq.txt.includes('FALLBACK'));
-
-  const served = await run(f, ["[ASK: living_costs]\n\n[CAPTURE]{}"], { fallback: { kind: 'plain', id: null, text: 'FALLBACK' } });
-  t('code-ask-without-question-mark-no-fallback', !served.txt.includes('FALLBACK'));
-
-  // Walk 8: a first skip on one fund is still first after another fund's skip.
-  const seen = [];
-  const per = await run(f, ["Of course.\n\n[CAPTURE]{\"deferrals\":[\"super.funds[].has_insurance#hp1\"]}"], { isFirstDeferral: (fl, it) => { seen.push(fl + '#' + it); return it === 'hp1'; } });
-  t('first-deferral-checked-per-item', seen.includes('super.funds[].has_insurance#hp1') && per.txt.startsWith(NUDGES.first));
-
-  const composed = await run(f, ["In that case a payslip will have everything we need.\n\nHave your most recent one in front of you. Attach it here or read the figures to me.\n\nIs there anything else coming in regularly?\n\n[CAPTURE]{}"], { sweepsAsked: ['other_income'], fallback: { kind: 'plain', id: null, text: 'FALLBACK' } });
-  t('composed-ask-without-question-mark-no-fallback', !composed.txt.includes('FALLBACK') && composed.txt.includes('read the figures to me') && !composed.txt.includes('anything else coming in'));
-
-  const src = await run(f, ["And is that the payslip in front of you right now, or a figure you know from memory?\n\n[CAPTURE]{}"], { lastUser: "ok got the payslip. gross is 118k", fallback: { kind: 'plain', id: null, text: 'Next on the list is what lands in your partner\'s account. What can you tell me about that?' } });
-  t('source-question-already-answered-dropped', !src.txt.includes('from memory') && src.txt.startsWith('Next on the list'));
-  const src2 = await run(f, ["Is that from the statement or from memory?\n\n[CAPTURE]{}"], { lastUser: "it's 9 grand" });
-  t('source-question-kept-when-unsaid', src2.txt.startsWith('Is that from the statement'));
-
-  // Run 10: "round out the shape of the household ... own or rent?" was
-  // dropped whole and the reply stalled.
-  const shp = await run(f, ["Good. So you're both continuing as you are.\n\nOne more thing to round out the shape of the household before we get into figures: do you own the place you live in, or are you renting?\n\n[CAPTURE]{}"], { userCorpus: "staying as is", fallback: { kind: 'plain', id: null, text: 'FALLBACK' } });
-  t('plain-word-shape-kept', shp.txt.includes('do you own the place') && !shp.txt.includes('FALLBACK'));
-  const jq = await run(f, ["Good.\n\nA couple of quick shape questions: what does Jess do?\n\n[CAPTURE]{}"], { fallback: { kind: 'plain', id: null, text: 'Do you own the home you live in, or rent?' } });
-  t('jargon-question-dropped-gets-fallback', !/shape questions/.test(jq.txt) && jq.txt.includes('Good.\n\nDo you own the home you live in, or rent?'));
-
-  // Run 10: the model nudged the same skip twice in a row.
-  const rn = await run(f, ["Noted. What about Jess's super, do you know which fund she's with?\n\n[NUDGE: first]\n\n[CAPTURE]{\"deferrals\":[\"super.funds[].balance#r1\"]}"], { prevAssistant: NUDGES.first, isFirstDeferral: () => false });
-  t('repeat-first-nudge-becomes-accept', rn.txt.includes(NUDGES.accept) && !rn.txt.includes(NUDGES.first) && rn.txt.includes("which fund she's with?"));
-  const rn2 = await run(f, ["[NUDGE: first]\n\n[CAPTURE]{}"], { prevAssistant: "What's the balance?", isFirstDeferral: () => true });
-  t('genuine-first-nudge-kept', rn2.txt.startsWith(NUDGES.first));
-
-  const gh = await run(f, ["Good to have those in place. Do you each have an enduring power of attorney?\n\n[CAPTURE]{}"], {});
-  t('good-to-have-in-place-dropped', gh.txt.startsWith('Do you each have an enduring power of attorney?'));
-
-  const gq = await run(f, ["That's fine. Do you have a rough sense of what the company made last year?\n\n[CAPTURE]{}"], { fallback: { kind: 'plain', id: null, text: 'Next on the list is the kids. What can you tell me about that?' } });
-  t('guess-question-dropped', !/rough sense/.test(gq.txt) && gq.txt.includes('Next on the list'));
-
-  // Run 10: Jess's Hostplus insurance was asked a third time after two skips.
-  const closed = await run(f, ["Thanks for checking.\n\nAnd while you're in myGov, Jess's Hostplus, does it have insurance inside it?\n\n[CAPTURE]{}"], { closedAsks: [['insurance', 'hostplus']], fallback: { kind: 'plain', id: null, text: 'Next on the list is what the company earns. What can you tell me about that?' } });
-  t('third-ask-after-two-nudges-dropped', !/insurance inside it/.test(closed.txt) && closed.txt.includes('Next on the list'));
-  const open2 = await run(f, ["And your AustralianSuper, does it have insurance inside it?\n\n[CAPTURE]{}"], { closedAsks: [['insurance', 'hostplus']] });
-  t('other-item-question-kept', open2.txt.includes('AustralianSuper'));
-
-  return { pass: failures.length === 0, total: 48, failures };
+  return { pass: failures.length === 0, total: 20, failures };
 }
