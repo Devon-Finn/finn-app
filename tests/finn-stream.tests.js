@@ -123,10 +123,25 @@ export async function runStreamTests(chat, tokens) {
   await run(f, ["Open the loan screen and read me the balance, the rate and the repayment.\n\n[CAPTURE]{}"], { result: fetchOk, retry: async () => ({ text: 'should not be called' }) });
   t('an-instruction-to-fetch-is-not-a-stall', !fetchOk.retried);
 
-  /* ── 7. the machine block always survives ── */
+  /* ── 7. walk 2, 24 Sept ── */
+  const attrib = {};
+  const badAttrib = await run(f, ["You mentioned other cash beyond the offset.\n\nHow much could you reach quickly?\n\n[CAPTURE]{}"], {
+    result: attrib, saidIt: () => false,
+    retry: async (why) => { attrib.why = why; return { text: "What could you reach quickly if income stopped?\n\n[CAPTURE]{}" }; },
+  });
+  t('a-claim-they-never-made-is-handed-back', attrib.absoluteFailures.includes('unsupported_attribution') && /never said/i.test(attrib.why) && badAttrib.visible.includes('reach quickly'));
+  const okAttrib = {};
+  await run(f, ["You mentioned the offset holds $38,000.\n\nIs it against the main loan?\n\n[CAPTURE]{}"], { result: okAttrib, saidIt: () => true, retry: async () => ({ text: 'should not be called' }) });
+  t('a-claim-they-did-make-stands', !okAttrib.retried && !okAttrib.absoluteFailures.length);
+  const secondNudge = await run(f, ["Noted.\n\n[NUDGE: first]\n\n[CAPTURE]{}"], { alreadyNudged: true });
+  t('a-nudge-one-turn-after-a-nudge-becomes-the-acceptance', secondNudge.visible.includes(NUDGES.accept) && !secondNudge.visible.includes(NUDGES.first));
+  const firstNudge = await run(f, ["Noted.\n\n[NUDGE: first]\n\n[CAPTURE]{}"], { alreadyNudged: false });
+  t('the-first-nudge-still-goes-out', firstNudge.visible.includes(NUDGES.first));
+
+  /* ── 8. the machine block always survives ── */
   const cap = await run(f, ['Noted.\n\n[CAPTURE]{"domains":{"home":{"owns_home":true}}}'], {});
   t('capture-block-passes-through', cap.txt.includes('"owns_home":true'));
   t('capture-block-reaches-the-save-path', typeof cap.done === 'string' && cap.done.includes('[CAPTURE]'));
 
-  return { pass: failures.length === 0, total: 25, failures };
+  return { pass: failures.length === 0, total: 29, failures };
 }

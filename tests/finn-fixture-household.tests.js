@@ -13,8 +13,11 @@
    Every asserted figure below is HAND-COMPUTED and written literally,
    never generated from the code under test:
 
-     home_equity          950000 − 540000                    = 410000
-     lvr_percent          540000 ÷ 950000 × 100              = 56.8
+     home_equity          950000 − 540000 − 90000 split
+                          (Devon, walk persona: lending
+                          secured on the home is deducted
+                          however it was recorded)           = 320000
+     lvr_percent          (540000+90000) ÷ 950000 × 100      = 66.3
      surplus_monthly      (7100+5400) − 5200 − 3300
                           − (550+0 personal minimums; the
                           card cleared monthly adds nothing) = 3450
@@ -282,8 +285,8 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
 
   /* ── the hand-computed figures ── */
   const der = derive(D);
-  t('home-equity-410000', der.home_equity === 410000);
-  t('lvr-56.8', der.lvr_percent === 56.8);
+  t('home-equity-320000', der.home_equity === 320000);
+  t('lvr-66.3', der.lvr_percent === 66.3);
   // 16 Sept 2026 tile review: the card cleared monthly no longer adds its
   // $48 minimum (its spending is already in living costs).
   t('surplus-3450', der.surplus_monthly === 3450);
@@ -594,7 +597,7 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
     total: 130,
     failures,
     hand_computed: {
-      home_equity: 410000, lvr_percent: 56.8, surplus_monthly: 3450, buffer_months: 2.7,
+      home_equity: 320000, lvr_percent: 66.3, surplus_monthly: 3450, buffer_months: 2.7,
       super_total: 373000, income_total_annual: 270200, income_costs_annual: 18000,
       property_equity_commercial: 300000, property_equity_holiday: 310000,
       debts_total_personal: 107400, debts_total_company: 380000,

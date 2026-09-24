@@ -970,7 +970,19 @@ export function applyCaptureCore({ picture, capture, sessionId, servedFields, sw
   const capGoals = capture.goals ?? {};
   const goals = deepMerge(priorGoals, capGoals);
   if (Array.isArray(priorGoals.directions) || Array.isArray(capGoals.directions)) {
-    goals.directions = [...new Set([...(Array.isArray(priorGoals.directions) ? priorGoals.directions : []), ...(Array.isArray(capGoals.directions) ? capGoals.directions : [])])];
+    // Walk 2, 24 Sept: "work-optional-at-60" and "work-optional-by-60" both
+    // landed, and "kids-supported" beside "kids-support-uni-or-first-home".
+    // Directions that share their leading words are the same direction.
+    const stem = d => String(d).toLowerCase().replace(/[^a-z0-9]+/g, "-").split("-").filter(w => !["at", "by", "the", "a", "to", "or", "of", "and"].includes(w));
+    const merged = [];
+    for (const d of [...(Array.isArray(priorGoals.directions) ? priorGoals.directions : []), ...(Array.isArray(capGoals.directions) ? capGoals.directions : [])]) {
+      if (typeof d !== "string" || !d.trim()) continue;
+      const w = stem(d);
+      const dupe = merged.find(m => { const mw = stem(m); const n = Math.min(mw.length, w.length); return n >= 2 && mw.slice(0, n).join("-") === w.slice(0, n).join("-"); });
+      if (!dupe) merged.push(d);
+      else if (String(d).length > String(dupe).length) merged[merged.indexOf(dupe)] = d;
+    }
+    goals.directions = merged;
   }
   if (typeof priorGoals.notes === "string" && priorGoals.notes && typeof capGoals.notes === "string" && capGoals.notes) {
     const norm = t => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();

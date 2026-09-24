@@ -413,6 +413,16 @@ const ABSOLUTE = [
     why: "You told them what to do. Finn explains how something works and names the kind of professional; it never prescribes an action or a product.",
   },
   {
+    id: "unsupported_attribution",
+    test: /\b(you (?:mentioned|said|told me)|as you said)\b/i,
+    when: ctx => typeof ctx.saidIt === "function",
+    extra: (text, ctx) => {
+      const claims = text.split(/(?<=[.!?])\s+/).filter(sn => /\b(you (?:mentioned|said|told me)|as you said)\b/i.test(sn));
+      return claims.some(sn => !ctx.saidIt(sn));
+    },
+    why: "You told the person they had said something they never said. Only repeat their own words back, and only when you are sure of them.",
+  },
+  {
     id: "wrapping_up",
     test: /\b(wrapping up|wrap (?:things )?up|that's everything we need|we're (?:all )?done|we're finished|you now have the complete picture)\b/i,
     when: ctx => ctx.canClose === false,
@@ -424,7 +434,9 @@ function absoluteFailures(text, ctx) {
   const out = [];
   for (const rule of ABSOLUTE) {
     if (rule.when && !rule.when(ctx)) continue;
-    if (rule.test.test(text)) out.push(rule);
+    if (!rule.test.test(text)) continue;
+    if (rule.extra && !rule.extra(text, ctx)) continue;
+    out.push(rule);
   }
   return out;
 }
@@ -443,7 +455,12 @@ function emDashScrubStream(onDone, ctx = {}) {
   let duplicateAsks = 0;
 
   function sub(s) {
-    const r = substituteTokens(s, { closeList: ctx.closeList, canClose: ctx.canClose, sweepsAsked: ctx.sweepsAsked });
+    // Code decides which of ITS OWN lines to serve: a first nudge one turn
+    // after a first nudge becomes the acceptance (walk 2, 24 Sept: the
+    // person said "note it" and got the whole nudge again).
+    let text = s;
+    if (ctx.alreadyNudged) text = text.replace(/\[NUDGE:\s*first\s*\]/g, "[NUDGE: accept]");
+    const r = substituteTokens(text, { closeList: ctx.closeList, canClose: ctx.canClose, sweepsAsked: ctx.sweepsAsked });
     for (const id of r.unknown) {
       console.error(`[Finn clarity] TOKEN FAULT — trigger token "${id}" emitted nothing`);
     }
@@ -1137,6 +1154,25 @@ export default async function handler(request, context) {
     canClose: plan.can_close,
     sweepsAsked: plan.sweeps_asked || [],
     result: streamResult,
+    // Their own words this session, for the "you said" check, and whether
+    // the last reply was already the nudge.
+    saidIt: (sentence) => {
+      const said = messages.filter(m => m && m.role === "user").map(m => typeof m.content === "string" ? m.content
+        : Array.isArray(m.content) ? m.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : "")
+        .join(" ").toLowerCase();
+      const words = String(sentence).toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/)
+        .filter(w => w.length > 4 && !["mentioned", "ould", "there", "where", "about", "which", "their", "those", "these"].includes(w));
+      if (!words.length) return true;
+      const hits = words.filter(w => said.includes(w)).length;
+      return hits / words.length >= 0.5;
+    },
+    alreadyNudged: (() => {
+      const a = messages.filter(m => m && m.role === "assistant");
+      const last = a[a.length - 1];
+      const text = !last ? "" : typeof last.content === "string" ? last.content
+        : Array.isArray(last.content) ? last.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : "";
+      return text.includes(NUDGES.first.slice(0, 60));
+    })(),
     onFirstReply: (t) => { firstReply = t; },
     retry: retryOnce,
   }));

@@ -37,8 +37,13 @@
     // home_equity = home.value_estimate − everything secured on the home:
     // the home loan plus any debts item linked to it
     // (secured_against_asset_id "home", e.g. a split used for shares).
+    // Walk 2, 24 Sept: the split came back with security 'property_home'
+    // and parent_loan_id 'home' but no secured_against_asset_id, so $60,000
+    // of lending against the house went uncounted and equity read $60,000
+    // high. Any of the three markers counts.
     const homeSecured = (Array.isArray(debts.items) ? debts.items : [])
-      .filter(it => it && it.secured_against_asset_id === 'home' && num(it.balance) !== null)
+      .filter(it => it && num(it.balance) !== null
+        && (it.secured_against_asset_id === 'home' || it.security === 'property_home' || it.parent_loan_id === 'home'))
       .reduce((a, it) => a + it.balance, 0);
     const home_equity = (num(home.value_estimate) !== null && num(home.mortgage_balance) !== null)
       ? home.value_estimate - home.mortgage_balance - homeSecured : null;

@@ -384,5 +384,13 @@ export function runPlanTests({ plan, pipeline, tokens }) {
   ] } }, goals: {}, completed_domains: [], refusals: [] }, { domains: { context: { adults: 2 } } });
   t('stored-duplicate-covers-collapse', dupes.domains.protection.covers.length === 1 && dupes.domains.protection.covers[0].inside_super === true);
 
-  return { pass: failures.length === 0, total: 99, failures };
+  // Walk 2, 24 Sept: "work-optional-at-60" and "work-optional-by-60" both
+  // landed, and "kids-supported" beside "kids-support-uni-or-first-home".
+  let G = { domains: {}, goals: { directions: ['work-optional-at-60', 'kids-protected'] }, completed_domains: [], refusals: [] };
+  const gr = pipeline.applyCaptureCore({ picture: G, capture: { goals: { directions: ['work-optional-by-60', 'kids-support-uni-or-first-home', 'kids-protected'] } }, sessionId: 's', servedFields: new Set() });
+  t('near-duplicate-directions-collapse', gr.goals.directions.length === 3
+    && gr.goals.directions.filter(d => d.startsWith('work-optional')).length === 1
+    && gr.goals.directions.includes('kids-protected'));
+
+  return { pass: failures.length === 0, total: 100, failures };
 }
