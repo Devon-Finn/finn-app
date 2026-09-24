@@ -88,7 +88,7 @@ export async function runStreamTests(chat, tokens) {
   });
   t('wrapping-up-with-areas-open-is-handed-back', r3.absoluteFailures[0] === 'wrapping_up' && r3.retried === true);
   const r3b = {};
-  await run(f, ["That's everything we need.\n\n[CAPTURE]{}"], { result: r3b, canClose: true, retry: async () => ({ text: 'x' }) });
+  await run(f, ["That's everything we need. What else is on your mind?\n\n[CAPTURE]{}"], { result: r3b, canClose: true, retry: async () => ({ text: 'x' }) });
   t('wrapping-up-allowed-once-code-says-it-can-close', !r3b.absoluteFailures.length && !r3b.retried);
   const r4 = {};
   const empty = await run(f, ["[SWEEP: other_income]\n\n[CAPTURE]{}"], {
@@ -106,10 +106,27 @@ export async function runStreamTests(chat, tokens) {
   await run(f, ["The loan sits at $412,000 against a home worth $845,000.\n\nWhat's in the offset?\n\n[CAPTURE]{}"], { result: clean, canClose: false, retry: async () => ({ text: 'should not be called' }) });
   t('a-clean-reply-is-never-handed-back', !clean.retried && !clean.absoluteFailures.length);
 
-  /* ── 6. the machine block always survives ── */
+  /* ── 6. a turn that stalls, and a question asked twice (walk 1, 24 Sept) ── */
+  const dup = await run(f, ["Now, beyond the home loan, are there any other debts in the picture?\n\n[SWEEP: other_debts]\n\n[CAPTURE]{}"], {});
+  t('the-models-own-version-of-a-served-ask-goes', !dup.visible.includes('beyond the home loan') && dup.visible === SWEEPS.other_debts.text);
+  const dupKeep = await run(f, ["An offset sits against the loan and cuts the interest charged.\n\nSo what else is there?\n\n[SWEEP: other_assets]\n\n[CAPTURE]{}"], {});
+  t('its-explanation-stays', dupKeep.visible.startsWith('An offset sits against the loan') && !dupKeep.visible.includes('So what else is there?'));
+  const st = {};
+  const stall = await run(f, ["A few things I'll want to come back to on the warehouse: what it's worth, and whether the company has a loan on it. We'll get to that.\n\n[CAPTURE]{}"], {
+    result: st, retry: async (why) => { st.why = why; return { text: "Does the company have a loan against the warehouse?\n\n[CAPTURE]{}" }; },
+  });
+  t('a-turn-with-nothing-to-answer-is-handed-back', st.retried === true && /nothing to answer/i.test(st.why) && stall.visible.includes('loan against the warehouse'));
+  const waitOk = {};
+  await run(f, ["Take your time, I'll be here.\n\n[CAPTURE]{}"], { result: waitOk, retry: async () => ({ text: 'should not be called' }) });
+  t('waiting-on-them-is-not-a-stall', !waitOk.retried);
+  const fetchOk = {};
+  await run(f, ["Open the loan screen and read me the balance, the rate and the repayment.\n\n[CAPTURE]{}"], { result: fetchOk, retry: async () => ({ text: 'should not be called' }) });
+  t('an-instruction-to-fetch-is-not-a-stall', !fetchOk.retried);
+
+  /* ── 7. the machine block always survives ── */
   const cap = await run(f, ['Noted.\n\n[CAPTURE]{"domains":{"home":{"owns_home":true}}}'], {});
   t('capture-block-passes-through', cap.txt.includes('"owns_home":true'));
   t('capture-block-reaches-the-save-path', typeof cap.done === 'string' && cap.done.includes('[CAPTURE]'));
 
-  return { pass: failures.length === 0, total: 20, failures };
+  return { pass: failures.length === 0, total: 25, failures };
 }

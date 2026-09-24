@@ -139,7 +139,7 @@ Extract from that answer whatever it yields: how many adults, children and their
 3. RE-RAISE. Items the person put off come back at natural points, especially when they're already on the right screen. The notes show each item's nudge count.
 4. THE CLOSE. Only when the notes say closing is available: emit [FRAME: close] (code appends the open items and where each lives), add one warm line and what happens next, and set session_complete. Never call the picture complete, never say "well done" or "you're well set up", never say goodbye, and never ask "anything else before we wrap up" while the notes show missing items. If the person says "that's everything" early, tell them plainly a few things are still to cover, and carry on with the NEXT MOVE.
 6. ONE THING AT A TIME, AND NEVER ASSUME (Devon, live walk 17 Sept 2026). Each reply asks about ONE thing: one person or one item. Several details of that same item belong in one question ("what's the balance, rate and minimum on the card?"), which is better than dribbling them out one by one. Never bundle a second person or a second item onto it ("and is Jess...?"); ask that on the next turn. Before any question, check the picture: anything already there is answered and is never asked again. If the person answers only part of what you asked, the rest is still open: ask it next, before moving on. Never fill a gap with what seems likely (a teacher is not automatically a PAYE employee; owning a home doesn't mean there's a mortgage; being married doesn't mean joint names), and never restate something as settled that the person didn't say. Your recap reflects only their words.
-7. HOW A TURN READS (these used to be enforced by code editing your replies; they are yours now, and the person notices every one of them). One question per reply, at the end of it, so they always know what to answer. Answer what they ask you before you ask anything. Say nothing about sweeps, phases, working notes, trips, the ledger or confidence: those are internal words. No softeners on a figure that has a document behind it ("roughly", "a rough sense", "ballpark", "best guess"), and never invite a guess when a screen has the answer. Never ask where a figure came from when they've just told you. Don't fill space: no "that's helpful to know", no "great question". Never repeat a question they have answered, in any wording, and never re-ask something the notes mark CLOSED. When the working notes list a sweep as not yet asked, ask it with its token, never in your own words.
+7. HOW A TURN READS (these used to be enforced by code editing your replies; they are yours now, and the person notices every one of them). One question per reply, at the end of it, so they always know what to answer. Answer what they ask you before you ask anything. Say nothing about sweeps, phases, working notes, trips, the ledger or confidence: those are internal words. No softeners on a figure that has a document behind it ("roughly", "a rough sense", "ballpark", "best guess"), and never invite a guess when a screen has the answer. Never ask where a figure came from when they've just told you. Don't fill space: no "that's helpful to know", no "great question". Never repeat a question they have answered, in any wording, and never re-ask something the notes mark CLOSED. When the working notes list a sweep as not yet asked, ask it with its token, never in your own words, and do not write your own version of that question alongside the token: the token becomes the full question and the person reads it once. Never end a turn without either a question or a plain instruction to fetch something.
 
 5. THE GUARDRAIL. What you ask about is driven by the SHAPE of the household (what exists, how many, what's still unanswered), never by the SIZE of a figure. Never probe harder, or choose a topic, because a number looks large, small, good or bad. That would be an opinion about their circumstances.
 
@@ -440,6 +440,7 @@ function emDashScrubStream(onDone, ctx = {}) {
   let substitutions = 0;
   let asksServed = 0;
   let closeRefused = false;
+  let duplicateAsks = 0;
 
   function sub(s) {
     const r = substituteTokens(s, { closeList: ctx.closeList, canClose: ctx.canClose, sweepsAsked: ctx.sweepsAsked });
@@ -454,8 +455,23 @@ function emDashScrubStream(onDone, ctx = {}) {
   // The close frame with areas open is the one cut that stays: nothing of
   // value follows an attempt to finish early, and code says plainly that
   // the session carries on.
+  // The model sometimes writes its own version of a question AND emits the
+  // token for it, so the person reads the same ask twice (walk 1 on the new
+  // build, twice in six turns). The duplicate is a QUESTION, which code may
+  // take away; its prose stays.
+  function dropDuplicateAsk(text) {
+    const paras = text.split(/\n{2,}/).map(x => x.trim()).filter(Boolean);
+    const tokenIx = paras.findIndex(x => /\[(ASK|SWEEP):\s*[a-z_]+\s*\]/.test(x));
+    if (tokenIx === -1) return text;
+    const kept = paras.filter((x, i) => {
+      if (i === tokenIx || !/\?/.test(x)) return true;
+      duplicateAsks++;
+      return false;
+    });
+    return kept.join("\n\n");
+  }
   function compose(raw) {
-    let text = raw;
+    let text = dropDuplicateAsk(raw);
     if (ctx.canClose === false && /\[FRAME:\s*close\s*\]/.test(text)) {
       closeRefused = true;
       text = text.split(/\[FRAME:\s*close\s*\]/)[0].trimEnd() + "\n\n[FRAME: not_yet]";
@@ -510,12 +526,19 @@ function emDashScrubStream(onDone, ctx = {}) {
       let visible = compose(visibleRaw);
       if (typeof ctx.onFirstReply === "function") ctx.onFirstReply(seenText);
       let failures = absoluteFailures(visible, ctx);
-      // Hand it back once, naming what it broke. An empty reply is a broken
-      // turn, not a judgement call, so it goes back too.
-      if ((failures.length || !visible) && typeof ctx.retry === "function") {
+      // A turn that leaves the person with nothing to answer is broken, the
+      // same as an empty one: it stalls the session (walk 1 on the new
+      // build). Code cannot invent the question, so the turn goes back to
+      // the model. A reply that is waiting on them, or that asks them to
+      // fetch something, is not a stall.
+      const WAITING = /\b(attach|upload|open (?:your|the|it)|read (?:me|them|it|the|those)|tell me|let me know|send (?:me|it|them|those)|in front of you|take your time|when you're ready|no rush|i'll (?:be|wait)|whenever you)\b/i;
+      const noAsk = !!visible && !/\?/.test(visible) && !WAITING.test(visible);
+      if ((failures.length || !visible || noAsk) && typeof ctx.retry === "function") {
         const why = failures.length
           ? failures.map(f => f.why).join(" ")
-          : "Your last reply had nothing in it for the person to read.";
+          : !visible
+            ? "Your last reply had nothing in it for the person to read."
+            : "Your last reply left the person with nothing to answer. End the turn with the one question you want next, or tell them plainly what to fetch.";
         console.error("[Finn clarity] absolute rule tripped (" + (failures.map(f => f.id).join(", ") || "empty") + "); handing the reply back");
         try {
           const second = await ctx.retry(why);
@@ -524,6 +547,9 @@ function emDashScrubStream(onDone, ctx = {}) {
             const retryVisible = compose(mi === -1 ? second.text : second.text.slice(0, mi));
             const retryMachine = mi === -1 ? "" : second.text.slice(mi);
             const stillFailing = absoluteFailures(retryVisible, ctx);
+            if (!stillFailing.length && retryVisible && !/\?/.test(retryVisible) && !WAITING.test(retryVisible)) {
+              console.error("[Finn clarity] retry still had nothing to answer");
+            }
             if (retryVisible && !stillFailing.length) {
               visible = retryVisible;
               if (retryMachine) machineBuf = retryMachine;
@@ -548,6 +574,8 @@ function emDashScrubStream(onDone, ctx = {}) {
       }
       if (visible) controller.enqueue(encoder.encode(deltaLine(visible)));
       if (machineBuf) controller.enqueue(encoder.encode(deltaLine("\n\n" + machineBuf)));
+      if (duplicateAsks > 0) console.log(`[Finn clarity] duplicate question(s) alongside code-authored copy removed: ${duplicateAsks}`);
+      if (ctx.result) ctx.result.duplicateAsks = duplicateAsks;
       if (substitutions > 0) console.log(`[Finn clarity] em-dash substitutions: ${substitutions}`);
       if (asksServed > 0) console.log(`[Finn clarity] code-authored copy served: ${asksServed}`);
       if (typeof onDone === "function") {
