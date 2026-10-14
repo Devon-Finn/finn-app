@@ -30,6 +30,15 @@ async function run(streamFactory, chunks, ctx) {
   return { txt, visible: txt.split("[CAPTURE]")[0].trim(), done };
 }
 
+// The [CAPTURE] block as data: these checks assert on the figures, never
+// on wording, so they survive a copy change.
+function captureOf(raw) {
+  const s = String(raw || "");
+  const i = s.indexOf("[CAPTURE]");
+  if (i === -1) return null;
+  try { return JSON.parse(s.slice(i + "[CAPTURE]".length).trim()); } catch { return null; }
+}
+
 export async function runStreamTests(chat, tokens) {
   const failures = [];
   const t = (name, cond) => { if (!cond) failures.push(name); };
@@ -143,5 +152,21 @@ export async function runStreamTests(chat, tokens) {
   t('capture-block-passes-through', cap.txt.includes('"owns_home":true'));
   t('capture-block-reaches-the-save-path', typeof cap.done === 'string' && cap.done.includes('[CAPTURE]'));
 
-  return { pass: failures.length === 0, total: 29, failures };
+  /* ── 9. a retried turn's capture is the RETRY's (15 Oct) ──
+     The write-ahead runs after the retry is accepted, so both the save
+     path and the served stream must read the second reply's block. The
+     figures are asserted, not words in the prose, so this still means
+     something when the copy changes. */
+  const rc = {};
+  const retryCap = await run(f, ['You’re in good shape here.\n\nWhat’s the balance?\n\n[CAPTURE]{"domains":{"buffer":{"accessible_savings":1000}}}'], {
+    result: rc, canClose: false,
+    retry: async () => ({ text: 'The offset holds $38,000 against the loan.\n\nWhat’s the balance on the card?\n\n[CAPTURE]{"domains":{"buffer":{"accessible_savings":38000}}}' }),
+  });
+  const savedCap = captureOf(retryCap.done);
+  const servedCap = captureOf(retryCap.txt);
+  t('a-retried-turn-saves-the-retrys-capture', rc.retried === true
+    && savedCap?.domains?.buffer?.accessible_savings === 38000
+    && servedCap?.domains?.buffer?.accessible_savings === 38000);
+
+  return { pass: failures.length === 0, total: 30, failures };
 }
