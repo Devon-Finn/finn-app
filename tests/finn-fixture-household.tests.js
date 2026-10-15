@@ -615,6 +615,22 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
     const kids = panels.contextHeader({ context: { adults: 2, owner_age: 42, partner_age: 40, children: [{ age: 9 }, { age: 6 }] } }, { library });
     t('context-header-lists-children-by-age', /Two children, 9 and 6\./.test(kids));
     const horizon = panels.contextHeader({ context: { owner_age: 51, horizon_years: 10 } }, { ownerName: 'Dana', library });
+    // The partner's name IS a picture field, so it fills that slot (15 Oct:
+    // the header said "your partner" while the picture held "Jess").
+    const named = panels.contextHeader({ context: { adults: 2, owner_age: 42, partner_name: 'Jess', partner_age: 40 } }, { ownerName: 'Sam', library });
+    t('context-header-uses-the-partner-name-from-the-picture', /Jess, 40/.test(named) && !/your partner/i.test(named));
+    const unnamed = panels.contextHeader({ context: { adults: 2, owner_age: 42, partner_age: 40 } }, { ownerName: 'Sam', library });
+    t('context-header-falls-back-to-your-partner', /your partner, 40/.test(unnamed));
+    t('context-header-prefers-the-picture-over-an-opts-name',
+      /Jess/.test(panels.contextHeader({ context: { adults: 2, partner_name: 'Jess' } }, { ownerName: 'Sam', partnerName: 'Robin', library })));
+    // A household label is not a person, whatever field it arrives in.
+    for (const label of ['test-household-c', 'The Soutars', 'Soutar Family Trust', 'Harbour Lane Pty Ltd']) {
+      const bad = panels.contextHeader({ context: { owner_age: 42 } }, { ownerName: label, library });
+      t('context-header-never-puts-a-household-label-in-a-person-slot: ' + label,
+        !bad.includes(label) && !bad.includes(String(label).split(/\s+/)[0]) && /You, 42/.test(bad));
+    }
+    t('context-header-still-accepts-a-real-first-name',
+      /Devon, 42/.test(panels.contextHeader({ context: { owner_age: 42 } }, { ownerName: 'Devon Soutar', library })));
     t('context-header-carries-the-horizon', /Dana, 51\./.test(horizon) && /next 10 years/.test(horizon));
   }
 
@@ -653,7 +669,7 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
 
   return {
     pass: failures.length === 0,
-    total: 147,
+    total: 155,
     failures,
     hand_computed: {
       home_equity: 320000, lvr_percent: 66.3, surplus_monthly: 3450, buffer_months: 2.7,

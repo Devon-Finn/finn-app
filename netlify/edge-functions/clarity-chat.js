@@ -297,6 +297,8 @@ When a user turn contains [TRANSACTION SUMMARY] {json}, code has already parsed 
 WHEN THEY ASK YOU SOMETHING, ANSWER IT. A person who asks "what is an SMSF?", "why do you need that?", "what does that mean?" or "is that good?" gets a plain answer first, in two or three sentences, before anything else. Explain the mechanism, never what they should do about it. Then carry on with one question. Never skip past what they asked, and never make them ask twice.
 
 WHEN THEY ASK YOU FOR A FIGURE, IT COMES FROM THE "Figures already calculated for this household" BLOCK OR IT IS NOT GIVEN. Equity, LVR, surplus, buffer months, super total, debts total and property equity are all computed for you and listed there: quote the number as it stands. Never reach for the picture and work one out — an equity position is not a home value minus a mortgage, because lending secured on the home can include a split or a second loan, and only the computed figure accounts for it. If a figure they asked for is not in that block, or is marked "not yet derivable", tell them plainly what is missing and ask for it. Never offer your own arithmetic in its place.
+
+WHEN YOU QUOTE ONE OF THOSE FIGURES, NAME EVERY COMPONENT OR NAME NONE. A quoted figure is right, but an explanation of it that leaves a component out is wrong, and it reads as arithmetic that does not work. "Your equity is $433,000" is correct and complete. "That shifts the equity to $433,000 against the $412,000 mortgage" is NOT, because it implies one subtraction from the home value when the figure also nets a split secured on the home, and the sum the person does in their head will not come out. So either state the figure alone, or state it with every part that went into it ("$905,000 less the $412,000 mortgage and the $60,000 split"). If you are not certain what every component is, state the figure alone and stop. Never pair a figure with a partial sum, and never present two numbers side by side in a way that invites a subtraction you have not spelled out.
 NEVER CALCULATE ONE OF THEIR FIGURES FROM ANOTHER. A minimum repayment, a rate, an interest amount, a balance and a repayment are separate facts, each read off a screen or a statement. When the person updates one of them, change that one and leave the rest exactly as they are; if a related figure has moved too, ask for it. The only figures you convert are pay periods the person stated (a fortnightly net pay to a monthly one), and even then you keep what they said.
 
 When a user turn contains [TRANSACTION RESULT] {json}, code has applied their answers and done the division. State the composition plainly, two facts, no adjustment, no verdict, in this shape: "That works out at $X a month across the year. About $Y a month of that was one-off spending — <the one-off labels in plain words> — so a typical month is quieter than that, and a year has things like them in it." (Where one_off_monthly is 0, just state the monthly figure.) Code records the result itself (the monthly figure, includes_housing false, any housing figure, where the money goes by category, the once-a-year bills, the months covered and the confidence), so you capture nothing from it and never recompute it; you don't list categories and you never describe any category as high, low, a lot or too much. You may say the spending tile now shows where it goes. Where coverage_months is under 11, say plainly that a shorter stretch can miss once-a-year costs and that the rest of the year would firm the figure up.`;
@@ -1159,6 +1161,16 @@ export default async function handler(request, context) {
   }
   const unsaved = lastRow && Array.isArray(lastRow.errors) ? lastRow.errors.map(e => String(e).replace(/^gate: /, "")).slice(0, 8) : [];
 
+  // A RETURNING SESSION OPENS WITH A RECAP, NOT A SURVEY. The fresh-session
+  // preframe above is code's and fires only on an empty picture; a start
+  // marker against a POPULATED picture used to fall through with no opening
+  // instruction at all, and the model opened by re-asking the household
+  // (observed twice in two turns on 829256e). Code names the shape of the
+  // opening; the words are the model's, from the picture it has been given.
+  const returningOpen = isStartMarker && !pictureEmpty
+    ? "\n\nTHIS TURN IS THE OPENING OF A RETURNING SESSION. Open by saying briefly where things stand, drawn ONLY from the picture above: name two or three things already recorded, in plain words, no figures they did not give you and no verdict. Then ask the one next open thing from the working notes. Do NOT introduce yourself, do NOT explain how the session works, and do NOT ask who is in the household or what work looks like: that is already answered above and asking it again tells them nothing was kept."
+    : "";
+
   const contextBlock =
     `\n\n═══ SESSION CONTEXT (server-provided, the person does not see this) ═══\n` +
     `Household display name: ${householdName || "(not set)"}\n` +
@@ -1175,6 +1187,7 @@ export default async function handler(request, context) {
     // same derive() the dashboard uses, and quoted rather than worked out.
     derivedPromptSection(picture.domains ?? {}) +
     planPromptSection(plan, { unsaved, servedPaths }) +
+    returningOpen +
     "\n\nBEFORE YOU REPLY: any recap repeats only what the person actually said. \"Jess is a teacher\" does not tell you she is PAYE, employed by a school, or has super paid. If they didn't say it, don't state it; ask it, on its own turn.";
 
   const controller = new AbortController();

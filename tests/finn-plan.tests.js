@@ -392,5 +392,30 @@ export function runPlanTests({ plan, pipeline, tokens }) {
     && gr.goals.directions.filter(d => d.startsWith('work-optional')).length === 1
     && gr.goals.directions.includes('kids-protected'));
 
-  return { pass: failures.length === 0, total: 100, failures };
+
+  /* ── context completeness decides the opening (walk on 829256e) ──
+     With a populated context the phase line still said "map the household",
+     and the model re-asked who was in the household twice in two turns with
+     the answer on screen above the chat. context_mapped is the one named
+     test: the four non-sweep shape basics, nothing to do with sweeps. */
+  const mappedDomains = {
+    context: { adults: 2, owner_age: 42, partner_age: 40, partner_name: 'Jess', children: [{ id: 'k1', age: 9 }], _confidence: 'stated' },
+    income: { structure: 'paye', _confidence: 'stated' },
+    home: { owns_home: true, _confidence: 'stated' },
+  };
+  const mapped = plan.buildPlan(mappedDomains, {});
+  t('context-mapped-true-once-the-four-basics-are-answered', mapped.context_mapped === true);
+  t('a-pending-sweep-does-not-make-the-context-incomplete',
+    mapped.context_mapped === true && mapped.sweeps_pending.length > 0);
+  const mappedText = plan.planPromptSection(mapped, {});
+  t('a-mapped-household-is-told-not-to-re-ask-it', /ALREADY MAPPED/.test(mappedText) && !/map the household before gathering/.test(mappedText));
+  t('a-mapped-household-is-told-not-to-open-on-the-household', /do not open with a question about the household/i.test(mappedText));
+
+  const bare = plan.buildPlan({}, {});
+  t('context-mapped-false-on-an-empty-picture', bare.context_mapped === false);
+  t('an-unmapped-household-is-still-told-to-map-it', /map the household before gathering/.test(plan.planPromptSection(bare, {})));
+  const partial = plan.buildPlan({ context: { adults: 2, children: [], owner_age: 42, _confidence: 'stated' } }, {});
+  t('context-mapped-false-while-a-basic-is-open', partial.context_mapped === false);
+
+  return { pass: failures.length === 0, total: 107, failures };
 }

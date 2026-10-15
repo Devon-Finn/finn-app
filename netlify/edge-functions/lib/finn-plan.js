@@ -411,6 +411,12 @@ export function buildPlan(domains, goals, opts = {}) {
 
   return {
     phase, signals, shapeOpen, areas, covered, trips,
+    // The context completeness test, named once so the prompt, the opening
+    // and the tests cannot drift apart: the household shape is mapped when
+    // none of the FOUR non-sweep shape basics are still open (who is in the
+    // household, children and ages, how each income is earned, whether they
+    // own their home). Pending sweeps do not make the context incomplete.
+    context_mapped: !shapeOpen.some(x => !x.startsWith("[SWEEP")),
     missing: missingAll, deferred: deferredAll, to_verify: toVerifyAll,
     sweeps_asked: [...sweepsAsked],
     sweeps_pending: sweepsPending,
@@ -447,7 +453,16 @@ export function planPromptSection(plan, opts = {}) {
   L.push("\n\n═══ FINN'S WORKING NOTES (computed by code every turn; the person never sees this) ═══");
   L.push("Use these to decide what to ask next. They describe what the picture still NEEDS, never what anything means. Never select or prioritise a question because of the size of a figure.");
   L.push("Item references are shown as {field#item_id}; use exactly those in \"deferrals\" when the person puts one off.");
-  L.push("Phase: " + (plan.phase === "shape" ? "SHAPE, map the household before gathering figures." : "TRIPS, gather figures one source at a time."));
+  // WALK on 829256e: with a populated context the phase line still read
+  // "SHAPE, map the household before gathering figures", and the model duly
+  // re-asked who was in the household and what work looked like, twice, with
+  // the answer displayed above the chat. The household shape is either
+  // mapped or it is not, and the line now says which.
+  L.push(plan.phase === "shape"
+    ? (plan.context_mapped
+      ? "Phase: SHAPE. THE HOUSEHOLD IS ALREADY MAPPED: who is in it, the children, how each income is earned and whether they own their home are all answered and in the picture above. Do NOT ask about any of them again, in any wording, and do not open with a question about the household or about work. What remains of this phase is the sweeps listed below, asked with their tokens."
+      : "Phase: SHAPE, map the household before gathering figures.")
+    : "Phase: TRIPS, gather figures one source at a time.");
   if (plan.signals.length) L.push("Household shape so far: " + plan.signals.join("; ") + ".");
   if (plan.shapeOpen.length) L.push("Shape still to map: " + plan.shapeOpen.join("; ") + ".");
   const areaLine = AREAS.map(a => {
@@ -490,7 +505,7 @@ export function planPromptSection(plan, opts = {}) {
   if (asked.length) L.push("Already asked, never ask again in any words: " + asked.map(s => "[SWEEP: " + s + "]").join(" ") + ".");
   // The next move, stated plainly (the stand-in run showed the model
   // composing sweeps in its own words, which never count).
-  const basicsKnown = !plan.shapeOpen.some(x => !x.startsWith("[SWEEP"));
+  const basicsKnown = plan.context_mapped !== undefined ? plan.context_mapped : !plan.shapeOpen.some(x => !x.startsWith("[SWEEP"));
   if (plan.phase === "shape" && basicsKnown && plan.sweeps_pending.length) {
     L.push("NEXT MOVE: your one question in this reply is [SWEEP: " + plan.sweeps_pending.find(x => ["other_assets", "other_debts", "other_super", "other_income"].includes(x)) + "], emitted as the token. Writing your own version of an 'anything else?' question does NOT count: the area stays uncovered and you will have to ask it again.");
   }

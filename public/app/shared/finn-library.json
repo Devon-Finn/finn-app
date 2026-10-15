@@ -498,12 +498,12 @@
     "_note": [
       "The household context header: the frame the nine tiles sit inside, not a tenth tile. Slot substitution ONLY, exactly like insights[].position_line - the renderer chooses which clauses apply and fills their slots, and never composes, rewords or summarises them.",
       "It carries no badge, no status, no routing and no questions. It states what is known and stays silent about what is not.",
-      "Names are not picture fields. A caller may supply the owner's and partner's names from the household record; the defaults below are used when it cannot."
+      "The partner's name IS a picture field (context.partner_name, captured for exactly this) and fills that slot first. The owner has no name field, so a caller may supply the member's own first name; a household display name is never a person and is never used here. The defaults below are the last resort."
     ],
     "clauses": {
       "person_with_age": { "template": "{name}, {age}", "fields": ["context.owner_age", "context.partner_age"] },
       "person_without_age": { "template": "{name}", "fields": [] },
-      "two_people": { "template": "{first}, and {second}.", "fields": ["context.adults", "context.partner_age"] },
+      "two_people": { "template": "{first}, and {second}.", "fields": ["context.adults", "context.partner_name", "context.partner_age"] },
       "one_person": { "template": "{first}.", "fields": ["context.owner_age"] },
       "one_child": { "template": "One child, {age}.", "fields": ["context.children[].age"] },
       "several_children": { "template": "{count} children, {ages}.", "fields": ["context.children[].age"] },

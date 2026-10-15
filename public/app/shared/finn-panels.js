@@ -944,6 +944,31 @@
 
   const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 
+  /* A person's given name, or nothing. (15 Oct: the header rendered
+     "test-household-c, 42, and your partner, 40" — a household label sitting
+     in the person slot. The page reads members.display_name, which is the
+     right field, but that row can hold a household-style label, and on a
+     real account the same path would read "The Soutars, 42".)
+
+     So the slot accepts a candidate only if it looks like a given name: no
+     digits, no organisation or household words, no slug punctuation. The
+     household record's display_name is never consulted for this slot at
+     all; this guard is the second line, for when the member's own field
+     holds something that is not a person. Anything rejected falls through
+     to the library default. */
+  const NOT_A_PERSON = /(\d|[_\/]|\b(household|family|trust|pty|ltd|limited|inc|the\s+\w+s)\b)/i;
+  function personName(v) {
+    const s = text(v);
+    if (!s) return null;
+    const first = s.trim().split(/\s+/)[0];
+    if (!first || !/[a-z]/i.test(first)) return null;
+    if (NOT_A_PERSON.test(s) || first.includes('-')) {
+      console.error('[Finn panels] "' + s + '" does not read as a person\'s name; the context header will say "You" rather than put it in the person slot.');
+      return null;
+    }
+    return first;
+  }
+
   /* ── the household context header ── (flagged August, built 15 Oct;
      copy moved into finn-library.json 15 Oct)
      The FRAME the nine tiles sit inside, not a tenth tile. It carries no
@@ -981,9 +1006,13 @@
     const parts = [];
     const push = s => { if (s) parts.push(s); };
 
-    // Who, with ages where they are known.
-    const ownerName = text(o.ownerName) || D.owner;
-    const partnerName = text(o.partnerName);
+    // Who, with ages where they are known. The partner's name IS a picture
+    // field (context.partner_name, captured for exactly this), so it comes
+    // first; an opts name is the fallback for a caller that has one, and the
+    // library default is the last resort. (15 Oct: the header said "your
+    // partner" while the picture held "Jess".)
+    const ownerName = personName(o.ownerName) || D.owner;
+    const partnerName = text(c.partner_name) || personName(o.partnerName) || null;
     const ownerAge = num(c.owner_age);
     const partnerAge = num(c.partner_age);
     const adults = num(c.adults);
@@ -995,7 +1024,7 @@
         first: person(ownerName, ownerAge),
         second: person(partnerName || D.partner, partnerAge),
       }));
-    } else if (ownerAge !== null || text(o.ownerName)) {
+    } else if (ownerAge !== null || personName(o.ownerName)) {
       push(fillClause(C.one_person, { first: person(ownerName, ownerAge) }));
     }
 
