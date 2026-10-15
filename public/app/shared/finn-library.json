@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "questions_status": "DRAFT 16 Sept 2026 (Claude): tiles[n].questions and insights[].question are draft copy awaiting Devon's edit and Charlie's sign-off. They render as questions for the person to take to a professional, never as Finn's view.",
+    "questions_status": "v2 15 Oct 2026: tiles[n].questions and insights[].question carry Devon's edited wording, 34 questions across the nine tiles, down from 37. DEVON'S EDIT IS COMPLETE AS OF 15 OCTOBER 2026. CHARLIE'S SIGN-OFF IS STILL OUTSTANDING. They render as questions for the person to take to a professional, never as Finn's view. tiles[5].conditional_questions holds one question that shows only on a cover asymmetry; its condition lives in finn-panels.js and its row is in docs/field-spec.md section 3.3b.",
     "source": "docs/field-spec.md Part 4 + docs/component-spec.md 5.2 (structure) + docs/education-library.md (copy, signed off tile by tile with Devon) + docs/term-registry.md (companion)",
     "rules": [
       "position_line.template is filled by slot substitution ONLY. The renderer never composes or rewords the sentence, and no model call touches this path.",
@@ -69,7 +69,7 @@
     },
     "2": {
       "title": "What's left over each month",
-      "questions": [{"q": "What could the money left over each month be doing for the things we want?", "pro": "financial_planner"}, {"q": "Which of our regular costs land once or twice a year, and how do we plan for them?", "pro": "financial_planner"}]
+      "questions": [{"q": "Which of our regular costs land once or twice a year, and how do we plan for them?", "pro": "financial_planner"}]
     },
     "3": {
       "title": "Your safety net",
@@ -78,7 +78,7 @@
     },
     "4": {
       "title": "Your super",
-      "questions": [{"q": "Do we need every super account we hold, and what does each one cost us?", "pro": "financial_planner"}, {"q": "What insurance sits inside our super, and what would it pay?", "pro": "insurance_specialist"}, {"q": "Is the nomination on each fund current, and does it say what we want?", "pro": "financial_planner"}],
+      "questions": [{"q": "Do we need every super account we hold, and what does each one cost us?", "pro": "financial_planner"}, {"q": "What insurance sits inside our super, and what would it pay?", "pro": "insurance_specialist"}, {"q": "Is the nomination on each fund current, and does it say what we want?", "pro": "estate_lawyer"}],
       "section_b": "Super is money held for you until retirement, in one account or several. Each account charges its own fees, taken out of the balance rather than billed to you, so they're easy not to notice. Accounts can also hold insurance inside them, with the premiums coming out of the balance the same way.",
       "calm": {
         "statement": "Nothing here routes to anyone.",
@@ -90,6 +90,7 @@
     "5": {
       "title": "Protection",
       "questions": [{"q": "What would our household need if one of us couldn't work for a year or more?", "pro": "insurance_specialist"}, {"q": "Which of our cover sits inside super and which outside, and what difference does that make?", "pro": "insurance_specialist"}],
+      "conditional_questions": [{"q": "If the one of us without that cover was the one who couldn't work, what would that mean for the household?", "pro": "insurance_specialist", "when": "cover_held_by_one_person_only"}],
       "section_b": "Life cover pays a lump sum if you die. Total and permanent disability cover pays if you're permanently unable to work again. Income protection is a different thing again, it replaces part of your income month to month while you're unable to work, and stops when you go back. They're three separate events, and holding cover for one doesn't cover you for the others."
     },
     "6": {
@@ -105,7 +106,7 @@
     },
     "7": {
       "title": "Your investments",
-      "questions": [{"q": "Does the way our investments are spread still suit our timeframe?", "pro": "financial_planner"}, {"q": "How are our investment income and any borrowing for it treated at tax time?", "pro": "accountant"}],
+      "questions": [{"q": "How are our investment income and any borrowing for it treated at tax time?", "pro": "accountant"}],
       "section_b": "An investment property has its own value, its own loan and its own equity, in the same way your home does. The rent it earns is income, and the interest on its loan is treated differently at tax time from the interest on the loan for the home you live in. For shares and funds, what they earn is taxed at the marginal rate of whoever the asset is held by, so whose name is on it changes what it costs."
     },
     "8": {
@@ -115,7 +116,7 @@
     },
     "9": {
       "title": "How your income is made up",
-      "questions": [{"q": "Is the way our income is earned set up sensibly for tax?", "pro": "accountant"}, {"q": "What records should we keep for income that doesn't come through a payslip?", "pro": "accountant"}],
+      "questions": [{"q": "What records should we keep for income that doesn't come through a payslip?", "pro": "accountant"}],
       "section_b": "Income from an employer has tax taken out before it reaches you, and the employer pays super on top of it. Income you earn for yourself arrives whole, with the tax on it settled later, and no super attached unless you arrange it yourself. The total here is annual and before tax, so it won't match what actually lands in your account each month.",
       "calm": {
         "statement": "Nothing here routes to anyone.",
@@ -128,7 +129,7 @@
   "insights": [
     {
       "id": "1.1",
-      "question": "Given my rate and how long I've been with my lender, is there a sharper rate or a better set-up available to me?",
+      "question": "I've been with my lender a while now. What would someone actually look at if they reviewed this loan, and what would they compare it against?",
       "title": "Your rate and how the loan is set up",
       "tile": 1,
       "variant": null,
@@ -149,7 +150,7 @@
     },
     {
       "id": "1.2",
-      "question": "Is the offset on my loan worth keeping, and what is it costing me while it's empty?",
+      "question": "Is the offset on my loan worth keeping, and what is it costing me?",
       "title": "An offset account with nothing in it",
       "tile": 1,
       "variant": null,
@@ -256,7 +257,7 @@
     },
     {
       "id": "3.2a",
-      "question": "Would our safety net do more for us sitting against the loan?",
+      "question": "How would our safety net work differently if it sat against the loan instead of in savings?",
       "title": "Where your safety net sits",
       "tile": 3,
       "variant": "has_offset",
@@ -299,7 +300,7 @@
     },
     {
       "id": "4.1",
-      "question": "Should our super sit in fewer accounts, and what would we lose or keep by moving it?",
+      "question": "If we brought our super together, what would we keep and what would we lose?",
       "title": "More than one super account",
       "tile": 4,
       "variant": null,
@@ -367,7 +368,7 @@
       "tile": 7,
       "variant": null,
       "route_primary": "mortgage_broker",
-      "route_also": ["financial_planner", "accountant"],
+      "route_also": [],
       "position_line": {
         "template": "Investment property valued around {property_value}, with {property_loan} owing and rent of {rental_income_annual} a year.",
         "fields": ["investments.properties", "income.other"]
@@ -405,7 +406,7 @@
     },
     {
       "id": "8.1a",
-      "question": "Is there a cheaper or simpler way to hold our other debts?",
+      "question": "If we moved these debts somewhere else, what would change about what they cost and how long they'd run?",
       "title": "Your other debts",
       "tile": 8,
       "variant": "has_mortgage",
@@ -426,7 +427,7 @@
     },
     {
       "id": "8.1b",
-      "question": "What's the cheapest order to clear our debts in?",
+      "question": "What are the different ways people work through several debts at once, and what decides which one suits?",
       "title": "Your other debts",
       "tile": 8,
       "variant": "no_mortgage",

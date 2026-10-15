@@ -670,10 +670,99 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
     t('edge-and-browser-derive-agree-on-the-fixture', JSON.stringify(a) === JSON.stringify(b));
   }
 
+
+  /* ── the v2 question set, and the one conditional question (15 Oct) ──
+     34 questions across the nine tiles, down from 37. The conditional one
+     is NOT an insight: it has no education blocks and never changes a
+     tile's state, so these checks hold both its firing and its silence. */
+  {
+    const tiles = library.tiles || {};
+    const generalCount = Object.keys(tiles).reduce((a, k) => a + (tiles[k].questions || []).length, 0);
+    const insightCount = (library.insights || []).filter(i => typeof i.question === 'string').length;
+    t('the-question-set-is-34-across-the-nine-tiles', generalCount + insightCount === 34);
+    t('no-insight-lost-its-education-blocks', (library.insights || []).every(i =>
+      i.blocks && ['why', 'turn_up', 'dont_realise', 'how_professional', 'nothing_to_prepare'].every(b => typeof i.blocks[b] === 'string' && i.blocks[b].length > 0)));
+    // 2.2 and 8.1b carry NO paid referral by design (field-spec 3.3), so a
+    // null route is correct for exactly those two and nothing else.
+    const NO_REFERRAL = ['2.2', '8.1b'];
+    t('every-insight-still-has-a-question-and-the-right-kind-of-route', (library.insights || []).every(i =>
+      typeof i.question === 'string' && i.question.length > 0
+      && (NO_REFERRAL.includes(i.id) ? !i.route_primary : typeof i.route_primary === 'string' && i.route_primary.length > 0)));
+
+    // Routing changes.
+    t('the-per-fund-nomination-question-goes-to-the-estate-lawyer',
+      (tiles['4'].questions || []).some(q => /nomination on each fund/.test(q.q) && q.pro === 'estate_lawyer'));
+    const i71 = (library.insights || []).find(i => i.id === '7.1');
+    t('7.1-routes-to-the-mortgage-broker-alone',
+      i71.route_primary === 'mortgage_broker' && (i71.route_also || []).length === 0);
+
+    // The wording cut: Finn does not judge the balance.
+    const i12 = (library.insights || []).find(i => i.id === '1.2');
+    t('1.2-no-longer-says-while-it-is-empty', !/while it’s empty|while it's empty/.test(i12.question));
+
+    // The three duplicate general questions are gone.
+    t('tile-2-no-longer-restates-its-own-fired-question',
+      !(tiles['2'].questions || []).some(q => /left over each month be doing for the things we want/.test(q.q)));
+    t('tile-7-no-longer-restates-its-own-fired-question',
+      !(tiles['7'].questions || []).some(q => /investments are spread still suit our timeframe/.test(q.q)));
+    t('tile-9-no-longer-restates-its-own-fired-question',
+      !(tiles['9'].questions || []).some(q => /income is earned set up sensibly for tax/.test(q.q)));
+
+    /* The five v2 rewrites, pinned verbatim. These are the questions that
+       sit closest to the advice line, so a silent drift in their wording
+       matters more than anywhere else in the library. Devon's edit is
+       complete; Charlie has not signed off. */
+    const Q = (id) => ((library.insights || []).find(i => i.id === id) || {}).question;
+    t('1.1-is-the-v2-wording',
+      Q('1.1') === "I've been with my lender a while now. What would someone actually look at if they reviewed this loan, and what would they compare it against?");
+    t('3.2a-is-the-v2-wording',
+      Q('3.2a') === "How would our safety net work differently if it sat against the loan instead of in savings?");
+    t('4.1-is-the-v2-wording',
+      Q('4.1') === "If we brought our super together, what would we keep and what would we lose?");
+    t('8.1a-is-the-v2-wording',
+      Q('8.1a') === "If we moved these debts somewhere else, what would change about what they cost and how long they'd run?");
+    t('8.1b-is-the-v2-wording',
+      Q('8.1b') === "What are the different ways people work through several debts at once, and what decides which one suits?");
+    // The rewrites did not disturb their routes: 8.1b carries no paid route.
+    t('the-five-rewrites-kept-their-routes', ['1.1', '3.2a', '8.1a'].every(id =>
+      (library.insights.find(i => i.id === id) || {}).route_primary === 'mortgage_broker')
+      && (library.insights.find(i => i.id === '4.1') || {}).route_primary === 'financial_planner'
+      && !(library.insights.find(i => i.id === '8.1b') || {}).route_primary);
+    // The library's house style is the ASCII apostrophe, 288 of them and no
+    // typographic ones; a smart quote here would be a silent inconsistency.
+    t('no-typographic-apostrophes-crept-in',
+      !(library.insights || []).some(i => /’/.test(i.question || ''))
+      && !Object.values(library.tiles || {}).some(tl => (tl.questions || []).concat(tl.conditional_questions || []).some(q => /’/.test(q.q || ''))));
+    t('the-meta-records-devons-edit-complete-and-charlie-outstanding',
+      /DEVON'S EDIT IS COMPLETE AS OF 15 OCTOBER 2026/.test(library._meta.questions_status)
+      && /CHARLIE'S SIGN-OFF IS STILL OUTSTANDING/.test(library._meta.questions_status));
+
+    /* The conditional question: fires on an asymmetry, silent otherwise. */
+    const cq = (d) => panels.conditionalQuestions(5, d, library).map(x => x.q);
+    const cover = (owner, type, held) => ({ id: owner + '-' + type, owner, type, held, amount: null, inside_super: null });
+    const ASYM = { context: { adults: 2 }, protection: { covers: [cover('you', 'income_protection', true), cover('partner', 'income_protection', false)] } };
+    t('conditional-fires-where-one-holds-income-protection-and-the-other-does-not',
+      cq(ASYM).length === 1 && /the one of us without that cover/.test(cq(ASYM)[0]));
+    t('the-conditional-question-routes-to-the-insurance-specialist',
+      panels.conditionalQuestions(5, ASYM, library)[0].pro === 'insurance_specialist');
+    t('conditional-silent-where-both-hold-it',
+      cq({ context: { adults: 2 }, protection: { covers: [cover('you', 'income_protection', true), cover('partner', 'income_protection', true)] } }).length === 0);
+    t('conditional-silent-where-neither-holds-it',
+      cq({ context: { adults: 2 }, protection: { covers: [cover('you', 'income_protection', false), cover('partner', 'income_protection', false)] } }).length === 0);
+    t('conditional-silent-for-a-single-adult-household',
+      cq({ context: { adults: 1 }, protection: { covers: [cover('you', 'income_protection', true), cover('partner', 'income_protection', false)] } }).length === 0);
+    // An unanswered cover is an unknown, not an asymmetry.
+    t('conditional-silent-where-the-others-cover-is-unanswered',
+      cq({ context: { adults: 2 }, protection: { covers: [cover('you', 'income_protection', true)] } }).length === 0);
+    // It is a question, never an insight: no education blocks, no tile state.
+    t('the-conditional-question-is-not-an-insight',
+      !(library.insights || []).some(i => /the one of us without that cover/.test(i.question || '')));
+  }
+
   return {
     pass: failures.length === 0,
     total: ran,
-    declared: 163,
+    declared: 187,
     failures,
     hand_computed: {
       home_equity: 320000, lvr_percent: 66.3, surplus_monthly: 3450, buffer_months: 2.7,

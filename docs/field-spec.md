@@ -398,6 +398,20 @@ A visible tile with no firing insight is a valid and intended state. It shows th
 | 8.1b | Other debts — no mortgage | `debts.items[]` holds at least one **consumer** item AND `mortgage_balance = 0` AND NOT `hardship` — same consumer-item scope as 8.1a | `debts.items[]` | **No paid referral.** Education plus National Debt Helpline. |
 | 9.1 | Income structure | `structure ≠ paye` OR `business_income_annual > 0` OR `entity ≠ null` | `structure`, `entity`, `employer_super_on` | Accountant |
 
+### 3.3b Conditional questions
+
+A conditional question is one of a tile's "Questions to ask" that shows only
+when the household's own shape raises it. It is **not an insight**: it carries
+no education blocks, no badge and no position line, and it never changes a
+tile's state. The copy lives in `finn-library.json` under
+`tiles[n].conditional_questions`; the condition lives in `finn-panels.js` under
+`QUESTION_CONDITIONS`, keyed by the entry's `when`. Adding one is a library
+entry plus a predicate, never new prose in code.
+
+| Tile | Question | Shows when | Reads | Route |
+|---|---|---|---|---|
+| 5 | If the one of us without that cover was the one who couldn't work, what would that mean for the household? | `cover_held_by_one_person_only`: for ANY cover type, one person holds it (`held = true`) and the other has been asked and does not (`held = false`). Silent where `context.adults < 2`, since there is no "the other one". Silent on a type neither holds, which is 5.1's territory. Silent where the other person's cover is unanswered: an unknown is not an asymmetry. | `protection.covers[].type`, `protection.covers[].owner`, `protection.covers[].held`, `context.adults` | Insurance specialist |
+
 ### Explicit non-triggers
 
 - **A household whose only debt items are cleared-monthly credit cards fires neither 8.1a nor 8.1b.** A card paid in full every month costs nothing and routes to no one; it still renders as an item, because the exclusion is a trigger rule, not a display one.

@@ -674,14 +674,65 @@
     return html;
   }
 
+  /* ══════════ conditional questions (15 Oct 2026) ══════════
+     A tile question that shows only when the household's own shape raises
+     it. The COPY lives in the library like every other question; only the
+     CONDITION lives here, keyed by name, so a new one is a library entry
+     plus a predicate and never new prose in code.
+
+     Deliberately NOT an insight: an insight carries the full education
+     template (why / what a look can turn up / what most people don't
+     realise / how the professional works / nothing to prepare), and that is
+     customer-facing copy nobody has signed off. A conditional question is
+     one line the person takes to a professional, which is exactly what the
+     questions block already is. */
+  const QUESTION_CONDITIONS = {
+    // Exactly one of the two people holds a given cover type. Silent on a
+    // single-adult household (there is no "the other one"), and silent on a
+    // type neither of them holds (that is 5.1's territory, not this).
+    cover_held_by_one_person_only: (domains) => {
+      const d = domains || {};
+      const ctx = d.context || {};
+      const prot = d.protection || {};
+      if (num(ctx.adults) !== null && num(ctx.adults) < 2) return false;
+      const bothPresent = num(ctx.adults) !== null ? num(ctx.adults) > 1 : coverOwners(prot, ctx).length > 1;
+      if (!bothPresent) return false;
+      return COVER_TYPES.some(type => {
+        const mine = coverFor(prot, 'you', type);
+        const theirs = coverFor(prot, 'partner', type);
+        const held = c => !!(c && c.held === true);
+        // One holds it, the other has been ASKED and does not: an unanswered
+        // cover is not an asymmetry, it is an unknown.
+        const answered = c => !!(c && typeof c.held === 'boolean');
+        return (held(mine) && answered(theirs) && !held(theirs))
+            || (held(theirs) && answered(mine) && !held(mine));
+      });
+    },
+  };
+
+  function conditionalQuestions(tileNo, domains, library) {
+    const tileMeta = library && library.tiles && library.tiles[String(tileNo)];
+    return arr(tileMeta && tileMeta.conditional_questions)
+      .filter(x => x && typeof x.q === 'string')
+      .filter(x => {
+        const cond = QUESTION_CONDITIONS[x.when];
+        if (!cond) {
+          console.error('[Finn panels] conditional question on tile ' + tileNo + ' names an unknown condition "' + x.when + '"; it will never show.');
+          return false;
+        }
+        return cond(domains);
+      });
+  }
+
   /* ══════════ questions (Devon, 16 Sept 2026) ══════════
      Every tile carries questions worth taking to a professional; a tile
      whose figures raise one for this household carries that one too, on
      its card. They are the person's questions to ask, never Finn's view.
      Copy lives in the library (draft until Devon and Charlie sign it off). */
-  function questionsSection(tileNo, library) {
+  function questionsSection(tileNo, library, domains) {
     const tileMeta = library && library.tiles && library.tiles[String(tileNo)];
-    const qs = arr(tileMeta && tileMeta.questions).filter(x => x && typeof x.q === 'string');
+    const qs = arr(tileMeta && tileMeta.questions).filter(x => x && typeof x.q === 'string')
+      .concat(conditionalQuestions(tileNo, domains, library));
     if (!qs.length) return '';
     const pros = (library && library.professionals) || {};
     return '<div class="fp-section fp-questions"><h4 class="fp-calchead">Questions to ask</h4><ul class="fp-qlist">' +
@@ -937,7 +988,7 @@
     }
     html += insightsSection(tileResult, domains, derived, library);
     html += calmSection(tileNo, tileResult, domains, library);
-    html += questionsSection(tileNo, library);
+    html += questionsSection(tileNo, library, domains);
     html += '</article>';
     return html;
   }
@@ -1200,5 +1251,5 @@
     return null;
   }
 
-  window.finnPanels = { renderDashboard, renderTile, renderWhoToSee, tileReached, fillPositionLine, slotValues, badgeLabel, tileComplete, questionPointer, tileHeadline, contextHeader };
+  window.finnPanels = { renderDashboard, renderTile, renderWhoToSee, tileReached, fillPositionLine, slotValues, badgeLabel, tileComplete, questionPointer, tileHeadline, contextHeader, conditionalQuestions };
 })();
