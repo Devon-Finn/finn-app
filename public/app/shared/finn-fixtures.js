@@ -203,6 +203,7 @@
 
   function runFinnTriggerFixtures() {
     const failures = [];
+    let ran = 0;
     for (const fx of FIXTURES) {
       let result;
       try {
@@ -247,8 +248,11 @@
       if (result.insight_ids.includes('2.1') && result.insight_ids.includes('2.2')) {
         failures.push(`${fx.name}: 2.1 and 2.2 both fired — exclusivity broken`);
       }
+      // Counted, not declared: a fixture that crashed above hit `continue`
+      // and is NOT counted here, so counted < declared is itself a signal.
+      ran++;
     }
-    return { pass: failures.length === 0, total: FIXTURES.length, failures };
+    return { pass: failures.length === 0, total: ran, declared: FIXTURES.length, failures };
   }
 
   window.runFinnTriggerFixtures = runFinnTriggerFixtures;

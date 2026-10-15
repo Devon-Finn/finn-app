@@ -41,7 +41,10 @@ function captureOf(raw) {
 
 export async function runStreamTests(chat, tokens) {
   const failures = [];
-  const t = (name, cond) => { if (!cond) failures.push(name); };
+  let ran = 0;
+  // COUNTED, never typed: total used to be a literal, so an assertion that
+  // failed to land still reported PASS. ran is what actually executed.
+  const t = (name, cond) => { ran++; if (!cond) failures.push(name); };
   const f = chat.__streamForTests;
   const { NUDGES, FRAMES } = tokens;
   const SWEEPS = chat.__sweepsForTests;
@@ -257,5 +260,5 @@ export async function runStreamTests(chat, tokens) {
   t('a-finishing-claim-is-allowed-once-the-picture-can-close',
     !canCloseNow.absoluteFailures.includes('wrapping_up') && !canCloseNow.retried);
 
-  return { pass: failures.length === 0, total: 43, failures };
+  return { pass: failures.length === 0, total: ran, declared: 43, failures };
 }

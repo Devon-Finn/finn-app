@@ -61,7 +61,10 @@ function scaleNumbers(v, k) {
 
 export function runPlanTests({ plan, pipeline, tokens }) {
   const failures = [];
-  const t = (name, cond) => { if (!cond) failures.push(name); };
+  let ran = 0;
+  // COUNTED, never typed: total used to be a literal, so an assertion that
+  // failed to land still reported PASS. ran is what actually executed.
+  const t = (name, cond) => { ran++; if (!cond) failures.push(name); };
   const { buildPlan, planPromptSection, AREAS } = plan;
 
   /* ── an empty picture: shape first, nothing covered, no closing ── */
@@ -417,5 +420,5 @@ export function runPlanTests({ plan, pipeline, tokens }) {
   const partial = plan.buildPlan({ context: { adults: 2, children: [], owner_age: 42, _confidence: 'stated' } }, {});
   t('context-mapped-false-while-a-basic-is-open', partial.context_mapped === false);
 
-  return { pass: failures.length === 0, total: 107, failures };
+  return { pass: failures.length === 0, total: ran, declared: 107, failures };
 }

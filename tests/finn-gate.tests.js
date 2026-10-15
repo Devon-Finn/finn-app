@@ -11,7 +11,10 @@
 export function runGateTests(mod) {
   const { FIELD_REGISTRY, persistenceGate } = mod;
   const failures = [];
-  const t = (name, cond) => { if (!cond) failures.push(name); };
+  let ran = 0;
+  // COUNTED, never typed: total used to be a literal, so an assertion that
+  // failed to land still reported PASS. ran is what actually executed.
+  const t = (name, cond) => { ran++; if (!cond) failures.push(name); };
   // STORE EVERY FIGURE, FLAG IT TO VERIFY (Devon, 15 Sept 2026). The gate
   // never refuses a figure for its evidence level; it flags it. Only an
   // enum written without its item-sibling requires is refused, leaf only.
@@ -142,7 +145,7 @@ export function runGateTests(mod) {
     mod.PRODUCERS.some(p => p.key === 'investments.holdings') &&
     mod.PRODUCERS.some(p => p.key === 'income.structure:sole_trader'));
 
-  return { pass: failures.length === 0, total: 45, failures };
+  return { pass: failures.length === 0, total: ran, declared: 45, failures };
 }
 
 /* ── capture-conduct steps 3-4: the retrieval path file and the
@@ -152,7 +155,10 @@ export function runPathTests(regMod, pathsMod) {
   const { FIELD_REGISTRY } = regMod;
   const { RETRIEVAL_PATHS, askFor } = pathsMod;
   const failures = [];
-  const t = (name, cond) => { if (!cond) failures.push(name); };
+  let ran = 0;
+  // COUNTED, never typed: total used to be a literal, so an assertion that
+  // failed to land still reported PASS. ran is what actually executed.
+  const t = (name, cond) => { ran++; if (!cond) failures.push(name); };
 
   const pathIds = Object.keys(RETRIEVAL_PATHS);
   const entries = Object.entries(FIELD_REGISTRY);
@@ -209,7 +215,7 @@ export function runPathTests(regMod, pathsMod) {
     (() => { const v = FIELD_REGISTRY['debts.items[].security'].retrieval_by_type.family_loan;
       return v.retrieval === 'none' && v.confidence_floor === 'stated'; })());
 
-  return { pass: failures.length === 0, total: 13, failures };
+  return { pass: failures.length === 0, total: ran, declared: 13, failures };
 }
 
 /* ── the conduct linter (lib/finn-conduct-linter.js, step 6) ──
@@ -219,7 +225,10 @@ export function runPathTests(regMod, pathsMod) {
 export function runLinterTests(regMod, pathsMod, linterMod) {
   const { runConductLinter } = linterMod;
   const failures = [];
-  const t = (name, cond) => { if (!cond) failures.push(name); };
+  let ran = 0;
+  // COUNTED, never typed: total used to be a literal, so an assertion that
+  // failed to land still reported PASS. ran is what actually executed.
+  const t = (name, cond) => { ran++; if (!cond) failures.push(name); };
   const lint = (rows, picture) => runConductLinter({
     rows, picture,
     registry: regMod.FIELD_REGISTRY,
@@ -290,7 +299,7 @@ export function runLinterTests(regMod, pathsMod, linterMod) {
   t('sighted-is-a-report-not-a-failure',
     check(sighted, 'sighted_resting').status === 'report' && check(sighted, 'sighted_resting').count > 0);
 
-  return { pass: failures.length === 0, total: 17, failures };
+  return { pass: failures.length === 0, total: ran, declared: 17, failures };
 }
 
 /* ── stable asset ids and id-aware merge (lib/finn-merge.js) ──
@@ -299,7 +308,10 @@ export function runLinterTests(regMod, pathsMod, linterMod) {
 export function runMergeTests(mod) {
   const { assignAssetIds, mergeDomainsById, migratePositionalLinks, resolveSecurity } = mod;
   const failures = [];
-  const t = (name, cond) => { if (!cond) failures.push(name); };
+  let ran = 0;
+  // COUNTED, never typed: total used to be a literal, so an assertion that
+  // failed to land still reported PASS. ran is what actually executed.
+  const t = (name, cond) => { ran++; if (!cond) failures.push(name); };
 
   // Ids are assigned at first write and existing ids are never touched.
   const withIds = assignAssetIds({ super: { funds: [{ fund: 'Aware', balance: 80000 }, { id: 'keep1234', fund: 'Rest' }] } });
@@ -351,5 +363,5 @@ export function runMergeTests(mod) {
   t('security-never-resolves-real-loans', sec.debts.items[2].security === undefined);
   t('security-never-overwrites-an-answer', sec.debts.items[3].security === 'other');
 
-  return { pass: failures.length === 0, total: 12, failures };
+  return { pass: failures.length === 0, total: ran, declared: 12, failures };
 }

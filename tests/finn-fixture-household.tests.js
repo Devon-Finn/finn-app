@@ -114,7 +114,10 @@ function makeSession(pipeline, pathsMod, sessionId, startPicture) {
 
 export function runFixtureHousehold({ pipeline, registry, paths, linter, derive, evaluate, panels, library, plan, chat, browserDerive }) {
   const failures = [];
-  const t = (name, cond) => { if (!cond) failures.push(name); };
+  let ran = 0;
+  // COUNTED, never typed: total used to be a literal, so an assertion that
+  // failed to land still reported PASS. ran is what actually executed.
+  const t = (name, cond) => { ran++; if (!cond) failures.push(name); };
   const lint = (rows, picture) => linter.runConductLinter({
     rows, picture,
     registry: registry.FIELD_REGISTRY,
@@ -669,7 +672,8 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
 
   return {
     pass: failures.length === 0,
-    total: 155,
+    total: ran,
+    declared: 155,
     failures,
     hand_computed: {
       home_equity: 320000, lvr_percent: 66.3, surplus_monthly: 3450, buffer_months: 2.7,
