@@ -145,7 +145,21 @@ export function runGateTests(mod) {
     mod.PRODUCERS.some(p => p.key === 'investments.holdings') &&
     mod.PRODUCERS.some(p => p.key === 'income.structure:sole_trader'));
 
-  return { pass: failures.length === 0, total: ran, declared: 45, failures };
+
+  /* ── the two skip branches: fields the gate deliberately never judges ──
+     (added 15 Oct, after counting showed the declared total claimed three
+     assertions that were never written.) persistenceGate opens with
+     `if (!entry || entry.never_asked) continue;` and neither half had a
+     test, so a change that started gating either one would have gone
+     unnoticed. */
+  const neverAsked = G({ flags: { hardship: true, _confidence: 'estimated' } }, { flags: {} });
+  t('never-asked-fields-are-not-judged-at-all',
+    neverAsked.ok && neverAsked.flags.length === 0 && neverAsked.clears.length === 0 && neverAsked.strip.length === 0);
+  const unregistered = G({ home: { not_a_field: 'something', _confidence: 'stated' } }, { home: {} });
+  t('a-field-outside-the-registry-is-skipped-never-refused',
+    unregistered.ok && unregistered.strip.length === 0 && !unregistered.flags.some(f => f.field === 'home.not_a_field'));
+
+  return { pass: failures.length === 0, total: ran, declared: 44, failures };
 }
 
 /* ── capture-conduct steps 3-4: the retrieval path file and the
@@ -222,7 +236,7 @@ export function runPathTests(regMod, pathsMod) {
    Run by blob-importing the linter alongside the registry and paths:
    runLinterTests(regMod, pathsMod, linterMod). Synthetic sessions, each
    crafted to trip exactly the checks named. */
-export function runLinterTests(regMod, pathsMod, linterMod) {
+export function runLinterTests(regMod, pathsMod, linterMod, planMod) {
   const { runConductLinter } = linterMod;
   const failures = [];
   let ran = 0;
@@ -235,6 +249,9 @@ export function runLinterTests(regMod, pathsMod, linterMod) {
     paths: pathsMod.RETRIEVAL_PATHS,
     confidenceRank: regMod.CONFIDENCE_RANK,
     producers: regMod.PRODUCERS,
+    // 15 Oct: the suite never passed a plan function, so the coverage check
+    // could not be exercised here at all. Passed now, so it can be.
+    plan: planMod ? planMod.buildPlan : undefined,
   });
   const check = (report, id) => report.checks.find(c => c.id === id);
   const at = (s) => new Date(Date.parse('2026-09-11T01:00:00Z') + s * 1000).toISOString();
@@ -299,7 +316,18 @@ export function runLinterTests(regMod, pathsMod, linterMod) {
   t('sighted-is-a-report-not-a-failure',
     check(sighted, 'sighted_resting').status === 'report' && check(sighted, 'sighted_resting').count > 0);
 
-  return { pass: failures.length === 0, total: ran, declared: 17, failures };
+
+  /* ── coverage ── (added 15 Oct) The only linter check with no assertion
+     anywhere, in either suite. It is a "report" check, so it never fails a
+     run and its absence was invisible: it exists to put the plan's own view
+     of what is covered and what is still open into the session report. */
+  const covRep = lint([row({ capture: { domains: { context: { adults: 2, _confidence: 'stated' } } } })],
+    { domains: { context: { adults: 2, _confidence: 'stated' } }, goals: {}, refusals: [] });
+  const cov = check(covRep, 'coverage');
+  t('coverage-reports-the-plans-own-view-of-what-is-open',
+    !!cov && cov.status === 'report' && cov.details.some(d => /^covered: /.test(d)) && cov.details.some(d => /sweeps not asked|missing \(/.test(d)));
+
+  return { pass: failures.length === 0, total: ran, declared: 16, failures };
 }
 
 /* ── stable asset ids and id-aware merge (lib/finn-merge.js) ──

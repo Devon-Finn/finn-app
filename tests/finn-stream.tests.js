@@ -260,5 +260,5 @@ export async function runStreamTests(chat, tokens) {
   t('a-finishing-claim-is-allowed-once-the-picture-can-close',
     !canCloseNow.absoluteFailures.includes('wrapping_up') && !canCloseNow.retried);
 
-  return { pass: failures.length === 0, total: ran, declared: 43, failures };
+  return { pass: failures.length === 0, total: ran, declared: 44, failures };
 }

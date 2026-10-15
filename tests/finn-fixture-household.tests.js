@@ -673,7 +673,7 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
   return {
     pass: failures.length === 0,
     total: ran,
-    declared: 155,
+    declared: 163,
     failures,
     hand_computed: {
       home_equity: 320000, lvr_percent: 66.3, surplus_monthly: 3450, buffer_months: 2.7,

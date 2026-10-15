@@ -420,5 +420,21 @@ export function runPlanTests({ plan, pipeline, tokens }) {
   const partial = plan.buildPlan({ context: { adults: 2, children: [], owner_age: 42, _confidence: 'stated' } }, {});
   t('context-mapped-false-while-a-basic-is-open', partial.context_mapped === false);
 
-  return { pass: failures.length === 0, total: ran, declared: 107, failures };
+
+  /* ── nextOpenAsk ── (added 15 Oct) It shipped in eb87c07 with no test of
+     its own: the stream suite exercised the close-refusal path by handing
+     compose() a hand-made ctx.nextAsk, so the function that actually
+     produces it was never run by any suite. These cover its three branches. */
+  const shapePlan = plan.buildPlan({ context: { adults: 2, children: [], _confidence: 'stated' }, income: { structure: 'paye', _confidence: 'stated' }, home: { owns_home: false, _confidence: 'stated' } }, {});
+  const shapeAsk = plan.nextOpenAsk(shapePlan);
+  t('next-open-ask-serves-a-sweep-token-in-the-shape-phase',
+    shapePlan.phase === 'shape' && !!shapeAsk && shapeAsk.kind === 'sweep' && /^\[SWEEP: [a-z_]+\]$/.test(shapeAsk.token));
+  const tripsAsk = plan.nextOpenAsk({ phase: 'trips', trips: [{ id: 'conversation', items: [{ field: 'buffer.accessible_savings', status: 'missing', label: 'what you could reach quickly (savings)' }] }], sweeps_pending: [] });
+  t('next-open-ask-names-the-missing-item-in-the-trips-phase',
+    !!tripsAsk && tripsAsk.kind === 'item' && tripsAsk.id === 'buffer.accessible_savings'
+    && /^Next on the list is what you could reach quickly\. What can you tell me about that\?$/.test(tripsAsk.text));
+  t('next-open-ask-returns-null-when-nothing-is-open',
+    plan.nextOpenAsk({ phase: 'trips', trips: [], sweeps_pending: [] }) === null && plan.nextOpenAsk(null) === null);
+
+  return { pass: failures.length === 0, total: ran, declared: 105, failures };
 }
