@@ -298,6 +298,7 @@
               <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
             </div>
           </div>
+          <div id="contextHeader"></div>
           <div class="tiles" id="tilesGrid"></div>
           <div class="dash-note" id="dashNote"><b>Built from your real figures as you talk.</b> Every tile has questions worth taking to the right professional. Where your own figures raise one, the tile says so. It's never a judgment of your numbers. Tap any tile for the full detail.</div>
           <div id="whoView" class="fc" style="display:none"></div>
@@ -563,6 +564,8 @@ const tileReached = (n, d) => window.finnPanels.tileReached(n, d);
 const tileHeadline = (n, d, der) => window.finnPanels.tileHeadline(n, d, der);
 
 let lastTriggers = null;
+// The member's own first name, for the context header. Not a picture field.
+let ownerFirstName = null;
 
 function renderTiles(picture) {
   const grid = document.getElementById('tilesGrid');
@@ -571,6 +574,9 @@ function renderTiles(picture) {
   const triggers = window.finnTriggers.evaluate(d, { derived });
   lastTriggers = triggers;
   grid.innerHTML = '';
+  // The frame the tiles sit inside. Built in finn-panels.js, never here.
+  const ctxEl = document.getElementById('contextHeader');
+  if (ctxEl) ctxEl.innerHTML = window.finnPanels.contextHeader(d, { ownerName: ownerFirstName });
   const ROUTE_ARROW = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
   for (const t of triggers.tiles) {
     if (!t.visible) continue;
@@ -608,8 +614,32 @@ function renderHero(completed) {
 
 let lastPicture = { domains: {}, goals: {}, completed_domains: [] };
 
+// THE MERGE LANDS AFTER THE RESPONSE CLOSES (walk 4, 15 Oct). The capture,
+// recorder and merge chain runs in the function's waitUntil, which by
+// definition outlives the stream, so the reply cannot carry a
+// "merge complete" marker: by the time the merge finishes there is nothing
+// left to write it to. The only honest signal is the picture row itself.
+//
+// We wait for the row's OWN updated_at to change rather than comparing it
+// against a client timestamp: the two clocks are not the same clock, and a
+// few seconds of skew would either return stale tiles or never fire.
+async function waitForMerge(beforeUpdatedAt) {
+  const DELAYS = [250, 400, 600, 900, 1300, 1800, 2500];
+  for (const ms of DELAYS) {
+    await new Promise(r => setTimeout(r, ms));
+    const { data } = await finnSupabase.from('picture').select('updated_at, last_write_status').limit(1);
+    const row = data && data[0];
+    if (!row) continue;
+    if (row.updated_at !== beforeUpdatedAt) return true;
+    // A refused write bumps last_write_status without touching the picture.
+    const st = row.last_write_status;
+    if (st && st.ok === false && st.at && st.at !== lastNoticedFailure) return true;
+  }
+  return false;
+}
+
 async function refreshProgress() {
-  const { data } = await finnSupabase.from('picture').select('domains, goals, completed_domains, last_write_status').limit(1);
+  const { data } = await finnSupabase.from('picture').select('domains, goals, completed_domains, last_write_status, updated_at').limit(1);
   const picture = (data && data[0]) ? data[0] : { domains: {}, goals: {}, completed_domains: [] };
   lastPicture = picture;
   const completed = Array.isArray(picture.completed_domains) ? picture.completed_domains : [];
@@ -714,6 +744,8 @@ function checkWriteStatus(turnStartedAt) {
 
 async function talk(userText, hidden, file, machineBlock, displayLabel) {
   const turnStartedAt = Date.now();
+  // What the picture looked like before this turn, for the merge wait below.
+  const beforeUpdatedAt = (lastPicture && lastPicture.updated_at) || null;
   busy = true;
   sendBtn.disabled = true;
   if (!hidden) addUser(userText, displayLabel || (file && file.name));
@@ -793,10 +825,16 @@ async function talk(userText, hidden, file, machineBlock, displayLabel) {
   sendBtn.disabled = false;
   // Server has merged (or refused) this turn's capture; give it a beat,
   // refresh, then surface any refusal to the person.
-  setTimeout(async () => {
+  // Refresh on the signal, not a timer: the merge can land well after any
+  // fixed delay (walk 4: the home estimate showed the old figure until a
+  // reload). We know what the picture looked like before this turn, so we
+  // wait for it to change.
+  (async () => {
+    const landed = await waitForMerge(beforeUpdatedAt);
+    if (!landed) console.warn('[Finn] merge not observed within the wait cap; refreshing anyway');
     await refreshProgress();
     checkWriteStatus(turnStartedAt);
-  }, 1200);
+  })();
 
   // CSV outlier classifications: the model emits [RESOLVE] blocks as the
   // person answers. When every outlier is resolved, CODE computes the
@@ -933,6 +971,7 @@ async function main() {
   }
 
   const famName = (households && households[0] && households[0].display_name) || 'Your household';
+  ownerFirstName = (me && me.display_name) ? String(me.display_name).trim().split(/\s+/)[0] : null;
   document.getElementById('famName').childNodes[0].textContent = famName;
   document.getElementById('famSub').textContent = (me && me.email) || '';
   document.getElementById('famAvatar').textContent = initials(famName);

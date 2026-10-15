@@ -942,6 +942,60 @@
     return html;
   }
 
+  const COUNT_WORDS = { 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six' };
+  const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+
+  /* ── the household context header ── (flagged August, built 15 Oct)
+     The FRAME the nine tiles sit inside, not a tenth tile. It carries no
+     badge, no status, no routing and no "questions to ask": it never flags
+     anything. Every clause comes from a template with slots filled from
+     captured fields, the same build constraint as the insight position
+     lines: nothing here is model-composed. It renders what is known and
+     says nothing at all about what is not, so a thin picture reads as a
+     short sentence rather than a list of gaps.
+
+     Names are NOT picture fields (the registry holds no name), so a caller
+     that has them from the household record may pass
+     { ownerName, partnerName }; without them the header says "You". */
+  function contextHeader(domains, opts) {
+    const o = opts || {};
+    const c = (domains || {}).context || {};
+    const age = v => num(v);
+    const parts = [];
+
+    // Who, with ages where they are known.
+    const owner = text(o.ownerName) || 'You';
+    const partner = text(o.partnerName);
+    const ownerAge = age(c.owner_age);
+    const partnerAge = age(c.partner_age);
+    const adults = num(c.adults);
+    const person = (name, yrs) => yrs !== null ? name + ', ' + yrs : name;
+    if (partner || (adults !== null && adults > 1) || partnerAge !== null) {
+      const them = partner || 'your partner';
+      parts.push(person(owner, ownerAge) + ', and ' + person(them, partnerAge) + '.');
+    } else if (ownerAge !== null || text(o.ownerName)) {
+      parts.push(person(owner, ownerAge) + '.');
+    }
+
+    // Children, by age, only where an age is recorded.
+    const kids = Array.isArray(c.children) ? c.children.map(k => age(k && k.age)).filter(a => a !== null) : [];
+    if (kids.length === 1) parts.push('One child, ' + kids[0] + '.');
+    else if (kids.length > 1) {
+      const last = kids[kids.length - 1];
+      parts.push(COUNT_WORDS[kids.length] ? COUNT_WORDS[kids.length] + ' children, ' : kids.length + ' children, ');
+      parts[parts.length - 1] += kids.slice(0, -1).join(', ') + ' and ' + last + '.';
+    }
+
+    // Work, and the timeframe they think in, in their own terms.
+    const intent = text(c.work_intent);
+    if (intent) parts.push(/[.!?]$/.test(intent) ? cap(intent) : cap(intent) + '.');
+    const horizon = num(c.horizon_years);
+    if (horizon !== null) parts.push('Thinking about the next ' + horizon + ' years.');
+
+    if (!parts.length) return '';
+    return '<div class="fp-context"><p class="fp-contextline">' + esc(parts.join(' ')) + '</p></div>';
+  }
+
   // A missing finn-derived.js used to render an empty dashboard in silence,
   // which reads as "nothing recorded" rather than as a fault. The fallback
   // stays, but a load-order regression now says so plainly. (15 Oct)
@@ -951,11 +1005,22 @@
     return {};
   }
 
+  // Item 6 (15 Oct): the same silence as the derived fallback. An absent
+  // finn-triggers.js rendered a dashboard with no tiles at all, which reads
+  // as a household with nothing in it. The fallback stays; the fault is loud.
+  function evaluateOrWarn(domains, o) {
+    if (window.finnTriggers && typeof window.finnTriggers.evaluate === 'function') {
+      return window.finnTriggers.evaluate(domains, { yearNow: o.yearNow, derived: o.derived });
+    }
+    console.error('[Finn panels] window.finnTriggers is missing: finn-triggers.js must load before the dashboard renders. Rendering with no tiles.');
+    return { tiles: [] };
+  }
+
   function renderDashboard(domains, opts) {
     const o = opts || {};
     const derived = o.derived || deriveOrWarn(domains);
-    const triggers = o.triggers || (window.finnTriggers ? window.finnTriggers.evaluate(domains, { yearNow: o.yearNow, derived }) : { tiles: [] });
-    let html = '<div class="fp-dashboard">';
+    const triggers = o.triggers || evaluateOrWarn(domains, { yearNow: o.yearNow, derived });
+    let html = '<div class="fp-dashboard">' + contextHeader(domains, o);
     for (const t of triggers.tiles) {
       if (!t.visible) continue;
       html += renderTile(t.tile, domains, derived, t, o.library, o);
@@ -1082,5 +1147,5 @@
     return null;
   }
 
-  window.finnPanels = { renderDashboard, renderTile, renderWhoToSee, tileReached, fillPositionLine, slotValues, badgeLabel, tileComplete, questionPointer, tileHeadline };
+  window.finnPanels = { renderDashboard, renderTile, renderWhoToSee, tileReached, fillPositionLine, slotValues, badgeLabel, tileComplete, questionPointer, tileHeadline, contextHeader };
 })();

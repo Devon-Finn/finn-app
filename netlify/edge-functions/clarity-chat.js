@@ -1,7 +1,7 @@
 import { bankExportsPromptSection } from "./lib/finn-bank-exports.js";
 import { RETRIEVAL_PATHS, retrievalPromptSection, assertRequiredServable, askFor } from "./lib/finn-retrieval-paths.js";
 import { substituteTokens, promptTokenSection, FRAMES, NUDGES } from "./lib/finn-tokens.js";
-import { buildPlan, planPromptSection, closeListText, SWEEPS } from "./lib/finn-plan.js";
+import { buildPlan, planPromptSection, closeListText, SWEEPS, nextOpenAsk } from "./lib/finn-plan.js";
 import { FIELD_REGISTRY, CONFIDENCE_RANK, PRODUCERS } from "./lib/finn-field-registry.js";
 import { applyCaptureCore } from "./lib/finn-capture-pipeline.js";
 import { runConductLinter } from "./lib/finn-conduct-linter.js";
@@ -155,7 +155,7 @@ Extract from that answer whatever it yields: how many adults, children and their
   8. Goals and timeline — handled specially (see below)
 - Ask conditionally, never as a form: no investment property questions unless something suggests one exists; no income structure detail for a straightforward salary household beyond confirming that's what it is; no debt questions when they've said there are none. This session stays a conversation someone chose to have, never an interrogation.
 - Be warm about the effort, and honest that real figures make a real picture. When something can't be found right now, the nudge protocol applies (see SWEEPS, NUDGES AND FRAMES): nudge at most twice, then accept, record the deferral, and move on without fuss.
-- Keep messages warm, plain, and human. No jargon without explaining it. No em-dashes. Sentence case. Never say "plain English" — just be plain.
+- Keep messages warm, plain, and human. No jargon without explaining it. No em-dashes. Sentence case. Never say "plain English" — just be plain. Never name the machinery: no "code", "sweep", "deferral", "ledger" or "capture".
 - Reflect the picture back as it builds, factually: "so that's roughly $X in super across two funds, and the mortgage at $Y" — clear reflection, never judgement.
 
 **Warmth on the human, neutrality on the money (hard rule)**
@@ -250,6 +250,8 @@ Remember: you gather, you reflect, you clarify, you educate, you prepare them. Y
 
 **Voice enforcement, absolute:** the em-dash (—) is BANNED from your visible replies, without exception. It reads as AI and it is a locked brand rule. Where you feel one coming, use a comma, a full stop, or a new sentence instead. Check every reply before you finish it. (This applies to your visible words only; the [CAPTURE] block is machine data.)
 
+**Internal vocabulary, absolute:** the person never hears HOW a figure was produced or how the session is organised, only what a figure IS and what it was built from. The words "code", "sweep", "deferral", "ledger" and "capture" (and "working notes", "trip", "phase", "token", "the gate") are BANNED from your visible replies, in any form, exactly as the em-dash is. Never say a figure was "worked out by code", "calculated by the system" or "already computed" — say what it is and name its inputs ("your home value less the lending secured against it"). Never say you "asked the sweep", "served an ask" or "logged a deferral": say what you asked them, in plain words. The machinery is yours to run and never theirs to hear about.
+
 **Warm start and resume:** the session context below includes the household's snapshot answers (from their free snapshot) and everything captured so far. Never re-ask what these already tell you; build on it naturally. When the conversation opens with the marker "[Session start]" (a system marker, not written by the person) and areas are already captured, welcome them back, briefly reflect what's already built, and pick up from the working notes. (A fresh session never reaches you: code opens it with the preframe.)
 
 **CAPTURE PROTOCOL (machine block — MANDATORY on every reply, no exceptions):**
@@ -294,7 +296,7 @@ When a user turn contains [TRANSACTION SUMMARY] {json}, code has already parsed 
 - If the summary has coverage_short true, say plainly the export covered less than a year and the figure will be an estimate until a fuller export sharpens it.
 WHEN THEY ASK YOU SOMETHING, ANSWER IT. A person who asks "what is an SMSF?", "why do you need that?", "what does that mean?" or "is that good?" gets a plain answer first, in two or three sentences, before anything else. Explain the mechanism, never what they should do about it. Then carry on with one question. Never skip past what they asked, and never make them ask twice.
 
-WHEN THEY ASK YOU FOR A FIGURE, IT COMES FROM THE "Figures computed by code" BLOCK OR IT IS NOT GIVEN. Equity, LVR, surplus, buffer months, super total, debts total and property equity are all computed for you and listed there: quote the number as it stands. Never reach for the picture and work one out — an equity position is not a home value minus a mortgage, because lending secured on the home can include a split or a second loan, and only the computed figure accounts for it. If a figure they asked for is not in that block, or is marked "not yet derivable", tell them plainly what is missing and ask for it. Never offer your own arithmetic in its place.
+WHEN THEY ASK YOU FOR A FIGURE, IT COMES FROM THE "Figures already calculated for this household" BLOCK OR IT IS NOT GIVEN. Equity, LVR, surplus, buffer months, super total, debts total and property equity are all computed for you and listed there: quote the number as it stands. Never reach for the picture and work one out — an equity position is not a home value minus a mortgage, because lending secured on the home can include a split or a second loan, and only the computed figure accounts for it. If a figure they asked for is not in that block, or is marked "not yet derivable", tell them plainly what is missing and ask for it. Never offer your own arithmetic in its place.
 NEVER CALCULATE ONE OF THEIR FIGURES FROM ANOTHER. A minimum repayment, a rate, an interest amount, a balance and a repayment are separate facts, each read off a screen or a statement. When the person updates one of them, change that one and leave the rest exactly as they are; if a related figure has moved too, ask for it. The only figures you convert are pay periods the person stated (a fortnightly net pay to a monthly one), and even then you keep what they said.
 
 When a user turn contains [TRANSACTION RESULT] {json}, code has applied their answers and done the division. State the composition plainly, two facts, no adjustment, no verdict, in this shape: "That works out at $X a month across the year. About $Y a month of that was one-off spending — <the one-off labels in plain words> — so a typical month is quieter than that, and a year has things like them in it." (Where one_off_monthly is 0, just state the monthly figure.) Code records the result itself (the monthly figure, includes_housing false, any housing figure, where the money goes by category, the once-a-year bills, the months covered and the confidence), so you capture nothing from it and never recompute it; you don't list categories and you never describe any category as high, low, a lot or too much. You may say the spending tile now shows where it goes. Where coverage_months is under 11, say plainly that a shorter stretch can miss once-a-year costs and that the rest of the year would firm the figure up.`;
@@ -489,12 +491,29 @@ function emDashScrubStream(onDone, ctx = {}) {
     });
     return kept.join("\n\n");
   }
+  // WALK 4, 15 Oct: the close cut kept EVERYTHING before the frame, so
+  // Finn's own "that's actually everything we set out to cover" survived and
+  // code's "we're not finished yet" landed underneath it. One reply, two
+  // contradictory claims, and nothing to answer. The claim goes with the
+  // frame, and the replacement carries the next open ask.
+  const FINISHING = /\b(that'?s (?:actually )?(?:everything|all|it)|everything we set out to cover|all we need|nothing (?:else|more) (?:we need|to cover)|we'?re (?:all )?(?:done|finished|set)|wrapping up|wrap (?:things )?up|you now have the complete picture|covered everything)\b/i;
+  function dropFinishingClaims(before) {
+    const paras = before.split(/\n{2,}/).map(x => x.trim()).filter(Boolean);
+    const kept = paras.filter(p => !FINISHING.test(p));
+    if (kept.length !== paras.length) console.error(`[Finn clarity] close refused: dropped ${paras.length - kept.length} finishing claim(s) rather than leaving them above the correction`);
+    return kept.join("\n\n");
+  }
   function compose(raw) {
     let text = dropDuplicateAsk(raw);
     if (ctx.canClose === false && /\[FRAME:\s*close\s*\]/.test(text)) {
       closeRefused = true;
-      text = text.split(/\[FRAME:\s*close\s*\]/)[0].trimEnd() + "\n\n[FRAME: not_yet]";
-      console.error("[Finn clarity] close attempted with areas open; reply cut at the frame");
+      const before = dropFinishingClaims(text.split(/\[FRAME:\s*close\s*\]/)[0].trimEnd());
+      // The replacement must leave something to answer: code knows the next
+      // open item, so it asks it rather than serving a dead end.
+      const ask = ctx.nextAsk || null;
+      const tail = ask ? (ask.token || ask.text) : "";
+      text = (before ? before + "\n\n" : "") + "[FRAME: not_yet]" + (tail ? "\n\n" + tail : "");
+      console.error("[Finn clarity] close attempted with areas open; reply cut at the frame" + (tail ? " and the next open ask served" : " with no next ask available"));
     }
     return sub(scrub(text)).replace(/\n{3,}/g, "\n\n").trim();
   }
@@ -966,6 +985,41 @@ async function waitForInFlight(householdId, sessionId) {
   return rows[0] || null;
 }
 
+/* ── has this household already been nudged about the thing we are chasing? ──
+   (walk 4, 15 Oct) This used to scan the last assistant message for the
+   first-nudge copy. `messages` is the CURRENT session's transcript only, so
+   a returning household always scanned empty and always got the full first
+   nudge again, however many times the item had been deferred before.
+
+   The durable ledger already exists: flags.to_verify[].nudges, written by
+   the capture pipeline. The target is the item the plan is chasing in this
+   turn, chosen the same way planPromptSection chooses its NEXT MOVE, so the
+   nudge the model emits and the count code reads are about the same thing.
+   The transcript check stays as an OR: a nudge served earlier in this same
+   session counts even before the ledger has been written. */
+function nudgeTarget(plan) {
+  if (!plan) return null;
+  const firstMissing = (plan.trips || []).map(t => ({ t, m: (t.items || []).find(i => i.status === "missing") })).find(x => x.m);
+  if (firstMissing) return { field: firstMissing.m.field, item_id: firstMissing.m.item_id || null };
+  const memory = (plan.to_verify || []).find(v => ["stated", "estimated", "unrecorded"].includes(v.confidence) && v.trip !== "conversation");
+  return memory ? { field: memory.field, item_id: memory.item_id || null } : null;
+}
+
+function alreadyNudgedFor(plan, domains, messages, nudgeCopy) {
+  const target = nudgeTarget(plan);
+  const entries = (((domains || {}).flags || {}).to_verify) || [];
+  if (target) {
+    const hit = entries.find(e => e && e.field === target.field && (e.item_id || null) === target.item_id);
+    if (hit && Number(hit.nudges) > 0) return true;
+  }
+  // Same session, before the ledger lands: the last reply was the nudge.
+  const a = (messages || []).filter(m => m && m.role === "assistant");
+  const last = a[a.length - 1];
+  const text = !last ? "" : typeof last.content === "string" ? last.content
+    : Array.isArray(last.content) ? last.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : "";
+  return !!nudgeCopy && text.includes(nudgeCopy.slice(0, 60));
+}
+
 /* ── the derived figures, for quoting ── (walk 4, 15 Oct)
    The model is given no means to work a figure out: it gets the finished
    numbers from the SAME derive() the dashboard tiles use, so an answer in
@@ -990,7 +1044,7 @@ function derivedPromptSection(domains) {
     }
     lines.push(`${key}: ${v}`);
   }
-  return `\nFigures computed by code (QUOTE THESE VERBATIM; never derive a figure yourself):\n` +
+  return `\nFigures already calculated for this household (QUOTE THESE VERBATIM; never work one out yourself):\n` +
     lines.map(l => "  " + l).join("\n") +
     `\nA figure marked "not yet derivable" is missing an input: name what is missing, never work it out.`;
 }
@@ -1202,13 +1256,10 @@ export default async function handler(request, context) {
       const hits = words.filter(w => said.includes(w)).length;
       return hits / words.length >= 0.5;
     },
-    alreadyNudged: (() => {
-      const a = messages.filter(m => m && m.role === "assistant");
-      const last = a[a.length - 1];
-      const text = !last ? "" : typeof last.content === "string" ? last.content
-        : Array.isArray(last.content) ? last.content.filter(b => b && b.type === "text").map(b => b.text).join(" ") : "";
-      return text.includes(NUDGES.first.slice(0, 60));
-    })(),
+    alreadyNudged: alreadyNudgedFor(plan, picture.domains, messages, NUDGES.first),
+    // Code knows the next open ask, so a reply it has to cut can still
+    // leave the person something to answer (walk 4).
+    nextAsk: nextOpenAsk(plan),
     onFirstReply: (t) => { firstReply = t; },
     retry: retryOnce,
   }));
@@ -1394,4 +1445,4 @@ export default async function handler(request, context) {
 }
 
 // Exposed for the local stream test only (tests/finn-stream.tests.js).
-export { emDashScrubStream as __streamForTests, ABSOLUTE as __absoluteForTests, SWEEPS as __sweepsForTests, derivedPromptSection as __derivedPromptSectionForTests };
+export { emDashScrubStream as __streamForTests, ABSOLUTE as __absoluteForTests, SWEEPS as __sweepsForTests, derivedPromptSection as __derivedPromptSectionForTests, alreadyNudgedFor as __alreadyNudgedForTests };

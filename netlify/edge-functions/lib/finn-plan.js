@@ -520,3 +520,23 @@ export function planPromptSection(plan, opts = {}) {
     : "Closing is NOT available yet: code will refuse session_complete until every area above is covered (each missing item gathered or put off by the person, every sweep asked). Do not wrap up, summarise as finished, or ask 'anything else before we wrap up' while items remain.");
   return L.join("\n");
 }
+
+/* The next open ask, as code already knows it (walk 4, 15 Oct).
+   Used when code has to take a reply's ending away: the replacement must
+   carry something to answer, not a generic "let's keep going". Mirrors the
+   NEXT MOVE choice in planPromptSection so the two never disagree. */
+export function nextOpenAsk(plan) {
+  if (!plan) return null;
+  if (plan.phase === "shape") {
+    const sweep = (plan.sweeps_pending || []).find(x => SWEEPS[x]);
+    if (sweep) return { kind: "sweep", id: sweep, token: "[SWEEP: " + sweep + "]" };
+  }
+  const firstMissing = (plan.trips || []).map(t => ({ t, m: (t.items || []).find(i => i.status === "missing") })).find(x => x.m);
+  if (firstMissing) {
+    const label = String(firstMissing.m.label || "").replace(/\s*\([^)]*\)\s*$/, "");
+    return { kind: "item", id: firstMissing.m.field, text: "Next on the list is " + label + ". What can you tell me about that?" };
+  }
+  const sweep = (plan.sweeps_pending || []).find(x => SWEEPS[x]);
+  if (sweep) return { kind: "sweep", id: sweep, token: "[SWEEP: " + sweep + "]" };
+  return null;
+}

@@ -593,6 +593,27 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
   }
 
 
+
+  /* ── the household context header (built 15 Oct) ──
+     The frame the tiles sit inside: facts from a template, no badge, no
+     status, no routing, and silent about what is not known. */
+  {
+    const ch = panels.contextHeader(D, { ownerName: 'Sam', partnerName: 'Jess' });
+    t('context-header-renders-the-people', /Sam, 41/.test(ch) && /Jess, 39/.test(ch));
+    t('context-header-carries-the-work-intent', /both continuing/i.test(ch));
+    t('context-header-never-flags-anything',
+      !/fp-badge|fp-route|questions to ask|not recorded|missing/i.test(ch));
+    // Quiet about what is not known: this household recorded no children.
+    t('context-header-silent-on-what-is-absent', !/child/i.test(ch));
+    // An entirely absent context must not throw and must render nothing.
+    t('context-header-survives-an-empty-picture', panels.contextHeader({}, {}) === '');
+    t('context-header-survives-no-arguments-at-all', panels.contextHeader() === '');
+    const kids = panels.contextHeader({ context: { adults: 2, owner_age: 42, partner_age: 40, children: [{ age: 9 }, { age: 6 }] } }, {});
+    t('context-header-lists-children-by-age', /Two children, 9 and 6\./.test(kids));
+    const horizon = panels.contextHeader({ context: { owner_age: 51, horizon_years: 10 } }, { ownerName: 'Dana' });
+    t('context-header-carries-the-horizon', /Dana, 51\./.test(horizon) && /next 10 years/.test(horizon));
+  }
+
   /* ── the derived figures reach the model (walk 4, 15 Oct) ──
      The defect: asked for an equity position, the model did its own
      arithmetic (home value minus mortgage) and missed the $60,000 split
@@ -602,8 +623,11 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
      These three checks hold that shut. */
   if (chat && typeof chat.__derivedPromptSectionForTests === "function") {
     const block = chat.__derivedPromptSectionForTests(D);
-    t('context-block-labels-the-figures-as-code-computed',
-      /QUOTE THESE VERBATIM/.test(block) && /never derive a figure yourself/i.test(block));
+    // Relabelled 15 Oct: the person must never hear HOW a figure was made,
+    // so the block no longer names the implementation.
+    t('context-block-labels-the-figures-without-naming-the-machinery',
+      /QUOTE THESE VERBATIM/.test(block) && /never work one out yourself/i.test(block)
+      && !/\bcode\b/i.test(block.split("\n")[1] || ""));
     // The household's real figures, not arithmetic over the raw picture:
     // a home value of 950000 less a 540000 mortgage AND the 90000 split.
     t('context-block-carries-home-equity-320000', /home_equity: 320000\b/.test(block));
@@ -625,7 +649,7 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
 
   return {
     pass: failures.length === 0,
-    total: 137,
+    total: 145,
     failures,
     hand_computed: {
       home_equity: 320000, lvr_percent: 66.3, surplus_monthly: 3450, buffer_months: 2.7,

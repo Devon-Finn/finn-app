@@ -168,5 +168,51 @@ export async function runStreamTests(chat, tokens) {
     && savedCap?.domains?.buffer?.accessible_savings === 38000
     && servedCap?.domains?.buffer?.accessible_savings === 38000);
 
-  return { pass: failures.length === 0, total: 30, failures };
+
+  /* ── 10. the nudge ledger survives a session boundary (walk 4, 15 Oct) ──
+     The old check scanned the last assistant message, and `messages` is the
+     current session only, so a returning household always read as never
+     nudged. The empty `messages` array below IS the test: the durable
+     count in flags.to_verify[].nudges has to carry it. */
+  const nudgedPlan = {
+    phase: 'trips',
+    trips: [{ id: 'conversation', items: [{ field: 'protection.income_protection.amount', item_id: null, status: 'missing', label: "Jess's income protection monthly benefit" }] }],
+    to_verify: [], sweeps_pending: [],
+  };
+  const nudgedDomains = { flags: { to_verify: [{ field: 'protection.income_protection.amount', item_id: null, nudges: 2, reason: 'deferred' }] } };
+  if (typeof chat.__alreadyNudgedForTests === 'function') {
+    t('a-prior-session-nudge-is-remembered-with-an-empty-transcript',
+      chat.__alreadyNudgedForTests(nudgedPlan, nudgedDomains, [], NUDGES.first) === true);
+    t('a-never-nudged-item-still-gets-the-first-nudge',
+      chat.__alreadyNudgedForTests(nudgedPlan, { flags: { to_verify: [] } }, [], NUDGES.first) === false);
+    // The transcript check stays as an OR for a nudge served this session
+    // before the ledger has been written.
+    t('a-nudge-earlier-in-this-session-still-counts',
+      chat.__alreadyNudgedForTests(nudgedPlan, { flags: { to_verify: [] } },
+        [{ role: 'assistant', content: NUDGES.first }], NUDGES.first) === true);
+  }
+  const remembered = await run(f, ['Noted.\n\n[NUDGE: first]\n\n[CAPTURE]{}'], {
+    alreadyNudged: chat.__alreadyNudgedForTests
+      ? chat.__alreadyNudgedForTests(nudgedPlan, nudgedDomains, [], NUDGES.first) : false,
+  });
+  t('a-remembered-nudge-serves-the-acceptance-not-the-first-nudge',
+    remembered.visible.includes(NUDGES.accept) && !remembered.visible.includes(NUDGES.first));
+
+  /* ── 11. a refused close replaces the claim and carries the next ask ──
+     Walk 4 served both "that's actually everything we set out to cover" AND
+     "we're not finished yet" in one reply, with nothing to answer. The
+     finishing claim must go with the frame, and the correction must ask the
+     next open thing code already knows. */
+  const refused = await run(f, [
+    "That's actually everything we set out to cover.\n\n" +
+    "Let me flag the one thing still open: Jess's income protection monthly benefit amount. That's sitting in the Hostplus insurance page whenever you get a chance to check it.\n\n" +
+    "[FRAME: close]\n\nYour picture is saved.\n\n[CAPTURE]{}",
+  ], { canClose: false, nextAsk: { kind: 'item', id: 'protection.income_protection.amount', text: 'Next on the list is the income protection monthly benefit. What can you tell me about that?' } });
+  t('the-finishing-claim-goes-with-the-frame', !/everything we set out to cover/i.test(refused.visible));
+  t('the-useful-paragraph-survives', /Hostplus/.test(refused.visible));
+  t('the-correction-is-served', refused.visible.includes(FRAMES.not_yet));
+  t('the-correction-carries-something-to-answer', /\?/.test(refused.visible) && /income protection monthly benefit/i.test(refused.visible));
+  t('nothing-after-the-close-frame-survives', !/picture is saved/i.test(refused.visible));
+
+  return { pass: failures.length === 0, total: 39, failures };
 }

@@ -219,3 +219,14 @@ details.fp-b[open] > summary.fp-howthis { margin-bottom: 8px; }
 .fp-sval { text-align: right; font-variant-numeric: tabular-nums; color: var(--fc-dark); font-weight: 600; white-space: nowrap; }
 .fp-sval .u { font-weight: 400; color: var(--fc-light); font-size: 11.5px; }
 @media (max-width: 560px) { .fp-srow { grid-template-columns: 1fr auto; } .fp-sbar { grid-column: 1 / -1; order: 3; } .fp-qlist li { flex-direction: column; gap: 2px; } }
+
+/* The household context header: the frame the tiles sit inside (15 Oct).
+   Deliberately quiet - no card, no border, no status colour. It states who
+   the picture is about and never flags anything. */
+.fp-context { margin: 0 0 18px; }
+.fp-contextline {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--fc-ink-soft, #4a5568);
+}
