@@ -1,0 +1,518 @@
+{
+  "_meta": {
+    "questions_status": "v2 15 Oct 2026: tiles[n].questions and insights[].question carry Devon's edited wording, 34 questions across the nine tiles, down from 37. DEVON'S EDIT IS COMPLETE AS OF 15 OCTOBER 2026. CHARLIE'S SIGN-OFF IS STILL OUTSTANDING. They render as questions for the person to take to a professional, never as Finn's view. tiles[5].conditional_questions holds one question that shows only on a cover asymmetry; its condition lives in finn-panels.js and its row is in docs/field-spec.md section 3.3b.",
+    "source": "docs/field-spec.md Part 4 + docs/component-spec.md 5.2 (structure) + docs/education-library.md (copy, signed off tile by tile with Devon) + docs/term-registry.md (companion)",
+    "rules": [
+      "position_line.template is filled by slot substitution ONLY. The renderer never composes or rewords the sentence, and no model call touches this path.",
+      "blocks are immutable at runtime: no summarisation, no rewriting for length, no tone adjustment. If a block is too long for a viewport, that is a layout problem.",
+      "Block copy is imported VERBATIM from docs/education-library.md. Editing copy happens in that document first, then re-imports here; never edit copy in this file alone.",
+      "Blocks marked [Not provided ...] had no corresponding block in the signed-off document and await Devon's copy; they must never be improvised by a model or a developer.",
+      "Entries with block_style 'inline_headings' carry their own headings inside the block text (8.1b's four-part no-referral content); the renderer must not print the template headings over them. Entries with block_style 'single' are deliberately one block; a one-paragraph unit beside five-block units is a Step 5 layout problem, never a copy gap to fill.",
+      "An entry's 'intro' renders above its blocks, verbatim (8.1b's no-referral lead-in is the trust moment on that tile).",
+      "Slots suffixed _display (statuses, counts, descriptions) are formatted by the deterministic renderer from the listed fields: formatting, never characterisation.",
+      "A missing field renders as 'none recorded', never as zero. (Fixture H, field-spec 3.6.)",
+      "route_primary/route_also (component-spec 5.2): a fixed property of the insight, never derived from the person. An insight appears once under its primary professional on the who-to-see view; route_also professionals are named inline beneath it, never given a duplicate entry.",
+      "no_referral: true means the entry has NO action button, NO route_primary and NO professional card. Where a counsellor appears in its copy, they are named as available, never prescribed.",
+      "section_b is absent ONLY where a calc block demonstrates the same mechanic (tiles 1 and 2). On tiles 3-9 the mechanic is about what a product does, not how numbers relate, so section_b stays (component-spec 4.1).",
+      "Only tiles 1, 4, 6 and 9 can go calm and carry a calm block {statement, why, what_would_change[], closing}, rendered when the tile has figures and zero insights. Tiles 2, 3, 5, 7 and 8 can never go calm (every computable state there fires something or is still building) and the renderer must never expect a block for them. why is a property of the situation type, never a judgment of the person. Never a tick, never green, never a completion state; the status flag is neutral grey Nothing flagged (component-spec 3.6, education-library 6.2).",
+      "professionals: cost belongs to the professional, not the insight. cost_pill and cost_line render once on the who-to-see view, never per insight (component-spec 2.6)."
+    ]
+  },
+  "professionals": {
+    "mortgage_broker": {
+      "name": "Mortgage broker",
+      "role": "Looks across a lot of lenders at once rather than one, and handles the comparison and the paperwork.",
+      "cost_pill": "Usually free",
+      "cost_line": "Most brokers charge you nothing. They're paid a commission by the lender when a loan settles. A few charge a fee in complex situations, and they have to tell you before you start."
+    },
+    "financial_planner": {
+      "name": "Financial planner",
+      "role": "Helps you work out what you're aiming at and how the pieces fit together, based on what matters to you.",
+      "cost_pill": "Varies",
+      "cost_line": "Usually a first conversation at no cost to see whether it's a fit. If you go ahead there's a fee for the written advice, and often an ongoing fee if you keep them on. The amounts vary a lot, and they tell you before anything is agreed."
+    },
+    "insurance_specialist": {
+      "name": "Insurance specialist",
+      "role": "Works out what cover you actually hold, what it would pay and when, and where the gaps sit for a household like yours.",
+      "cost_pill": "Usually free",
+      "cost_line": "Generally paid a commission by the insurer rather than a fee by you. Some charge a fee instead, and will say so upfront."
+    },
+    "estate_lawyer": {
+      "name": "Estate planning lawyer",
+      "role": "Prepares the documents that decide what happens to what you own, and who looks after the children, so they actually do what you intend.",
+      "cost_pill": "Fixed price",
+      "cost_line": "Usually a set price for a will and the related documents, quoted before they start. For a straightforward situation it's often less than people expect."
+    },
+    "accountant": {
+      "name": "Accountant",
+      "role": "Looks at where your income comes from and how it's structured, and handles the tax that follows from it.",
+      "cost_pill": "Fee, often deductible",
+      "cost_line": "A fee for the work, often a set price for a return and hourly for advice. Accounting fees are generally deductible, so part of it comes back."
+    },
+    "financial_counsellor": {
+      "name": "Financial counsellor",
+      "role": "Free, independent help for people having trouble with debt. Not a salesperson and not a lender.",
+      "cost_pill": "Free",
+      "cost_line": "Free, always. They're on your side entirely, and you don't have to be in crisis to call one."
+    }
+  },
+  "tiles": {
+    "1": {
+      "title": "Your home and mortgage",
+      "questions": [{"q": "How does my rate compare with what lenders are offering today?", "pro": "mortgage_broker"}, {"q": "Does the way my loan is set up, including any splits, offset or fixed period, still fit how we live now?", "pro": "mortgage_broker"}, {"q": "What does this loan cost me in fees each year, and what do I get for them?", "pro": "mortgage_broker"}],
+      "calm": {
+        "statement": "Nothing here routes to anyone.",
+        "why": "With no loan against the place there's no rate to review, no structure to look at and no lender in the picture. A home owned outright is the simplest position this tile can hold.",
+        "what_would_change": ["Borrowing against the property for any reason", "Buying somewhere else while keeping this one", "Using what you own of it to fund something"],
+        "closing": "Any of those brings a lender back into the picture, and that's when a broker becomes useful again."
+      }
+    },
+    "2": {
+      "title": "What's left over each month",
+      "questions": [{"q": "Which of our regular costs land once or twice a year, and how do we plan for them?", "pro": "financial_planner"}]
+    },
+    "3": {
+      "title": "Your safety net",
+      "questions": [{"q": "How much would we want within easy reach if our income paused?", "pro": "financial_planner"}, {"q": "Does money in an offset work the same way as savings for us?", "pro": "mortgage_broker"}],
+      "section_b": "Your safety net is money you could reach quickly, without selling anything or asking anyone's permission. The months figure is that amount divided by what a month of your life costs, so it's expressed as time rather than dollars. It counts only money you already hold. Credit you could draw on isn't included, because that belongs to a lender rather than to you."
+    },
+    "4": {
+      "title": "Your super",
+      "questions": [{"q": "Do we need every super account we hold, and what does each one cost us?", "pro": "financial_planner"}, {"q": "What insurance sits inside our super, and what would it pay?", "pro": "insurance_specialist"}, {"q": "Is the nomination on each fund current, and does it say what we want?", "pro": "estate_lawyer"}],
+      "section_b": "Super is money held for you until retirement, in one account or several. Each account charges its own fees, taken out of the balance rather than billed to you, so they're easy not to notice. Accounts can also hold insurance inside them, with the premiums coming out of the balance the same way.",
+      "calm": {
+        "statement": "Nothing here routes to anyone.",
+        "why": "One account each. Fees come out of one balance rather than several, and there's no second account quietly holding cover you'd forgotten about. That's the simplest way super can sit.",
+        "what_would_change": ["Changing jobs, where a new employer opens their default fund", "Starting to work for yourself", "Turning up an old account you'd lost track of"],
+        "closing": "Super accounts open far more easily than they close. A new job with a new default fund is how most people end up with two without ever deciding to."
+      }
+    },
+    "5": {
+      "title": "Protection",
+      "questions": [{"q": "What would our household need if one of us couldn't work for a year or more?", "pro": "insurance_specialist"}, {"q": "Which of our cover sits inside super and which outside, and what difference does that make?", "pro": "insurance_specialist"}],
+      "conditional_questions": [{"q": "If the one of us without that cover was the one who couldn't work, what would that mean for the household?", "pro": "insurance_specialist", "when": "cover_held_by_one_person_only"}],
+      "section_b": "Life cover pays a lump sum if you die. Total and permanent disability cover pays if you're permanently unable to work again. Income protection is a different thing again, it replaces part of your income month to month while you're unable to work, and stops when you go back. They're three separate events, and holding cover for one doesn't cover you for the others."
+    },
+    "6": {
+      "title": "Your will and estate",
+      "questions": [{"q": "Do our wills still describe our family as it is now?", "pro": "estate_lawyer"}, {"q": "Who could make decisions for us if we couldn't make them ourselves?", "pro": "estate_lawyer"}, {"q": "How does our super pass on, and does it line up with our wills?", "pro": "estate_lawyer"}],
+      "section_b": "A will directs what happens to what you own. An enduring power of attorney lets someone you choose make decisions on your behalf if you're unable to, while you're still alive, which a will doesn't cover. Guardianship names who would raise your children. A super nomination directs your super, which is dealt with separately from your will.",
+      "calm": {
+        "statement": "Nothing here routes to anyone.",
+        "why": "A will, an enduring power of attorney, guardianship and a super nomination, all in place and none of them old enough to have drifted from what you'd want. That's the full set.",
+        "what_would_change": ["A child arriving", "A separation, or a new relationship", "Buying or selling a property", "Your super nomination reaching three years old"],
+        "closing": "The nomination is the one with a clock on it. Most expire after three years unless the fund offers a non-lapsing one, and nothing tells you when that happens."
+      }
+    },
+    "7": {
+      "title": "Your investments",
+      "questions": [{"q": "How are our investment income and any borrowing for it treated at tax time?", "pro": "accountant"}],
+      "section_b": "An investment property has its own value, its own loan and its own equity, in the same way your home does. The rent it earns is income, and the interest on its loan is treated differently at tax time from the interest on the loan for the home you live in. For shares and funds, what they earn is taxed at the marginal rate of whoever the asset is held by, so whose name is on it changes what it costs."
+    },
+    "8": {
+      "title": "Your other debts",
+      "questions": [{"q": "What does each of our debts cost us over a year, all in?", "pro": "mortgage_broker"}, {"q": "If money ever got tight, what help is available and who do we call?", "pro": "financial_counsellor"}],
+      "section_b": "The minimum repayment on a credit card is calculated as a small percentage of the balance, which means most of an early payment goes to interest rather than the debt. It's why a balance at 20% moves slowly even when the minimum is met every month."
+    },
+    "9": {
+      "title": "How your income is made up",
+      "questions": [{"q": "What records should we keep for income that doesn't come through a payslip?", "pro": "accountant"}],
+      "section_b": "Income from an employer has tax taken out before it reaches you, and the employer pays super on top of it. Income you earn for yourself arrives whole, with the tax on it settled later, and no super attached unless you arrange it yourself. The total here is annual and before tax, so it won't match what actually lands in your account each month.",
+      "calm": {
+        "statement": "Nothing here routes to anyone.",
+        "why": "When income comes from an employer, the tax is settled before it reaches you and super goes in on top automatically. There's no structure sitting underneath it to review, so there's no conversation to have.",
+        "what_would_change": ["Contracting or work under an ABN", "A business, however small", "Rent from a property", "Money paid through a trust or a company"],
+        "closing": "Each of those brings tax you settle yourself rather than an employer settling it, and super nobody pays for you unless you arrange it. That's when this becomes an accountant's conversation."
+      }
+    }
+  },
+  "insights": [
+    {
+      "id": "1.1",
+      "question": "I've been with my lender a while now. What would someone actually look at if they reviewed this loan, and what would they compare it against?",
+      "title": "Your rate and how the loan is set up",
+      "tile": 1,
+      "variant": null,
+      "route_primary": "mortgage_broker",
+      "route_also": [],
+      "position_line": {
+        "template": "Your loan is at {rate_percent}% ({rate_type}), and you've been with {lender} since {with_lender_since}.",
+        "fields": ["home.rate_percent", "home.rate_type", "home.lender", "home.with_lender_since"]
+      },
+      "blocks": {
+        "why": "Your mortgage is almost certainly the biggest financial commitment you have, so small differences in the rate or the way the loan is set up add up to real money over the years it runs. Loans also quietly drift out of date. The rate that was competitive when you signed up, the features you're paying for, the structure you chose for a situation you were in years ago, none of it updates itself. A review is simply someone checking whether the loan still fits the life you're in now.",
+        "turn_up": "People often find their rate has crept above what's currently on offer, or that they're paying for features they don't use, or that the loan could be structured to suit them better. Sometimes everything's fine and they walk away reassured. Either way, they stop wondering.",
+        "dont_realise": "Lenders will often offer a sharper rate to a new customer than the one an existing customer is sitting on. Nobody rings to tell you, because there's no reason for them to. It's a large part of why a loan drifts without anything actually going wrong.\n\nAnd the review itself costs nothing. A mortgage broker is paid by the lender, not by you, so the only thing you're risking is half an hour.",
+        "how_professional": "A broker looks across a lot of lenders at once, not just your current bank, so they can see how your loan compares to the whole market rather than one shelf of it. They handle the comparison, the paperwork, and the back-and-forth with lenders.",
+        "nothing_to_prepare": "This is the bit people quietly dread, sitting across from someone and worrying they'll be asked something they can't answer. That doesn't happen here. Finn has already built your picture and can pass it straight to them, so you walk in with everything already understood. You don't need to have it all figured out, or know the right questions, or feel on top of it. That's Finn's job, and it's done. You just turn up."
+      },
+      "action_label": "Find a mortgage broker"
+    },
+    {
+      "id": "1.2",
+      "question": "Is the offset on my loan worth keeping, and what is it costing me?",
+      "title": "An offset account with nothing in it",
+      "tile": 1,
+      "variant": null,
+      "route_primary": "mortgage_broker",
+      "route_also": [],
+      "position_line": {
+        "template": "You have an offset account attached to your loan, with nothing currently sitting in it.",
+        "fields": ["home.has_offset", "home.offset_balance"]
+      },
+      "blocks": {
+        "why": "An offset account is one of the most useful features a home loan can have, and it only does anything when there's money in it. Every dollar in an offset comes off the balance your loan charges interest on, while staying completely available to you. An empty one does none of that, and it usually isn't free.",
+        "turn_up": "Sometimes the account was set up at settlement and never used, because nobody explained what it was for. Sometimes the money that would sit in it is somewhere else entirely. Either way it's a short conversation, and it's the kind of thing a broker sorts out in one call.",
+        "dont_realise": "An offset usually comes as part of a package the loan charges you for, often a few hundred dollars a year. That fee is charged whether the account is working hard or sitting empty. Most people never think of an offset as something with a price on it, which is how an unused one goes years without anyone noticing.",
+        "how_professional": "A broker can tell you what your particular package costs, what the offset is actually attached to, and how your accounts could sit around the loan. This is routine work for them.",
+        "nothing_to_prepare": "You don't need to understand offsets before you go, that's the whole point of the conversation. Finn passes on how your accounts currently sit, and they explain the rest in ordinary terms. No homework."
+      },
+      "action_label": "Find a mortgage broker"
+    },
+    {
+      "id": "1.3",
+      "question": "What are the options and the risks around the equity in my home?",
+      "title": "Your equity and what it could be used for",
+      "tile": 1,
+      "variant": null,
+      "route_primary": "mortgage_broker",
+      "route_also": ["financial_planner"],
+      "position_line": {
+        "template": "Your equity in the home is {home_equity}, with the loan at {lvr_percent}% of the home's value.",
+        "fields": ["derived.home_equity", "derived.lvr_percent"]
+      },
+      "blocks": {
+        "why": "Equity is the part of your home you actually own, and it grows every time you make a repayment and every time the place is worth more. For most households it's the largest asset they have, and it sits there doing nothing visible. What a lot of people never find out is that equity can be used. It's the starting point for a number of things people do to build their position over time, and it's one of the more established areas of financial advice in Australia. Whether any of it suits you is a completely separate question, and it's the one worth putting to someone.",
+        "turn_up": "This is an area where the honest answer is that it depends enormously. Using equity means taking on more debt against your home, so it lifts both what you might build and what you're exposed to if things don't go to plan. For some households that trade-off is right. For plenty of others it isn't. Which one you are depends on your income and how secure it is, what else you're carrying, and what you actually want. That isn't something to settle from an article.",
+        "dont_realise": "Equity on paper and equity a lender will actually work with are two different numbers. Lenders look at how much you'd still be borrowing against the property, and there are thresholds where the terms change, including whether lenders mortgage insurance comes into it. Where you sit against those thresholds matters more than the raw figure, and it isn't something you can read off a valuation.",
+        "how_professional": "A mortgage broker can tell you what a lender would actually consider and on what terms. A financial planner is the one who helps you think about whether using it serves what you're trying to do, and what it would mean if things went differently. Anything that involves borrowing in order to invest is a planner's conversation rather than a broker's, and it's worth knowing which one you're having.",
+        "nothing_to_prepare": "You don't need to know what any of the options are called, or to have decided anything. Plenty of people have this conversation purely to find out what their position allows and what it would actually mean. Finn passes on the whole picture, so it starts from something real."
+      },
+      "action_label": "Find the right professional"
+    },
+    {
+      "id": "2.1",
+      "question": "What should the money left over each month be doing, given what we want?",
+      "title": "What your spare money could be doing",
+      "tile": 2,
+      "variant": null,
+      "route_primary": "financial_planner",
+      "route_also": ["accountant"],
+      "position_line": {
+        "template": "About {surplus_monthly} is left in a typical month after living costs and housing.",
+        "fields": ["derived.surplus_monthly"]
+      },
+      "blocks": {
+        "why": "Most people have never seen this number. Not because it's hard to work out, but because nobody ever sits down and does it. Whatever is genuinely left over after everything is paid is the part of your finances with the most room in it, because it's the only money that isn't already promised to something. What it ends up doing, over the years it builds up, quietly decides a lot.",
+        "turn_up": "This is the one part of a household's money where the conversation is about possibility rather than repair. Spare money can go to plenty of places. More into super. Investments held outside super. Something set aside for the kids. Paying the mortgage down faster. A first investment property. Sometimes it's a holiday people had assumed was out of reach and it turns out isn't. Which of those is worth doing depends entirely on what you actually want, and that is the conversation.",
+        "dont_realise": "Spare money that stays in the account it landed in tends to get spent. Not on anything memorable, it just goes. That isn't a discipline problem, it's that money sitting next to your spending money behaves like spending money. The households that build something out of their surplus are almost always the ones where it moves somewhere separate automatically, before they see it.\n\nOn cost, a first conversation with a planner is usually about seeing whether it's a fit, so you find out what ongoing help would run to before committing to anything.",
+        "how_professional": "A financial planner helps you work out what your spare money could be working toward, based on what matters to you rather than a standard plan. An accountant comes into it where tax or the way your income is structured does. A first conversation is usually about understanding your situation, not signing you up to anything.",
+        "nothing_to_prepare": "You don't need a goal figured out, or a plan, or the right words for what you want. Working out what you actually want is a large part of what this conversation is for. Finn has already built the picture and passes it on, so you can turn up unsure, which is completely normal, and still get somewhere useful."
+      },
+      "action_label": "Find a financial planner"
+    },
+    {
+      "id": "2.2",
+      "question": "What are our options when more goes out each month than comes in?",
+      "title": "When there's nothing left over",
+      "tile": 2,
+      "variant": null,
+      "no_referral": true,
+      "route_primary": null,
+      "route_also": [],
+      "position_line": {
+        "template": "On these figures, what goes out each month is a little more than what comes in.",
+        "fields": ["derived.surplus_monthly", "debts.items"]
+      },
+      "block_style": "inline_headings",
+      "blocks": {
+        "why": "The figure is a snapshot, not a verdict\n\nThis number is built from what you told Finn about a typical month. It doesn't know about the quiet months, or the ones where the car registration and the school costs land together. Most households come out differently across a full year than they do in any single month, so the useful thing here is the shape of it rather than the precision.",
+        "turn_up": "Where the gap usually comes from\n\nFor most households it isn't one big thing. It's that the regular costs have crept up over a few years while the income hasn't, or that direct debits set up at different times have quietly accumulated. Debts with high minimum payments do it faster than anything else, because those minimums come out before anything is left.",
+        "dont_realise": "What people do about it\n\nOnly two things move this number, what comes in and what goes out, and neither is a small thing to change. What tends to help first is seeing every regular payment in one place, because the ones people find are almost always the ones they'd forgotten they were still paying for.",
+        "how_professional": "There's no referral here, and that's deliberate\n\nFinn doesn't have anyone on its list for this one. Planners don't generally take on work at this scale and the fee would be larger than the problem, and we won't point you at the businesses that advertise debt help. So instead of a referral, that's what's worth knowing.",
+        "nothing_to_prepare": "If it's causing real stress\n\nFinancial counsellors are free, they're on your side entirely, and you don't have to be in crisis to call one. The National Debt Helpline is 1800 007 007. There's no cost and no catch. It's there if you want it."
+      },
+      "action_label": null
+    },
+    {
+      "id": "3.1",
+      "question": "Is the length of time our safety net would last right for our household?",
+      "title": "How long your safety net would last",
+      "tile": 3,
+      "variant": null,
+      "route_primary": "financial_planner",
+      "route_also": [],
+      "position_line": {
+        "template": "Your accessible savings would cover about {buffer_months} months of your usual outgoings.",
+        "fields": ["derived.buffer_months", "context.children", "income.structure"]
+      },
+      "blocks": {
+        "why": "If your income stopped tomorrow, through illness, redundancy, or something nobody plans for, your safety net is what you'd live on until things settled. The useful way to think about it isn't a dollar figure, it's time. How many months of your actual living costs could you cover without earning anything. That's the difference between a rough patch and a real problem, and most people have never once worked it out.",
+        "turn_up": "There's no correct answer here, because it isn't really a maths question. It's a question about how much certainty you want. Someone with secure work, no dependants and a partner still earning is in a different position from a sole earner with a mortgage and three kids. What's enough for you depends on what your life costs and how much runway lets you sleep. That's the conversation, and it's a short one.",
+        "dont_realise": "Plenty of people are quietly counting something as their emergency fund that isn't really theirs. An unused credit card limit, or money they could redraw from the mortgage. Both of those belong to the lender, and both can be reduced or withdrawn without much notice. Lenders also tend to reassess when someone's circumstances change, which is the same moment you were relying on it. A safety net is money you already hold and can reach on your own.\n\nOn cost, a first conversation with a planner is usually about seeing whether it's a fit before anything ongoing is involved.",
+        "how_professional": "A financial planner helps you land on a number that suits your situation, and if there's a way to go, how to build towards it over time without pulling everything else apart. A first conversation is about understanding your situation, not selling you something.",
+        "nothing_to_prepare": "This is one of those things people avoid because facing it feels heavy. It doesn't have to be. Finn has already worked out where you stand, and can pass that straight on, so you're not sitting there trying to explain a situation you've never had laid out before. You just turn up, already understood."
+      },
+      "action_label": "Find a financial planner"
+    },
+    {
+      "id": "3.2a",
+      "question": "How would our safety net work differently if it sat against the loan instead of in savings?",
+      "title": "Where your safety net sits",
+      "tile": 3,
+      "variant": "has_offset",
+      "route_primary": "mortgage_broker",
+      "route_also": [],
+      "position_line": {
+        "template": "Your safety net of {accessible_savings} is held in {where_held}, separately from your loan.",
+        "fields": ["buffer.accessible_savings", "buffer.where_held"]
+      },
+      "blocks": {
+        "why": "A safety net has to stay reachable, which is why most people keep it in a savings account. That's the instinct everyone's taught. What far fewer people are told is that if you have a mortgage with an offset, money sitting in the offset stays exactly as reachable as it is in savings. You can get at it the same day. It isn't locked away, it isn't invested, and it doesn't stop being your emergency fund.",
+        "turn_up": "The two accounts do different things with the same money. Every dollar in an offset reduces the balance your loan charges interest on, for as long as it sits there. A dollar in a savings account earns interest at whatever rate that account pays. Both keep the money available to you. Which one is doing more comes down to the rate on your loan against the rate on the account.",
+        "dont_realise": "There's a tax difference almost nobody hears about. Interest you earn in a savings account is income, so it's taxed at your marginal rate and you only keep part of it. Interest an offset saves you isn't income at all, so there's no tax on it. The two aren't really comparable on their headline rates, before you even compare the rates themselves.",
+        "how_professional": "A broker can walk you through how your particular offset works, how much can sit in it, and how your accounts can be arranged so your safety net stays entirely available. This is routine work for them.",
+        "nothing_to_prepare": "You don't need to understand any of this beforehand, that's what the conversation is for. Finn passes on where your money currently sits, and they explain the rest in ordinary terms. No homework."
+      },
+      "action_label": "Find a mortgage broker"
+    },
+    {
+      "id": "3.2b",
+      "question": "Would an offset account on our loan change how our safety net works?",
+      "title": "Where your safety net sits",
+      "tile": 3,
+      "variant": "no_offset",
+      "route_primary": "mortgage_broker",
+      "route_also": [],
+      "position_line": {
+        "template": "Your safety net of {accessible_savings} is held in {where_held}, and your loan has no offset account attached.",
+        "fields": ["buffer.accessible_savings", "buffer.where_held"]
+      },
+      "block_style": "single",
+      "blocks": {
+        "why": "An offset is a loan feature rather than a separate product. Some home loans come with one, some don't, and some charge for it as part of a package. Whether your loan has one available, and what it would mean on your particular loan, is a question for a broker. It costs nothing to ask, because they're paid by the lender.",
+        "turn_up": "[Not provided - 3.2 Variant B is deliberately a single short block per docs/education-library.md, which hands the whole question to the broker because suggesting a different loan is credit assistance]",
+        "dont_realise": "[Not provided - 3.2 Variant B is deliberately a single short block per docs/education-library.md]",
+        "how_professional": "[Not provided - 3.2 Variant B is deliberately a single short block per docs/education-library.md]",
+        "nothing_to_prepare": "[Not provided - 3.2 Variant B is deliberately a single short block per docs/education-library.md]"
+      },
+      "action_label": "Find a mortgage broker"
+    },
+    {
+      "id": "4.1",
+      "question": "If we brought our super together, what would we keep and what would we lose?",
+      "title": "More than one super account",
+      "tile": 4,
+      "variant": null,
+      "route_primary": "financial_planner",
+      "route_also": [],
+      "position_line": {
+        "template": "{owner_display} {fund_count_display} super accounts.",
+        "fields": ["super.funds"]
+      },
+      "blocks": {
+        "why": "When super is spread across more than one account, each account usually charges its own set of fees, and over the decades super runs, paying two or three sets instead of one quietly adds up. Bringing accounts together is something a lot of people mean to get to and never do, partly because it's not obvious how, and partly because there's a catch worth knowing about first.",
+        "turn_up": "Each account charges its own fees, so holding three means paying three sets rather than one. Over the length of a working life that difference is real money. People also often turn up an account they'd lost track of entirely, since every super account in your name is tied to your tax file number and visible in one place through myGov, along with any super the ATO is holding from accounts that went inactive.",
+        "dont_realise": "Super accounts often have insurance sitting inside them, and with more than one account you can end up paying for the same cover twice. That matters most with income protection, because it generally only ever pays up to a set share of your income no matter how many policies you hold. Two premiums, one payout.\n\nIt runs the other way too. Closing an account to consolidate can cancel cover you didn't know you had, sometimes cover that would be hard or costly to replace. Between those two, checking what's inside each account before anything moves is the single reason this is worth a short conversation rather than a form you fill in blind.",
+        "how_professional": "A financial planner can look at what's in each account, including any cover held inside them, and help you bring things together without costing you something you didn't know you had. A first conversation is usually about understanding what you've got.",
+        "nothing_to_prepare": "You don't need to know which account has what, or whether you've got insurance inside your super, that's exactly what they work out. Finn passes on what you've gathered, and the rest is their job. You just turn up."
+      },
+      "action_label": "Find a financial planner"
+    },
+    {
+      "id": "5.1",
+      "question": "Does the cover we hold match what our household would actually need?",
+      "title": "The cover that protects your household",
+      "tile": 5,
+      "variant": null,
+      "route_primary": "insurance_specialist",
+      "route_also": ["financial_planner"],
+      "position_line": {
+        "template": "Cover recorded, {cover_display}.",
+        "fields": ["protection.covers", "context", "home.mortgage_balance"]
+      },
+      "blocks": {
+        "why": "Protection is the cover that steps in if something serious happens, if you couldn't work for a long stretch, or if you weren't around anymore. For a household with a mortgage and people who depend on that income, it's what stands between a hard situation and a much harder one. It's also one of the most commonly skipped corners of a household's finances, not because people don't care, but because it's uncomfortable to think about and easy to leave for another day.",
+        "turn_up": "Most people have some cover already and have never looked at what it actually does. Whether it pays a lump sum or a monthly amount. How long it keeps paying. How long you'd be waiting before it started. What would need to be true for a claim to be accepted. Those details are the entire product, and knowing them rather than assuming them is the point of the conversation.",
+        "dont_realise": "A lot of Australians have cover inside their super without ever choosing it, and there are two things worth knowing about that kind of default cover.\n\nThe first is that it isn't sized to your household. It doesn't know you have a mortgage, or three kids, or that you're the only one earning. The amount is set by the fund, not by your situation.\n\nThe second is that it can switch off. If no contributions go into a super account for long enough, the insurance inside it can be cancelled automatically, and people generally find out long after it happened.\n\nThere's also a cost that's easy to miss. Premiums for cover held in super come out of your super balance, so it isn't free, it's just paid from somewhere you never look.",
+        "how_professional": "A risk specialist or financial planner works out what cover you actually hold, what it would pay and when, and where the gaps sit for a household like yours. They're generally paid by the insurer rather than by you, so understanding what you've got usually costs nothing. A first conversation is about your situation, not pressure.",
+        "nothing_to_prepare": "This is a heavy one to sit with, which is exactly why people avoid it for years. You don't need to have thought it through, or know what cover you have, or have the answers. Finn has laid out where you stand, and can pass it on, so the conversation starts from something real instead of a blank and daunting page."
+      },
+      "action_label": "Find an insurance specialist"
+    },
+    {
+      "id": "6.1",
+      "question": "Which of our legal documents need writing or updating, and what happens if we leave them?",
+      "title": "Your will and the legal basics",
+      "tile": 6,
+      "variant": null,
+      "route_primary": "estate_lawyer",
+      "route_also": [],
+      "position_line": {
+        "template": "Recorded: will {will_display}, power of attorney {poa_display}, guardianship {guardianship_display}, super nomination {nomination_display}.",
+        "fields": ["estate.will", "estate.poa", "estate.guardianship", "super.funds[].nomination", "context.children"]
+      },
+      "blocks": {
+        "why": "This is the paperwork that decides what happens to your money, your home, and, if you have children, who looks after them, if something happened to you. A will, an enduring power of attorney, guardianship for the kids, and the nomination on your super. Almost everyone means to get these sorted. Most haven't, and most underestimate how much simpler it is than they fear.",
+        "turn_up": "For a lot of households, some or all of this isn't in place, or hasn't been looked at in years, since before the kids or a house move or something else that would change what you'd want. Where there's no will at all, the law has a fixed formula for who gets what, set by the state, and it doesn't know anything about your family. Getting this sorted tends to bring a particular kind of relief, because it's been sitting quietly on the conscience for a long time.",
+        "dont_realise": "Your super usually isn't covered by your will. It's directed by a nomination made on the super account itself, and if there's no valid nomination in place, the fund's trustee decides where it goes under its own rules. Not your will, not your family.\n\nThere's a second half to it that catches even the organised. Most nominations expire after three years unless the fund offers a non-lapsing one. Plenty of people who did the right thing at some point are sitting on a nomination that quietly stopped being valid, and nothing tells you when that happens.",
+        "how_professional": "An estate planning lawyer prepares these documents so they actually do what you intend. For a straightforward situation it's often quicker and more affordable than people expect, because they do this every day.",
+        "nothing_to_prepare": "You don't need to have decided anything, or understand the legal side, or have your affairs \"in order\" before you go, sorting it out is the whole point of the appointment. Finn passes on your picture, and they guide the rest."
+      },
+      "action_label": "Find an estate planning lawyer"
+    },
+    {
+      "id": "7.1",
+      "question": "Is the loan and set-up on our investment property still right for us?",
+      "title": "Your investment property",
+      "tile": 7,
+      "variant": null,
+      "route_primary": "mortgage_broker",
+      "route_also": [],
+      "position_line": {
+        "template": "Investment property valued around {property_value}, with {property_loan} owing and rent of {rental_income_annual} a year.",
+        "fields": ["investments.properties", "income.other"]
+      },
+      "blocks": {
+        "why": "An investment property comes with its own loan, its own equity, and its own tax picture, and each of those is worth keeping current in the same way your home loan is. The rate and structure on an investment loan can drift out of date just like any other, and the tax side has its own moving parts.",
+        "turn_up": "People often find the loan on an investment property hasn't been reviewed in years, or that there are tax questions they've never had properly answered. Seeing the property, its loan, and its equity laid out alongside everything else is often the first time it all sits in one place.",
+        "dont_realise": "The interest on a loan for an investment property is generally deductible against the income the property earns. The interest on the loan for the home you live in isn't. That's why two loans that look identical on a statement aren't really the same kind of debt, and it's the reason the two get treated very differently at tax time.\n\nThe other one that catches Victorian investors is land tax. The home you live in is generally exempt. An investment property generally isn't, and the thresholds have moved in recent years, so people who bought a while ago have found themselves paying something they never used to.",
+        "how_professional": "A mortgage broker handles the loan and how it's structured. A financial planner helps with how the property fits your bigger picture and goals. An accountant handles the tax side. Which one you start with depends on what you're weighing up, and Finn points you to the right one.",
+        "nothing_to_prepare": "You don't need to have the numbers at your fingertips or understand the tax rules. Finn has it all captured, and passes it on, so whoever you see starts from a full picture, not a standing start."
+      },
+      "action_label": "Find the right professional"
+    },
+    {
+      "id": "7.2",
+      "question": "Do our investments still fit what we're aiming for and our timeframe?",
+      "title": "Your investments and how they fit",
+      "tile": 7,
+      "variant": null,
+      "route_primary": "financial_planner",
+      "route_also": [],
+      "ownership_block": { "block": "dont_realise", "paragraph": 0 },
+      "position_line": {
+        "template": "Investments of {investments_total_display}, held in {held_in}.",
+        "fields": ["investments.shares_value", "investments.managed_funds_value", "investments.held_in"]
+      },
+      "blocks": {
+        "why": "Once you've built up investments outside your home and super, the useful question stops being what you own and becomes whether the way it's put together still suits what you're trying to do. How it's spread across different types of assets. How much risk sits in it. How it lines up with your timeframe and with what's already in your super. Whether it's doing what you expected it to. Those are the questions a financial planner is for, and most people have never had them properly asked.",
+        "turn_up": "Seeing everything you hold, and how it's spread, laid out in one place is clarifying on its own. Most people have never actually seen it that way. It's also common for the mix to have drifted from what it started as, simply because some things grew faster than others. That's just what happens over time, and it's one of the things a review looks at.",
+        "dont_realise": "Whose name an investment is held in changes what it costs you. Earnings are taxed at the marginal rate of whoever owns the asset, so the same portfolio can produce quite different after-tax outcomes in one person's name, in both names, or held some other way. Ownership is usually decided in the first ten minutes of opening an account and rarely looked at again.\n\nThere's a practical one too. Every purchase, sale and reinvested dividend needs a record kept for tax, going back to when you bought. People who've had a portfolio for a decade are often reconstructing it from old emails when they finally come to sell.",
+        "how_professional": "A financial planner looks at what you hold alongside your goals, your timeframe, and the rest of your picture, and helps you think about how it all fits together. A first conversation is about understanding your situation, not moving your money around.",
+        "nothing_to_prepare": "You don't need to justify what you hold or know whether it's \"right\", that's not what this is. Finn has laid out exactly what you've got and how it's spread, and passes that on, so the conversation starts from a clear and complete picture."
+      },
+      "action_label": "Find a financial planner"
+    },
+    {
+      "id": "8.1a",
+      "question": "If we moved these debts somewhere else, what would change about what they cost and how long they'd run?",
+      "title": "Your other debts",
+      "tile": 8,
+      "variant": "has_mortgage",
+      "route_primary": "mortgage_broker",
+      "route_also": [],
+      "position_line": {
+        "template": "Debts outside the mortgage total {debts_total}, across {debt_count_display}.",
+        "fields": ["debts.items", "derived.debts_total"]
+      },
+      "blocks": {
+        "why": "Debts like credit cards, buy-now-pay-later, car loans, and personal loans work very differently from a mortgage, they usually carry much higher interest, and they're often the debt that quietly does the most damage to a household's month. Because they build up in bits and pieces, it's easy to lose track of the whole picture, which is often the first useful thing to see clearly.",
+        "turn_up": "Seeing these in one place, rather than scattered across four statements, is often a relief in itself. Bringing them together or restructuring them is a common way through, and it's a conversation worth having properly rather than acting on an ad.",
+        "dont_realise": "Rolling shorter debts into the mortgage almost always lowers what you pay each month, because the same amount gets spread over twenty or thirty years instead of three or five. Lower monthly cost and lower total cost are not the same thing. A debt of $30,000 moved onto a thirty year loan at a lower rate can cost more in total interest than clearing it over four years at a higher one. It's the time that does the damage, not just the rate.\n\nThe part that catches people is what happens afterwards. Once the debt sits inside the mortgage there's no separate balance to look at and no separate payment to make, so the pressure to clear it quietly disappears and it rides along for the full term. The households where consolidating works well are almost always the ones who keep paying what they were paying before, so the debt still goes in a few years rather than thirty.\n\nThere's a second change worth knowing. Debts like a credit card or a personal loan are unsecured. Rolled into the mortgage, they become secured against your home. That doesn't make it the wrong move, plenty of households do it deliberately and it works. It does mean the consequences of a bad year are different afterwards, and it's the part that tends not to get explained.",
+        "how_professional": "A mortgage broker can look at whether consolidating or restructuring makes sense for your situation. It's someone helping you find a way forward, not judging how you got here. People who do this all day have seen every version of it. The broker conversation is usually free to you.",
+        "nothing_to_prepare": "This is one people avoid out of a bit of shame, and there's genuinely no need. Finn has it laid out plainly, and passes it on, so you don't have to explain or account for anything, you just turn up and get help finding the way forward."
+      },
+      "action_label": "Find a mortgage broker"
+    },
+    {
+      "id": "8.1b",
+      "question": "What are the different ways people work through several debts at once, and what decides which one suits?",
+      "title": "Your other debts",
+      "tile": 8,
+      "variant": "no_mortgage",
+      "no_referral": true,
+      "route_primary": null,
+      "route_also": [],
+      "position_line": {
+        "template": "Debts total {debts_total}, across {debt_count_display}.",
+        "fields": ["debts.items", "derived.debts_total"]
+      },
+      "block_style": "inline_headings",
+      "intro": "There's nobody on Finn's list for this one, and that's deliberate. Planners don't generally take on debt of this size, and we won't point you at the businesses that advertise debt help. So instead of a referral, here's what's genuinely worth knowing.",
+      "blocks": {
+        "why": "The two ways people work through debts like these\n\nOne is to put everything spare against the debt charging the highest rate, and work down. That costs the least in interest. The other is to clear the smallest balance first, regardless of rate, so the number of debts drops quickly. That costs a bit more but people are more likely to stick with it. Both are well established, and which suits you has more to do with how you're wired than with the maths.",
+        "turn_up": "Hardship is a right, not a favour\n\nEvery credit provider in Australia is legally required to consider a hardship request. You can ask for a payment pause, a reduced payment, or more time, and they have to respond. It doesn't cost anything, and it's a formal process rather than a negotiation you have to win. A lot of people don't know it exists, or assume it's only for people in serious trouble.",
+        "dont_realise": "Balance transfers, and the part that catches people\n\nA balance transfer moves a card balance to a new card at a low or nil rate for a set period. What tends to catch people is what happens at the end, when the rate reverts, and that new purchases on the card generally aren't covered by the offer. They work well for people who clear the balance inside the period and poorly for people who don't.",
+        "how_professional": "And a free option worth knowing about\n\nFinancial counsellors are free, they're on your side entirely, and you don't have to be in crisis to call one. The National Debt Helpline is 1800 007 007. There's no cost and no catch.",
+        "nothing_to_prepare": "[Not provided - docs/education-library.md gives 8.1b the four-part no-referral content only; no 'nothing to prepare' block exists for this variant]"
+      },
+      "action_label": null
+    },
+    {
+      "id": "9.1",
+      "question": "Is the way our income is structured working well for us at tax time?",
+      "title": "How your income is set up",
+      "tile": 9,
+      "variant": null,
+      "route_primary": "accountant",
+      "route_also": [],
+      "position_line": {
+        "template": "Your income is made up as {structure_display}.",
+        "fields": ["income.structure", "income.entity", "income.employer_super_on", "income.other"]
+      },
+      "blocks": {
+        "why": "When some of your income comes from something other than a regular salary, a business, side work, an investment, or a trust, how it's all structured starts to matter for tax in a way it simply doesn't for a straightforward wage. It's an area where the right setup can make a genuine difference, and where a lot of people are running on an arrangement they set up years ago, or never deliberately set up at all.",
+        "turn_up": "An accountant often spots questions worth asking about how income like yours is handled, things that aren't obvious unless you do this for a living. Sometimes it's already fine. Either way you stop wondering whether you're missing something.",
+        "dont_realise": "When income comes from somewhere other than an employer, no tax is withheld along the way. The first year that happens, the bill arrives all at once. What catches people is the year after, because once the ATO has seen it, you're generally moved onto quarterly instalments, and it's common to be paying last year's bill and this year's instalments across the same few months. It isn't extra tax, it's the timing catching up. It's also the single most common reason people with income like yours get caught short.\n\nThe other one is super. When you're employed, someone else is putting money into your super whether you think about it or not. On income you earn for yourself, nobody is, unless you do it deliberately. Years of self-employed income can pass with very little going in, and it doesn't show up anywhere until you look.",
+        "how_professional": "An accountant looks at where your income comes from and how it's structured, and helps with tax, deductions, and whether the setup still suits your situation. A first conversation is about understanding what you've got.\n\nOn cost, accounting fees are generally deductible, so part of it comes back. What an accountant charges varies a lot, and a first conversation is usually about understanding what you've got before anything is agreed.",
+        "nothing_to_prepare": "You don't need to understand the tax side or have anything organised, that's what they're for. Finn passes on how your income is made up, and they take it from there."
+      },
+      "action_label": "Find an accountant"
+    }
+  ],
+  "overrides": [
+    {
+      "id": "hardship",
+      "question": "What help can I ask my lenders for while money is tight?",
+      "title": "If money is tight right now",
+      "tile": 8,
+      "variant": null,
+      "route_primary": "financial_counsellor",
+      "route_also": [],
+      "position_line": {
+        "template": "Debts total {debts_total}, across {debt_count_display}.",
+        "fields": ["debts.items", "derived.debts_total"]
+      },
+      "block_style": "single",
+      "blocks": {
+        "why": "If money is genuinely tight right now, and it's causing real stress, the most useful person is a financial counsellor. They're free, they're on your side entirely, and they help people work through exactly this. You can reach the National Debt Helpline on 1800 007 007. There's no cost and no catch, and it's a good place to start.",
+        "turn_up": "[Not provided - hardship override is deliberately a single block per Devon: the Part Three counsellor script is the whole content]",
+        "dont_realise": "[Not provided - see turn_up]",
+        "how_professional": "[Not provided - see turn_up]",
+        "nothing_to_prepare": "[Not provided - see turn_up]"
+      },
+      "action_label": "About the National Debt Helpline"
+    }
+  ],
+  "context": {
+    "_note": [
+      "The household context header: the frame the nine tiles sit inside, not a tenth tile. Slot substitution ONLY, exactly like insights[].position_line - the renderer chooses which clauses apply and fills their slots, and never composes, rewords or summarises them.",
+      "It carries no badge, no status, no routing and no questions. It states what is known and stays silent about what is not.",
+      "The partner's name IS a picture field (context.partner_name, captured for exactly this) and fills that slot first. The owner has no name field, so a caller may supply the member's own first name; a household display name is never a person and is never used here. The defaults below are the last resort."
+    ],
+    "clauses": {
+      "person_with_age": { "template": "{name}, {age}", "fields": ["context.owner_age", "context.partner_age"] },
+      "person_without_age": { "template": "{name}", "fields": [] },
+      "two_people": { "template": "{first}, and {second}.", "fields": ["context.adults", "context.partner_name", "context.partner_age"] },
+      "one_person": { "template": "{first}.", "fields": ["context.owner_age"] },
+      "one_child": { "template": "One child, {age}.", "fields": ["context.children[].age"] },
+      "several_children": { "template": "{count} children, {ages}.", "fields": ["context.children[].age"] },
+      "work_intent": { "template": "{intent}.", "fields": ["context.work_intent"] },
+      "horizon": { "template": "Thinking about the next {years} years.", "fields": ["context.horizon_years"] }
+    },
+    "defaults": { "owner": "You", "partner": "your partner" },
+    "counts": { "2": "Two", "3": "Three", "4": "Four", "5": "Five", "6": "Six" },
+    "ages_joiner": { "separator": ", ", "final": " and " }
+  }
+}

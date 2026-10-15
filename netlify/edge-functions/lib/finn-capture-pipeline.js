@@ -1,0 +1,1025 @@
+/* The capture pipeline — every pure step between a parsed [CAPTURE]
+   block and the validated picture write, extracted from clarity-chat so
+   the fixture household (capture-conduct step 7) can drive the REAL
+   chain: translate → migrate → ids → merge-by-id → gate → code
+   resolutions → validate. clarity-chat calls applyCaptureCore and keeps
+   only the IO around it (write-ahead log, path_served query, picture
+   PATCH, status marking); nothing here touches the network.
+
+   The schema constants, validators and translators below are moved
+   verbatim from clarity-chat (Sept 2026) — same bytes, new home. */
+
+import { FIELD_REGISTRY, persistenceGate, leafWrites } from "./finn-field-registry.js";
+import { assignAssetIds, mergeDomainsById, migratePositionalLinks, resolveSecurity, adoptNaturalIds } from "./finn-merge.js";
+import { buildPlan, AREAS, SWEEPS } from "./finn-plan.js";
+import { SPEND_CATEGORY_KEYS } from "./finn-csv-engine.js";
+export { categorise as __categorise } from "./finn-csv-engine.js";
+
+/* ════════════ SCHEMA v2 — field-spec.md Part 2 (Step 1) ════════════
+   The domains JSONB target shape. Conventions, enforced here:
+     * null = not yet asked; false/0 = asked and answered no. Strictly
+       distinct — the translator never turns absence into a negative.
+     * Money is a whole-dollar integer, never a string (floats are
+       rounded; strings are rejected).
+     * Derived values (Part 2.11) are computed at read time in
+       public/app/shared/finn-derived.js and are NEVER stored here.
+   The 3a system prompt is untouched in this step (it still emits the
+   legacy capture shape), so every incoming capture is TRANSLATED v1→v2
+   before merge, and a legacy stored row is lazily upgraded on its first
+   new write. schema_version identifies which shape a row holds.
+   Deliberate deviation from the spec, flagged for Devon: every domain
+   also accepts optional `_notes` (string) — the legacy protocol captures
+   per-domain notes and dropping them silently would lose data. Step 2
+   decides their fate. */
+
+const MONEY = "money", RATE = "rate", BOOL = "bool", INT = "int", STR = "str";
+const V2_ENUMS = {
+  work_intent: ["both continuing", "one reducing", "one stopping", "unsure"],
+  structure: ["paye", "sole_trader", "company", "trust", "mixed"],
+  // field-spec Part 2 (Sept 2026 fold): debts carry product and purpose
+  // separately. Purpose is NEVER inferred from product; type carries
+  // requires [purpose, borrower] in the field registry, enforced.
+  debt_type: ["home_loan", "investment_property_loan", "loan_split", "line_of_credit", "commercial_loan", "business_loan", "equipment_finance", "car_loan", "personal_loan", "credit_card", "bnpl", "hecs_help", "tax_debt", "family_loan", "other"],
+  debt_purpose: ["owner_occupied", "investment_property", "commercial_property", "investment_shares", "business_operating", "vehicle", "personal", "education", "tax", "mixed", "unknown"],
+  debt_borrower: ["personal", "joint", "company", "trust", "smsf", "partnership", "unknown"],
+  debt_security: ["property_home", "property_investment", "property_commercial", "vehicle", "business_assets", "unsecured", "other"],
+  // Five-state ladder (Devon, Sept 2026), ranked document > sighted >
+  // stated > estimated > inferred. document means Finn read the artefact;
+  // sighted means the person was on the source and read it off; stated
+  // means they knew it and said it from memory; estimated means no
+  // document exists or it couldn't be reached. "inferred" remains solely
+  // for flags.hardship, which is written from Finn's read.
+  confidence: ["document", "sighted", "stated", "estimated", "inferred"],
+  // component-spec 5.1: a holiday house is neither the home they live in
+  // nor an investment, and needs somewhere to go.
+  property_use: ["investment", "holiday", "other"],
+  // field-spec Part 2 (Sept 2026 fold): income beyond salary is one typed
+  // array, each entry linked to its producing asset and carrying whose
+  // hands it arrives in and whether the figure is gross or net of costs.
+  // Gross rent and costs are never netted silently.
+  other_income_source: ["rental_residential", "rental_commercial", "dividends", "distributions", "trust_distribution", "business_profit", "director_fee", "government", "other"],
+  income_entity: ["personal", "joint", "company", "trust", "smsf", "unknown"],
+  income_basis: ["gross", "net_of_costs"],
+  // Cover is held by a person, not by a household (Devon, 17 Sept): one
+  // partner's cover and the other's are separate facts, and a gap only
+  // shows when they are stored apart.
+  cover_type: ["life", "tpd", "income_protection", "trauma"],
+  cover_owner: ["you", "partner"],
+};
+const COVER = { held: BOOL, amount: MONEY, inside_super: BOOL };
+const COVER_TYPES = ["life", "tpd", "income_protection", "trauma"];
+const isObj = v => !!v && typeof v === "object" && !Array.isArray(v);
+const SPEND_CATS = Object.fromEntries(SPEND_CATEGORY_KEYS.map(k => [k, MONEY]));
+const ESTATE_DOC = { in_place: "docstate", last_updated: STR };
+
+const V2_SCHEMA = {
+  // Every array item carries `id`: generated by CODE at first write
+  // (lib/finn-merge.js), echoed by the model when correcting an existing
+  // item. Never positional, never derived from capture order, never
+  // reused after deletion.
+  // partner_name: so the tiles and the close say "Jess", not "(partner)".
+  context: { adults: INT, partner_name: STR, children: { array: { id: STR, age: INT } }, owner_age: INT, partner_age: INT, work_intent: { enum: "work_intent" }, horizon_years: INT },
+  // Legacy business_income_annual / rental_income_annual scalars are gone
+  // from the schema (field-spec Part 2 fold): every non-salary source is a
+  // typed income.other[] entry. Stored scalars migrate via
+  // migrateIncomeShape — to income._unmapped and flags.income_unreconciled,
+  // never silently dropped from a total.
+  income: { salary_gross_annual: MONEY, salary_net_monthly: MONEY, partner_salary_gross_annual: MONEY, partner_salary_net_monthly: MONEY, other: { array: { id: STR, source: { enum: "other_income_source" }, linked_asset_id: STR, entity: { enum: "income_entity" }, amount_annual: MONEY, basis: { enum: "income_basis" }, costs_annual: MONEY, costs_note: STR } }, structure: { enum: "structure" }, entity: { object: { type: STR, name: STR } }, employer_super_on: { array: STR } },
+  // by_category and the annual/one-off/coverage fields are CODE-WRITTEN
+  // from a bank-export result (a [TRANSACTION RESULT] turn), never
+  // composed by the model. Categories are a fixed set (finn-csv-engine).
+  expenses: { living_monthly: MONEY, includes_housing: BOOL, housing_repayment_monthly: MONEY,
+    by_category: { object: SPEND_CATS }, annual_bills_monthly: MONEY, annual_bills_note: STR,
+    one_off_monthly: MONEY, coverage_months: RATE, source: STR },
+  // value_low / value_high: the range an online estimate shows (Devon,
+  // 16 Sept: the portal estimate is the default source, range kept).
+  home: { owns_home: BOOL, value_estimate: MONEY, value_low: MONEY, value_high: MONEY, value_source: STR, mortgage_balance: MONEY, rate_percent: RATE, rate_type: STR, lender: STR, with_lender_since: STR, repayment_monthly: MONEY, term_remaining_years: INT, has_offset: BOOL, offset_balance: MONEY, package_fee_annual: MONEY },
+  buffer: { accessible_savings: MONEY, where_held: STR, linked_to_loan: BOOL, counts_credit_as_buffer: BOOL, other_cash: MONEY, other_cash_where_held: STR },
+  // A nomination belongs to its fund (Devon, 17 Sept): one household-level
+  // nomination meant the second fund's answer overwrote the first's.
+  super: { funds: { array: { id: STR, fund: STR, owner: STR, balance: MONEY, has_insurance: BOOL, nomination: { object: { ...ESTATE_DOC, binding: BOOL } } } }, multiple_accounts: BOOL, extra_contributions: BOOL },
+  // covers[] is the live shape; the four legacy objects are still accepted
+  // (older rows, and a model reply in the old shape) and are folded into
+  // covers as the person's own cover.
+  protection: { covers: { array: { id: STR, owner: { enum: "cover_owner" }, type: { enum: "cover_type" }, held: BOOL, amount: MONEY, inside_super: BOOL, fund_id: STR } },
+    life: { object: COVER }, tpd: { object: COVER }, income_protection: { object: COVER }, trauma: { object: COVER } },
+  estate: { will: { object: ESTATE_DOC }, poa: { object: ESTATE_DOC }, guardianship: { object: ESTATE_DOC }, super_nomination: { object: { ...ESTATE_DOC, binding: BOOL } } },
+  investments: { shares_value: MONEY, held_in: STR, managed_funds_value: MONEY, properties: { array: { id: STR, value_estimate: MONEY, loan_balance: MONEY, rate_percent: RATE, repayment_type: STR, rent_monthly: MONEY, held_in: STR, use: { enum: "property_use" } } } },
+  debts: { items: { array: { id: STR, type: { enum: "debt_type" }, purpose: { enum: "debt_purpose" }, borrower: { enum: "debt_borrower" }, security: { enum: "debt_security" }, secured_against_asset_id: STR, is_split: BOOL, parent_loan_id: STR, cleared_monthly: BOOL, balance: MONEY, rate_percent: RATE, minimum_monthly: MONEY } }, hecs_balance: MONEY },
+  // to_verify and sweeps_asked are CODE-WRITTEN (the model's copies are
+  // stripped before merge): the verification ledger and the sweeps asked.
+  flags: { hardship: BOOL, hardship_signal: STR, income_unreconciled: { array: STR },
+    to_verify: { array: { field: STR, item_id: STR, confidence: STR, floor: STR, reason: STR, nudges: INT, at: STR } },
+    sweeps_asked: { array: STR } },
+};
+
+// Validate + normalise one value against a field spec. Returns the
+// normalised value; pushes human-readable problems into errors.
+function v2CheckValue(spec, v, path, errors) {
+  if (v === null || v === undefined) return v === undefined ? undefined : null;
+  if (spec === MONEY) {
+    if (typeof v !== "number" || !isFinite(v)) { errors.push(path + ": money must be a number, got " + typeof v); return undefined; }
+    return Math.round(v); // whole-dollar integer
+  }
+  if (spec === RATE) {
+    if (typeof v !== "number" || !isFinite(v)) { errors.push(path + ": rate must be a number"); return undefined; }
+    return v;
+  }
+  if (spec === INT) {
+    if (typeof v !== "number" || !isFinite(v)) { errors.push(path + ": must be an integer"); return undefined; }
+    return Math.round(v);
+  }
+  if (spec === BOOL) {
+    if (typeof v !== "boolean") { errors.push(path + ": must be true/false/null"); return undefined; }
+    return v;
+  }
+  if (spec === STR) {
+    // A year or a number given where text is expected (stand-in run 5:
+    // with_lender_since 2019) is kept as its text.
+    if (typeof v === "number" && isFinite(v)) return String(v);
+    if (typeof v !== "string") { errors.push(path + ": must be a string"); return undefined; }
+    return v.slice(0, 500);
+  }
+  if (spec === "docstate") {
+    // Three-state estate value, approved by Devon with the trigger rule
+    // DECIDED (for the Step-4 trigger engine): false fires 6.1, "unsure"
+    // ALSO fires 6.1, "na" does not fire and renders as not applicable.
+    if (typeof v === "boolean" || v === "unsure" || v === "na") return v;
+    errors.push(path + ': must be true/false/"unsure"/"na"/null'); return undefined;
+  }
+  if (spec.enum) {
+    if (typeof v === "string" && V2_ENUMS[spec.enum].includes(v)) return v;
+    errors.push(path + ": must be one of " + V2_ENUMS[spec.enum].join("/")); return undefined;
+  }
+  if (spec.array) {
+    if (!Array.isArray(v)) { errors.push(path + ": must be an array"); return undefined; }
+    return v.map((item, i) => {
+      if (typeof spec.array === "string" || spec.array === STR) return v2CheckValue(spec.array, item, path + "[" + i + "]", errors);
+      if (item === null || typeof item !== "object" || Array.isArray(item)) { errors.push(path + "[" + i + "]: must be an object"); return undefined; }
+      return v2CheckObject(spec.array, item, path + "[" + i + "]", errors);
+    }).filter(x => x !== undefined);
+  }
+  if (spec.object) {
+    if (typeof v !== "object" || Array.isArray(v)) { errors.push(path + ": must be an object"); return undefined; }
+    return v2CheckObject(spec.object, v, path, errors);
+  }
+  errors.push(path + ": unhandled spec"); return undefined;
+}
+
+function v2CheckObject(shape, obj, path, errors) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    // An item-level confidence is read by the gate, then dropped here: the
+    // stored confidence lives on the domain and in the to_verify ledger.
+    if (k === "_confidence") continue;
+    // Item notes are the model's working prose; they have no home on an
+    // item and are dropped quietly (they filled partial_writes with noise).
+    if (k === "_notes") continue;
+    if (!(k in shape)) { errors.push(path + "." + k + ": unknown field"); continue; }
+    const checked = v2CheckValue(shape[k], v, path + "." + k, errors);
+    if (checked !== undefined) out[k] = checked;
+  }
+  return out;
+}
+
+// Validate a full v2 domains object. Unknown domains and unknown fields are
+// ERRORS, not tolerated noise — a silently malformed picture is worse than
+// a failed write.
+function validateDomainsV2(domains) {
+  const errors = [];
+  const out = {};
+  if (!domains || typeof domains !== "object" || Array.isArray(domains)) {
+    return { ok: false, errors: ["domains: must be an object"], value: null };
+  }
+  for (const [name, body] of Object.entries(domains)) {
+    if (!(name in V2_SCHEMA)) { errors.push(name + ": unknown domain"); continue; }
+    if (body === null) { out[name] = null; continue; }
+    if (typeof body !== "object" || Array.isArray(body)) { errors.push(name + ": must be an object"); continue; }
+    const clean = {};
+    for (const [k, v] of Object.entries(body)) {
+      if (k === "_confidence") {
+        if (v === null || (typeof v === "string" && V2_ENUMS.confidence.includes(v))) clean._confidence = v;
+        else errors.push(name + "._confidence: must be document/stated/estimated/inferred/null");
+        continue;
+      }
+      if (k === "_notes") {
+        // Approved deviation. HARD CONSTRAINT (Devon): _notes must NEVER
+        // feed a trigger or a position line — human reading and the
+        // Advice-Ready Pack only.
+        if (typeof v === "string") clean._notes = v.slice(0, 2000);
+        else errors.push(name + "._notes: must be a string");
+        continue;
+      }
+      if (k === "_unmapped") {
+        // Lossless-translation holding pen for v1 fields with no v2 home.
+        // Same hard constraint as _notes: never feeds a trigger or a
+        // position line. Step 2 re-asks or re-homes these.
+        if (v && typeof v === "object" && !Array.isArray(v) && JSON.stringify(v).length <= 4000) clean._unmapped = v;
+        else errors.push(name + "._unmapped: must be a small object");
+        continue;
+      }
+      if (!(k in V2_SCHEMA[name])) { errors.push(name + "." + k + ": unknown field"); continue; }
+      const checked = v2CheckValue(V2_SCHEMA[name][k], v, name + "." + k, errors);
+      if (checked !== undefined) clean[k] = checked;
+    }
+    out[name] = clean;
+  }
+  return { ok: errors.length === 0, errors, value: out };
+}
+
+/* ── v1 → v2 translation ──
+   Sparse: only domains present in the input produce output. Absence stays
+   absence; null stays null; has_offset is NEVER inferred. */
+function isV2Domains(d) {
+  if (!d || typeof d !== "object") return false;
+  // v2-only domain names are decisive.
+  if (["context", "expenses", "home", "investments", "debts", "flags"].some(k => k in d)) return true;
+  // Domains that exist in both shapes need field-level detection — a
+  // capture touching only one shared-name domain must still be recognised
+  // (an income-only v2 patch has no marker key at the top level).
+  const p = d.protection;
+  if (p && ["life", "tpd", "income_protection", "trauma"].some(k => p[k] && typeof p[k] === "object")) return true;
+  const e = d.estate;
+  if (e && ["will", "poa", "guardianship", "super_nomination"].some(k => e[k] && typeof e[k] === "object")) return true;
+  const inc = d.income;
+  if (inc && ["salary_gross_annual", "salary_net_monthly", "partner_salary_gross_annual", "partner_salary_net_monthly", "business_income_annual", "rental_income_annual", "other", "structure", "entity", "employer_super_on"].some(k => k in inc)) return true;
+  const b = d.buffer;
+  if (b && ["where_held", "linked_to_loan", "counts_credit_as_buffer", "other_cash", "other_cash_where_held"].some(k => k in b)) return true;
+  const s = d.super;
+  if (s && Array.isArray(s.funds) && s.funds.some(f => f && typeof f === "object" && "has_insurance" in f)) return true;
+  return false;
+}
+
+function v2DebtType(s) {
+  const t = String(s || "").toLowerCase();
+  if (t.includes("credit")) return "credit_card";
+  if (t.includes("car")) return "car_loan";
+  if (t.includes("personal")) return "personal_loan";
+  if (t.includes("bnpl") || t.includes("afterpay") || t.includes("zip") || t.includes("buy now")) return "bnpl";
+  if (t.includes("tax")) return "tax_debt";
+  return "other";
+}
+
+/* ── income shape migration (field-spec Part 2 fold, Sept 2026) ──
+   The income domain lost its business_income_annual / rental_income_annual
+   scalars and income.other[] changed shape ({type,label,amount_annual} →
+   {source,linked_asset_id,entity,amount_annual,basis}). Rows and patches
+   carrying the old shape are migrated here.
+
+   The migration must not reintroduce the omission bug the reconciliation
+   exists to catch: NOTHING is dropped. Old array items re-type 1:1 (the
+   source enum is a superset except family_support, which is "other" by
+   definition of the new enum); entity becomes "unknown" and basis null —
+   honest not-yet-asked states, never guesses. The scalars cannot be
+   re-typed without guessing (rental: residential or commercial is exactly
+   the guess that caused the walk finding), so their figures land pathed in
+   income._unmapped AND are named in flags.income_unreconciled — they
+   render as open items and no income total presents as complete while
+   they stand. */
+function migrateIncomeShape(domains) {
+  const inc = domains && domains.income;
+  if (!inc || typeof inc !== "object") return domains;
+  const oldShape = "business_income_annual" in inc || "rental_income_annual" in inc || "other_income_annual" in inc ||
+    (Array.isArray(inc.other) && inc.other.some(it => it && typeof it === "object" && "type" in it && !("source" in it)));
+  if (!oldShape) return domains;
+  const out = { ...domains, income: { ...inc } };
+  const o = out.income;
+  const un = () => (o._unmapped = { ...(o._unmapped || {}) });
+  const open = new Set(Array.isArray(domains.flags?.income_unreconciled) ? domains.flags.income_unreconciled : []);
+  if ("business_income_annual" in o) {
+    if (o.business_income_annual !== null && o.business_income_annual !== undefined) {
+      un()["income.business_income_annual"] = o.business_income_annual;
+      open.add("legacy:business_income_annual");
+    }
+    delete o.business_income_annual;
+  }
+  if ("rental_income_annual" in o) {
+    if (o.rental_income_annual !== null && o.rental_income_annual !== undefined) {
+      un()["income.rental_income_annual"] = o.rental_income_annual;
+      open.add("legacy:rental_income_annual");
+    }
+    delete o.rental_income_annual;
+  }
+  // A stray other_income_annual on a v2-era row (drift, or a transition
+  // write) sweeps the same way: unmapped and surfaced, never dropped.
+  if ("other_income_annual" in o) {
+    if (o.other_income_annual !== null && o.other_income_annual !== undefined) {
+      un()["income.other_income_annual"] = o.other_income_annual;
+      open.add("legacy:other_income_annual");
+    }
+    delete o.other_income_annual;
+  }
+  if (Array.isArray(o.other)) {
+    o.other = o.other.map((item, i) => {
+      if (!item || typeof item !== "object" || !("type" in item) || "source" in item) return item;
+      const source = item.type === "family_support" ? "other" : item.type;
+      if (typeof source === "string" && V2_ENUMS.other_income_source.includes(source)) {
+        if (typeof item.label === "string" && item.label) un()["income.other[" + i + "].label"] = item.label;
+        return { source, linked_asset_id: null, entity: "unknown", amount_annual: item.amount_annual ?? null, basis: null };
+      }
+      un()["income.other[" + i + "]"] = item;
+      open.add("legacy:income.other[" + i + "]");
+      return undefined;
+    }).filter(x => x !== undefined);
+  }
+  if (open.size) out.flags = { ...(domains.flags || {}), income_unreconciled: [...open] };
+  return out;
+}
+
+function v2Cover(vAmount, globalInsideSuper) {
+  if (vAmount === undefined) return undefined;               // not mentioned
+  if (vAmount === null) return { held: null, amount: null, inside_super: null };   // not yet asked
+  if (vAmount === false) return { held: false, amount: null, inside_super: null }; // confirmed not held
+  if (vAmount === true) return { held: true, amount: null, inside_super: globalInsideSuper === true ? true : null };
+  if (typeof vAmount === "number") return { held: true, amount: Math.round(vAmount), inside_super: globalInsideSuper === true ? true : null };
+  return undefined;
+}
+
+// Translation is NEVER lossy (Devon rule): every v1 field either maps to a
+// v2 field or lands, raw and pathed, in the successor domain's _unmapped
+// object. _unmapped and _notes are for human reading and the Advice-Ready
+// Pack ONLY — they must NEVER feed a trigger or a position line.
+function stashUnmapped(out, targetDomain, srcDomain, srcObj, consumed) {
+  const leftovers = Object.entries(srcObj).filter(([k]) => !consumed.has(k) && k !== "notes");
+  if (!leftovers.length) return;
+  out[targetDomain] = out[targetDomain] || {};
+  const u = out[targetDomain]._unmapped = out[targetDomain]._unmapped || {};
+  for (const [k, v] of leftovers) u[srcDomain + "." + k] = v;
+}
+
+function translateLegacyDomains(v1) {
+  const out = {};
+  const inc = v1.income, a = v1.assets, l = v1.liabilities, b = v1.buffer, p = v1.protection, e = v1.estate, s = v1.super;
+
+  if (inc) {
+    const consumed = new Set(["salary_annual", "partner_salary_annual", "side_income_annual", "monthly_expenses"]);
+    const o = {};
+    if ("salary_annual" in inc) o.salary_gross_annual = inc.salary_annual;
+    if ("partner_salary_annual" in inc) o.partner_salary_gross_annual = inc.partner_salary_annual;
+    if ("side_income_annual" in inc) o.business_income_annual = inc.side_income_annual;
+    // Legacy other_income_annual has no type and income.other[] items may
+    // never take a nearest-fit type (no_default) — it goes to _unmapped via
+    // stashUnmapped rather than being guessed into the typed array.
+    if (typeof inc.notes === "string") o._notes = inc.notes;
+    if (Object.keys(o).length) out.income = o;
+    if ("monthly_expenses" in inc) {
+      // Legacy figure never declared whether it includes housing — mark
+      // explicitly unknown so it can be identified and re-asked (spec 2.3).
+      out.expenses = { living_monthly: inc.monthly_expenses, includes_housing: null };
+    }
+    stashUnmapped(out, "income", "income", inc, consumed);
+  }
+
+  const home = {};
+  if (a && "home_value" in a) {
+    home.value_estimate = a.home_value;
+    if (a.home_value !== null) { home.owns_home = true; home.value_source = "owner estimate"; }
+  }
+  if (l) {
+    if ("mortgage_balance" in l) { home.mortgage_balance = l.mortgage_balance; if (l.mortgage_balance !== null) home.owns_home = true; }
+    if ("mortgage_rate_percent" in l) home.rate_percent = l.mortgage_rate_percent;
+    if ("offset_balance" in l) home.offset_balance = l.offset_balance;
+    // has_offset deliberately NOT set — explicit capture only, never inferred.
+  }
+  if (Object.keys(home).length) out.home = home;
+
+  if (b) {
+    // assets.savings is NOT folded in here (Devon rule): it answers a
+    // different question than accessible_savings and buffer_months is a
+    // headline figure. Step 2 asks properly; until then it sits in
+    // investments._unmapped["assets.savings"].
+    const consumed = new Set(["accessible_savings"]);
+    const buf = {};
+    if ("accessible_savings" in b) buf.accessible_savings = b.accessible_savings;
+    if (typeof b.notes === "string") buf._notes = b.notes;
+    if (Object.keys(buf).length) out.buffer = buf;
+    stashUnmapped(out, "buffer", "buffer", b, consumed);
+  }
+
+  if (a) {
+    const consumed = new Set(["home_value", "shares_value", "investment_property_value"]);
+    const inv = {};
+    if ("shares_value" in a) inv.shares_value = a.shares_value;
+    if ("investment_property_value" in a && a.investment_property_value !== null) {
+      inv.properties = [{ value_estimate: a.investment_property_value, loan_balance: null, rate_percent: null, repayment_type: null, rent_monthly: null, held_in: null }];
+    }
+    if (typeof a.notes === "string") inv._notes = a.notes;
+    if (Object.keys(inv).length) out.investments = inv;
+    // Everything else (savings, business_value, other, model drift) is
+    // preserved, pathed, in investments._unmapped — never dropped.
+    stashUnmapped(out, "investments", "assets", a, consumed);
+  }
+
+  if (l) {
+    const consumed = new Set(["mortgage_balance", "mortgage_rate_percent", "offset_balance", "expensive_debts", "hecs_balance"]);
+    const debts = {};
+    if (Array.isArray(l.expensive_debts)) {
+      // purpose and borrower were never captured in v1 — "unknown" is the
+      // legitimate, reachable value for exactly this (never a nearest fit),
+      // and it satisfies the enforced requires on type so translation
+      // itself cannot trip the gate.
+      debts.items = l.expensive_debts
+        .filter(x => x && typeof x === "object")
+        .map(x => ({ type: v2DebtType(x.type), purpose: "unknown", borrower: "unknown", balance: typeof x.balance === "number" ? Math.round(x.balance) : null, rate_percent: null, minimum_monthly: null }));
+    }
+    if ("hecs_balance" in l) debts.hecs_balance = l.hecs_balance; // separate, never in debt totals
+    if (typeof l.notes === "string") debts._notes = l.notes;
+    if (Object.keys(debts).length) out.debts = debts;
+    stashUnmapped(out, "debts", "liabilities", l, consumed);
+  }
+
+  if (s) {
+    const consumed = new Set(["funds", "multiple_accounts", "extra_contributions"]);
+    const o = {};
+    if (Array.isArray(s.funds)) {
+      o.funds = s.funds.filter(f => f && typeof f === "object").map(f => ({
+        fund: typeof f.fund === "string" ? f.fund : null,
+        owner: typeof f.owner === "string" ? f.owner : null,
+        balance: typeof f.balance === "number" ? Math.round(f.balance) : null,
+        has_insurance: (typeof f.has_insurance === "boolean") ? f.has_insurance : null, // not asked per-fund in v1
+      }));
+    }
+    if ("multiple_accounts" in s) o.multiple_accounts = s.multiple_accounts;
+    if ("extra_contributions" in s) o.extra_contributions = s.extra_contributions;
+    if (typeof s.notes === "string") o._notes = s.notes;
+    if (Object.keys(o).length) out.super = o;
+    stashUnmapped(out, "super", "super", s, consumed);
+  }
+
+  if (p) {
+    const consumed = new Set(["life_cover_amount", "tpd_amount", "income_protection", "trauma_amount", "inside_super"]);
+    const gis = p.inside_super;
+    const o = {};
+    const life = v2Cover(p.life_cover_amount, gis); if (life) o.life = life;
+    const tpd = v2Cover(p.tpd_amount, gis); if (tpd) o.tpd = tpd;
+    const ip = v2Cover(p.income_protection, gis); if (ip) o.income_protection = ip;
+    const trauma = v2Cover(p.trauma_amount, gis); if (trauma) o.trauma = trauma;
+    if (typeof p.notes === "string") o._notes = p.notes;
+    if (Object.keys(o).length) out.protection = o;
+    stashUnmapped(out, "protection", "protection", p, consumed);
+  }
+
+  if (e) {
+    const consumed = new Set(["will", "poa", "guardianship", "super_nomination"]);
+    const doc = v => v === undefined ? undefined : { in_place: v, last_updated: null };
+    const o = {};
+    const w = doc(e.will); if (w) o.will = w;
+    const poa = doc(e.poa); if (poa) o.poa = poa;
+    const g = doc(e.guardianship); if (g) o.guardianship = g;
+    if (e.super_nomination !== undefined) o.super_nomination = { in_place: e.super_nomination, last_updated: null, binding: null };
+    if (typeof e.notes === "string") o._notes = e.notes;
+    if (Object.keys(o).length) out.estate = o;
+    stashUnmapped(out, "estate", "estate", e, consumed);
+  }
+
+  // Unknown v1 domains (model drift) are passed through untouched; the
+  // validator rejects them and the whole write lands in quarantine — held,
+  // not lost, and loudly flagged.
+  for (const [k, v] of Object.entries(v1)) {
+    if (!["income", "assets", "liabilities", "buffer", "protection", "estate", "super"].includes(k)) out[k] = v;
+  }
+
+  return out;
+}
+
+// Deep-merge captured domain data into the existing picture. Objects merge
+// recursively; arrays and scalars replace (a corrected figure overwrites).
+function deepMerge(base, patch) {
+  if (patch === null || typeof patch !== "object" || Array.isArray(patch)) return patch;
+  const out = { ...(base && typeof base === "object" && !Array.isArray(base) ? base : {}) };
+  for (const [k, v] of Object.entries(patch)) {
+    out[k] = deepMerge(out[k], v);
+  }
+  return out;
+}
+
+
+/* ── the core (pure) ──
+   STORE EVERY FIGURE, FLAG IT TO VERIFY (Devon, 15 Sept 2026).
+
+   Everything applyCapture decides, with no IO. The caller supplies the
+   picture row, the parsed capture, the session id, the set of field ids
+   with code-witnessed path_served rows this session, the sweep ids served
+   this turn, and whether the close frame has been served this session.
+
+   A turn is never refused whole. Malformed or misclassified leaves are
+   dropped individually and reported in `errors`; every valid fact in the
+   same capture commits. status is "applied" in every normal case; errors
+   non-empty means a PARTIAL write (the caller records it and tells the
+   model next turn what didn't save).
+
+   Returns { status: "applied", domains, goals, completedDomains,
+             refusalsOut, anomalies, errors, dropped, plan,
+             sessionComplete, sessionCompleteRefused } */
+function stripLeaf(patch, s) {
+  const dom = patch[s.domain];
+  if (!dom || typeof dom !== "object") return;
+  if (s.itemRef) { delete s.itemRef[s.sub]; return; }
+  if (s.sub !== undefined) {
+    if (dom[s.key] && typeof dom[s.key] === "object") delete dom[s.key][s.sub];
+    return;
+  }
+  delete dom[s.key];
+}
+
+function cloneJson(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }
+
+export function applyCaptureCore({ picture, capture, sessionId, servedFields, sweepsServed, closeServed, userText }) {
+  const anomalies = [];
+  const errors = [];
+  const served = servedFields instanceof Set ? servedFields : new Set(servedFields || []);
+  capture = cloneJson(capture ?? {}) || {};
+
+  // Defensive re-homing: a domain emitted as a SIBLING of "domains" is
+  // folded back in (loudly) rather than dropped.
+  const KNOWN_TOP = new Set(["domains", "goals", "completed_domains", "session_complete", "refusals", "deferrals"]);
+  for (const [k, v] of Object.entries(capture)) {
+    if (KNOWN_TOP.has(k)) continue;
+    if ((k in V2_SCHEMA || ["assets", "liabilities"].includes(k)) && v && typeof v === "object" && !Array.isArray(v)) {
+      anomalies.push(`domain "${k}" emitted outside "domains" — re-homed rather than dropped`);
+      capture.domains = capture.domains || {};
+      capture.domains[k] = capture.domains[k] ? deepMerge(capture.domains[k], v) : v;
+    } else {
+      anomalies.push(`unknown top-level key "${k}" ignored (value type: ${typeof v})`);
+    }
+  }
+  // The reverse slip: control keys emitted INSIDE domains (15 Sept walk:
+  // completed_domains inside domains refused a whole turn).
+  if (capture.domains && typeof capture.domains === "object") {
+    for (const k of ["completed_domains", "session_complete", "goals", "refusals", "deferrals"]) {
+      if (k in capture.domains) {
+        anomalies.push(`control key "${k}" emitted inside "domains" — lifted out`);
+        if (!(k in capture)) capture[k] = capture.domains[k];
+        delete capture.domains[k];
+      }
+    }
+  }
+
+  // A _confidence emitted at the root of domains applies to every domain
+  // in the capture that lacks its own (15 Sept+1 stand-in run).
+  if (capture.domains && typeof capture.domains === "object" && typeof capture.domains._confidence === "string") {
+    const rootConf = capture.domains._confidence;
+    delete capture.domains._confidence;
+    for (const [k, v] of Object.entries(capture.domains)) {
+      if (v && typeof v === "object" && !Array.isArray(v) && !v._confidence) v._confidence = rootConf;
+    }
+    anomalies.push("_confidence at the root of domains — applied to each domain");
+  }
+  // A known field placed under the wrong domain is moved to the one
+  // domain whose schema owns it (e.g. investments.other -> income.other).
+  if (capture.domains && typeof capture.domains === "object") {
+    for (const [dk, body] of Object.entries(capture.domains)) {
+      if (!body || typeof body !== "object" || Array.isArray(body) || !(dk in V2_SCHEMA)) continue;
+      for (const k of Object.keys(body)) {
+        if (k.startsWith("_") || k in V2_SCHEMA[dk]) continue;
+        const owners = Object.keys(V2_SCHEMA).filter(d => d !== dk && k in V2_SCHEMA[d]);
+        if (owners.length !== 1) continue;
+        const to = owners[0];
+        capture.domains[to] = capture.domains[to] || {};
+        if (!(k in capture.domains[to])) {
+          capture.domains[to][k] = body[k];
+          if (!capture.domains[to]._confidence && body._confidence) capture.domains[to]._confidence = body._confidence;
+          anomalies.push(`${dk}.${k} re-homed to ${to}.${k}`);
+        }
+        delete body[k];
+      }
+    }
+  }
+
+  let baseDomains = picture.domains ?? {};
+  if ((picture.schema_version ?? 1) < 2 && !isV2Domains(baseDomains)) {
+    baseDomains = translateLegacyDomains(baseDomains);
+  }
+  baseDomains = migrateIncomeShape(baseDomains);
+  baseDomains = migratePositionalLinks(assignAssetIds(baseDomains));
+
+  let patch = capture.domains ?? {};
+  // The protocol has emitted v2 for months; a patch is translated only when
+  // it carries an unmistakably v1 marker. (A super-only v2 patch without
+  // has_insurance was being mistaken for v1 and lost its confidence.)
+  const V1_MARK = "assets" in patch || "liabilities" in patch
+    || (patch.income && ["salary_annual", "partner_salary_annual", "side_income_annual", "monthly_expenses"].some(k => k in patch.income))
+    || (patch.protection && ["life_cover_amount", "tpd_amount", "trauma_amount"].some(k => k in patch.protection));
+  if (Object.keys(patch).length && !isV2Domains(patch) && V1_MARK) {
+    patch = translateLegacyDomains(patch);
+  }
+  patch = migrateIncomeShape(patch);
+  // Code owns the ledger and the sweep record; a model copy is ignored.
+  if (patch.flags && typeof patch.flags === "object") {
+    for (const k of ["to_verify", "sweeps_asked", "income_unreconciled"]) {
+      if (k in patch.flags) { anomalies.push(`model wrote flags.${k} — code-owned, ignored`); delete patch.flags[k]; }
+    }
+  }
+  // Unknown domains are dropped individually, never the whole turn.
+  for (const k of Object.keys(patch)) {
+    if (!(k in V2_SCHEMA)) { errors.push(k + ": unknown domain (dropped)"); delete patch[k]; }
+  }
+  // Pay given in the person's own period: code converts, deterministically.
+  if (patch.income && typeof patch.income === "object") {
+    const PER = { weekly: 52, fortnightly: 26, monthly: 12, annual: 1 };
+    for (const k of Object.keys(patch.income)) {
+      const m = /^(partner_)?salary_(gross|net)_(weekly|fortnightly|monthly|annual)$/.exec(k);
+      if (!m) continue;
+      const target = (m[1] || "") + "salary_" + m[2] + "_" + (m[2] === "gross" ? "annual" : "monthly");
+      if (k === target) continue;
+      const v = patch.income[k];
+      delete patch.income[k];
+      if (typeof v !== "number") continue;
+      const perYear = v * PER[m[3]];
+      if (patch.income[target] === undefined || patch.income[target] === null) {
+        patch.income[target] = Math.round(m[2] === "gross" ? perYear : perYear / 12);
+        anomalies.push(`${k} converted to ${target}`);
+      }
+    }
+  }
+  // null means "not yet asked": it never erases a value already held
+  // (stand-in run 3: a null net pay wiped the figure).
+  {
+    const base = picture.domains || {};
+    for (const [dk, body] of Object.entries(patch)) {
+      if (!body || typeof body !== "object" || Array.isArray(body) || !base[dk]) continue;
+      for (const [k, v] of Object.entries(body)) {
+        if (v === null && base[dk][k] !== null && base[dk][k] !== undefined) { delete body[k]; }
+        else if (v && typeof v === "object" && !Array.isArray(v) && base[dk][k] && typeof base[dk][k] === "object") {
+          for (const [ik, iv] of Object.entries(v)) if (iv === null && base[dk][k][ik] !== null && base[dk][k][ik] !== undefined) delete v[ik];
+        } else if (Array.isArray(v) && Array.isArray(base[dk][k])) {
+          for (const item of v) {
+            if (!item || typeof item !== "object" || !item.id) continue;
+            const b = base[dk][k].find(x => x && x.id === item.id);
+            if (!b) continue;
+            for (const [ik, iv] of Object.entries(item)) if (iv === null && b[ik] !== null && b[ik] !== undefined) delete item[ik];
+          }
+        }
+      }
+    }
+  }
+  // HECS is held separately, never as a debts item (stand-in run 2: the
+  // recorder created a hecs_help item alongside hecs_balance).
+  if (patch.debts && Array.isArray(patch.debts.items)) {
+    const hecs = patch.debts.items.filter(it => it && it.type === "hecs_help");
+    if (hecs.length) {
+      const bal = hecs.map(h => h.balance).find(v => typeof v === "number");
+      if (typeof bal === "number" && (patch.debts.hecs_balance === undefined || patch.debts.hecs_balance === null)) patch.debts.hecs_balance = bal;
+      patch.debts.items = patch.debts.items.filter(it => !(it && it.type === "hecs_help"));
+      anomalies.push("hecs_help item folded into debts.hecs_balance");
+    }
+  }
+  // A household-level nomination already in place is never switched off by
+  // a later answer about a different fund (stand-in run 2: "REST has no
+  // nomination" erased the AustralianSuper binding nomination).
+  const priorNom = picture.domains && picture.domains.estate && picture.domains.estate.super_nomination;
+  if (priorNom && priorNom.in_place === true && patch.estate && patch.estate.super_nomination && patch.estate.super_nomination.in_place === false) {
+    delete patch.estate.super_nomination.in_place;
+    for (const k of ["binding", "last_updated"]) delete patch.estate.super_nomination[k];
+    anomalies.push("super_nomination in_place true kept; a later 'none' for another fund does not switch it off");
+  }
+  // Id-less re-sends of an existing item update it rather than duplicate
+  // it; genuinely new items get their ids now, so the ledger can key them.
+  patch = assignAssetIds(adoptNaturalIds(baseDomains, patch));
+
+  // THE GATE: verification status, plus the few hard classification
+  // refusals, stripped leaf by leaf.
+  const claimedRefusals = new Set([
+    ...(Array.isArray(picture.refusals) ? picture.refusals : [])
+      .filter(r => r && r.field && sessionId && r.session_id === sessionId).map(r => r.field),
+    ...(Array.isArray(capture.refusals) ? capture.refusals : [])
+      .filter(f => typeof f === "string" && FIELD_REGISTRY[f]),
+  ]);
+  const validRefusals = new Set([...claimedRefusals].filter(f => served.has(f)));
+  // The four legacy cover objects become covers[] entries for the person
+  // themselves: a reply in the old shape, and any row written before the
+  // per-person change, still land in one place.
+  if (patch.protection && COVER_TYPES.some(t => isObj(patch.protection[t]))) {
+    const existing = (baseDomains.protection && Array.isArray(baseDomains.protection.covers) ? baseDomains.protection.covers : []);
+    const incoming = Array.isArray(patch.protection.covers) ? patch.protection.covers.slice() : [];
+    for (const t of COVER_TYPES) {
+      const legacy = patch.protection[t];
+      if (!isObj(legacy)) continue;
+      delete patch.protection[t];
+      if (incoming.some(c => c && c.type === t)) continue;
+      const prior = existing.find(c => c && c.type === t && (c.owner || "you") === "you");
+      incoming.push({ ...(prior ? { id: prior.id } : {}), owner: "you", type: t, ...legacy });
+    }
+    if (incoming.length) patch.protection = { ...patch.protection, covers: incoming };
+    anomalies.push("cover written in the old shape folded into protection.covers for you");
+  }
+  // A household nomination with exactly one fund in the picture belongs to
+  // that fund; with several, whose it is has to be asked.
+  if (patch.estate && isObj(patch.estate.super_nomination)) {
+    const fundsNow = (patch.super && Array.isArray(patch.super.funds) ? patch.super.funds : [])
+      .concat(baseDomains.super && Array.isArray(baseDomains.super.funds) ? baseDomains.super.funds : [])
+      .filter(f => f && f.id);
+    const ids = [...new Set(fundsNow.map(f => f.id))];
+    if (ids.length === 1) {
+      const nom = patch.estate.super_nomination;
+      delete patch.estate.super_nomination;
+      const funds = Array.isArray(patch.super && patch.super.funds) ? patch.super.funds.slice() : [];
+      const ix = funds.findIndex(f => f && f.id === ids[0]);
+      if (ix === -1) funds.push({ id: ids[0], nomination: nom });
+      else funds[ix] = { ...funds[ix], nomination: { ...(funds[ix].nomination || {}), ...nom } };
+      patch.super = { ...(patch.super || {}), funds };
+      anomalies.push("nomination recorded against the one fund in the picture");
+    }
+  }
+  // Figures the person did not give are not the model's to work out (run
+  // 10: a new card balance came with a "minimum" of 2% of it). When a patch
+  // updates an existing item, any other number on that item that is not in
+  // what the person just said keeps its stored value.
+  if (typeof userText === "string" && userText) {
+    const said = userText.replace(/[,\s$]/g, "").toLowerCase();
+    const spoken = v => {
+      const n = Math.abs(v);
+      const forms = [String(n), String(Math.round(n)), String(n).replace(/\.0+$/, "")];
+      if (n >= 1000 && n % 100 === 0) forms.push((n / 1000).toString().replace(/\.0$/, "") + "k");
+      return forms.some(f => f && said.includes(f));
+    };
+    for (const [dk, arrKey] of [["debts", "items"], ["super", "funds"], ["investments", "properties"], ["income", "other"]]) {
+      const pd = patch[dk], bd = baseDomains[dk];
+      if (!pd || !Array.isArray(pd[arrKey]) || !bd || !Array.isArray(bd[arrKey])) continue;
+      pd[arrKey] = pd[arrKey].map(item => {
+        if (!item || typeof item !== "object" || !item.id || item._remove) return item;
+        const prior = bd[arrKey].find(b => b && b.id === item.id);
+        if (!prior) return item;
+        const numeric = Object.keys(item).filter(k => typeof item[k] === "number");
+        const changed = numeric.filter(k => typeof prior[k] === "number" && prior[k] !== item[k]);
+        if (!changed.some(k => spoken(item[k]))) return item;   // nothing stated: leave the turn alone
+        const out = { ...item };
+        for (const k of changed) {
+          if (spoken(item[k])) continue;
+          out[k] = prior[k];
+          anomalies.push(`${dk}.${arrKey}[].${k} kept: the new value was not in what the person said`);
+        }
+        return out;
+      });
+    }
+  }
+  // A new home value without its own range retires the old range (Devon,
+  // 17 Sept: subscribers update the value when a new estimate lands; a
+  // stale range beside a new midpoint would misstate the equity spread).
+  if (patch.home && typeof patch.home.value_estimate === "number" && baseDomains.home
+      && typeof baseDomains.home.value_estimate === "number" && patch.home.value_estimate !== baseDomains.home.value_estimate) {
+    for (const k of ["value_low", "value_high"]) if (patch.home[k] === undefined) patch.home[k] = null;
+  }
+  let merged = mergeDomainsById(baseDomains, patch);
+  const gate = persistenceGate(patch, merged, validRefusals);
+  const dropped = [];
+  if (gate.strip.length) {
+    for (const st of gate.strip) { stripLeaf(patch, st); dropped.push(st.field); }
+    errors.push(...gate.errors);
+    merged = mergeDomainsById(baseDomains, patch);
+  }
+  // A NEW debt item whose type was refused is not an item yet (stand-in
+  // run 6 left a typeless card behind, then added the real one).
+  if (merged.debts && Array.isArray(merged.debts.items)) {
+    const baseIds = new Set(((baseDomains.debts && baseDomains.debts.items) || []).map(it => it && it.id).filter(Boolean));
+    const kept = merged.debts.items.filter(it => !it || it.type || (it.id && baseIds.has(it.id)));
+    if (kept.length !== merged.debts.items.length) {
+      anomalies.push("new debt item without a type dropped");
+      merged = { ...merged, debts: { ...merged.debts, items: kept } };
+    }
+  }
+  // The home loan lives in home.*, never as a debt item too (run 10: the
+  // CBA loan was stored twice, so its repayment would count twice in what's
+  // left over). A household home loan item is folded into home and removed;
+  // a split that pointed at it points at the home.
+  if (merged.debts && Array.isArray(merged.debts.items)) {
+    const ENTITY = ["company", "trust", "smsf", "partnership"];
+    const isHomeLoan = it => it && it.type === "home_loan" && it.is_split !== true
+      && !ENTITY.includes(String(it.borrower || "").toLowerCase())
+      && (it.purpose === "owner_occupied" || it.security === "property_home" || it.secured_against_asset_id === "home");
+    const hl = merged.debts.items.filter(isHomeLoan);
+    // A debt item for study that isn't HECS is the HECS mentioned in
+    // passing (run 10: "Jess has some HECS" became a home_loan for
+    // education). New ones are dropped; HECS lives in debts.hecs_balance.
+    const baseIds2 = new Set(((baseDomains.debts && baseDomains.debts.items) || []).map(it => it && it.id).filter(Boolean));
+    const junkHecs = merged.debts.items.filter(it => it && it.purpose === "education" && it.type !== "hecs_help" && !(it.id && baseIds2.has(it.id)) && (it.balance === undefined || it.balance === null));
+    if (hl.length === 1 || junkHecs.length) {
+      let home = { ...(merged.home || {}) };
+      const gone = new Set(junkHecs.map(it => it.id));
+      if (hl.length === 1) {
+        const it = hl[0];
+        // What this turn said is the latest word (a subscriber's refinance
+        // or new balance updates the home); a stored item only fills gaps.
+        const fresh = !(it.id && baseIds2.has(it.id));
+        const fill = (k, v) => { if (v !== undefined && v !== null && (fresh || home[k] === undefined || home[k] === null)) home[k] = v; };
+        fill("mortgage_balance", it.balance);
+        fill("rate_percent", it.rate_percent);
+        fill("repayment_monthly", it.minimum_monthly);
+        fill("lender", it.lender);
+        if (home.owns_home === undefined || home.owns_home === null) home.owns_home = true;
+        gone.add(it.id);
+        anomalies.push(`home loan item ${it.id} folded into home`);
+      }
+      if (junkHecs.length) anomalies.push("study debt item without a balance dropped (HECS lives in hecs_balance)");
+      const items = merged.debts.items.filter(it => !(it && gone.has(it.id)))
+        .map(it => it && gone.has(it.parent_loan_id) ? { ...it, parent_loan_id: "home" } : it);
+      merged = { ...merged, home, debts: { ...merged.debts, items } };
+      if (junkHecs.length && merged.debts.hecs_balance === undefined) merged = { ...merged, debts: { ...merged.debts, hecs_balance: null } };
+    }
+  }
+  // One cover per person per type: any doubles (from rows written before
+  // ids were reliable) collapse, latest values winning.
+  if (merged.protection && Array.isArray(merged.protection.covers)) {
+    const byKey = new Map();
+    for (const c of merged.protection.covers) {
+      if (!isObj(c) || !c.type) continue;
+      const key = (c.owner || "you") + "|" + c.type;
+      const prev = byKey.get(key);
+      byKey.set(key, prev ? { ...prev, ...Object.fromEntries(Object.entries(c).filter(([k, v]) => v !== null && v !== undefined)), id: prev.id || c.id } : c);
+    }
+    if (byKey.size !== merged.protection.covers.length) {
+      anomalies.push("duplicate covers for the same person and type collapsed");
+      merged = { ...merged, protection: { ...merged.protection, covers: [...byKey.values()] } };
+    }
+  }
+  merged = resolveSecurity(assignAssetIds(merged));
+  // A property loan recorded as a debt item links to its property when
+  // there is exactly one candidate (same holder, or the only property).
+  if (merged.debts && Array.isArray(merged.debts.items) && merged.investments && Array.isArray(merged.investments.properties)) {
+    const props = merged.investments.properties.filter(p => p && p.id);
+    merged = { ...merged, debts: { ...merged.debts, items: merged.debts.items.map(it => {
+      if (!it || it.secured_against_asset_id || !["property_commercial", "property_investment"].includes(it.security)) return it;
+      const holderMatch = props.filter(p => String(p.held_in || "").toLowerCase() === String(it.borrower || "").toLowerCase());
+      const cands = holderMatch.length ? holderMatch : props;
+      if (cands.length !== 1) return it;
+      anomalies.push(`debt ${it.id} linked to property ${cands[0].id}`);
+      return { ...it, secured_against_asset_id: cands[0].id };
+    }) } };
+  }
+
+  // A property whose rent is recorded is an income-producing property:
+  // its use is "investment" unless the person said otherwise (stand-in
+  // run 4: the leased warehouse held the close open on "what it's for").
+  if (merged.investments && Array.isArray(merged.investments.properties) && merged.income && Array.isArray(merged.income.other)) {
+    const rented = new Set(merged.income.other.filter(o => o && /^rental_/.test(String(o.source || "")) && o.linked_asset_id).map(o => o.linked_asset_id));
+    if (merged.investments.properties.some(p => p && rented.has(p.id) && (p.use === undefined || p.use === null))) {
+      merged = { ...merged, investments: { ...merged.investments, properties: merged.investments.properties.map(p =>
+        p && rented.has(p.id) && (p.use === undefined || p.use === null) ? { ...p, use: "investment" } : p) } };
+      anomalies.push("property use set to investment from its linked rent");
+    }
+  }
+
+  // Validation: invalid leaves drop, valid ones commit.
+  const check = validateDomainsV2(merged);
+  if (!check.ok) errors.push(...check.errors);
+  let domains = check.value || {};
+
+  /* ── the verification ledger (flags.to_verify) ── */
+  const now = new Date().toISOString();
+  const keyOf = (f, i) => f + "|" + (i || "");
+  const ledger = new Map();
+  const prior = domains.flags && Array.isArray(domains.flags.to_verify) ? domains.flags.to_verify : [];
+  for (const e of prior) if (e && e.field) ledger.set(keyOf(e.field, e.item_id), e);
+  for (const c of gate.clears) {
+    const k = keyOf(c.field, c.item_id);
+    if (ledger.has(k) && !String(ledger.get(k).reason || "").startsWith("needs:")) ledger.delete(k);
+  }
+  for (const f of gate.flags) {
+    if (dropped.includes(f.field)) continue;
+    const k = keyOf(f.field, f.item_id);
+    const prev = ledger.get(k);
+    ledger.set(k, { field: f.field, item_id: f.item_id || null, confidence: f.confidence, floor: f.floor, reason: f.reason, nudges: prev && prev.nudges ? prev.nudges : 0, at: now });
+  }
+  const valueAt = (field, itemId) => {
+    const parts = field.split(".");
+    if (field.includes("[]")) {
+      const [dk, arrKey] = [parts[0], parts[1].replace("[]", "")];
+      const list = domains[dk] && Array.isArray(domains[dk][arrKey]) ? domains[dk][arrKey] : [];
+      const it = itemId ? list.find(x => x && x.id === itemId) : null;
+      return it ? it[parts[2]] : undefined;
+    }
+    let node = domains;
+    for (const p of parts) node = node && typeof node === "object" ? node[p] : undefined;
+    return node;
+  };
+  // Deferrals: the person put an item off. Recorded with a nudge count so
+  // the plan can cap the pushing at two.
+  const deferralList = (Array.isArray(capture.deferrals) ? capture.deferrals : []).map(x =>
+    typeof x === "string" ? { field: x.split("#")[0], item_id: x.includes("#") ? x.split("#")[1] || null : null } : (x && typeof x === "object" && typeof x.field === "string" ? { field: x.field, item_id: typeof x.item_id === "string" ? x.item_id : null } : null)).filter(Boolean)
+    // What a company or trust earns, put off under an improvised id
+    // (stand-in run 4: "income.entity.profit"), is the plan's entity item.
+    .map(df => /^income\.(?:other\.)?(?:entity|company|trust)\b|^income\.[a-z_.]*profit/.test(df.field) && !df.field.includes("[]")
+      ? { field: "income.other.entity", item_id: null } : df);
+  // A legacy refusal with no figure given is a deferral too.
+  for (const f of (Array.isArray(capture.refusals) ? capture.refusals : [])) {
+    if (typeof f === "string" && !leafWrites(patch).some(w => w.id === f)) deferralList.push({ field: f, item_id: null });
+  }
+  // An item reference that is not an id (the model wrote a fund name) is
+  // resolved against the item's natural label when exactly one matches.
+  for (const df of deferralList) {
+    if (!df.item_id || !df.field.includes("[]")) continue;
+    const [dk, arrKey] = [df.field.split(".")[0], df.field.split(".")[1].replace("[]", "")];
+    const list = domains[dk] && Array.isArray(domains[dk][arrKey]) ? domains[dk][arrKey] : [];
+    if (list.some(x => x && x.id === df.item_id)) continue;
+    const needle = String(df.item_id).toLowerCase().replace(/[^a-z0-9]/g, "");
+    const hits = list.filter(x => x && [x.fund, x.type, x.held_in, x.source, x.name].some(v => typeof v === "string" && v.toLowerCase().replace(/[^a-z0-9]/g, "").includes(needle)));
+    if (hits.length === 1) df.item_id = hits[0].id;
+  }
+  for (const df of deferralList) {
+    const k = keyOf(df.field, df.item_id);
+    const prev = ledger.get(k);
+    const stored = df.field.includes("[]") ? (df.item_id ? valueAt(df.field, df.item_id) : undefined) : valueAt(df.field, null);
+    if ((prev && prev.reason !== "deferred") || (stored !== null && stored !== undefined)) {
+      // A stored-but-unverified figure the person won't source: note it.
+      ledger.set(k, { field: df.field, item_id: df.item_id, confidence: prev ? prev.confidence : null, floor: prev ? prev.floor : null, reason: "declined_source", nudges: Math.min(((prev && prev.nudges) || 0) + 1, 9), at: now });
+    } else {
+      ledger.set(k, { field: df.field, item_id: df.item_id, confidence: null, floor: null, reason: "deferred", nudges: Math.min(((prev && prev.nudges) || 0) + 1, 9), at: now });
+    }
+  }
+  // Resolve needs:<req> once the prerequisite is present; drop entries for
+  // removed items and for deferred fields that now hold a value.
+  const liveIds = new Set();
+  for (const dk of ["context", "super", "investments", "debts", "income"]) {
+    const dom = domains[dk];
+    if (!dom) continue;
+    for (const v of Object.values(dom)) if (Array.isArray(v)) for (const it of v) if (it && it.id) liveIds.add(it.id);
+  }
+  const presentField = (req) => {
+    let node = domains;
+    for (const p of req.split(".")) node = node && typeof node === "object" ? node[p] : undefined;
+    return node !== null && node !== undefined;
+  };
+  for (const [k, e] of [...ledger.entries()]) {
+    if (e.item_id && !liveIds.has(e.item_id) && e.field.includes("[]")) { ledger.delete(k); continue; }
+    if (String(e.reason).startsWith("needs:") && presentField(String(e.reason).slice(6))) { ledger.delete(k); continue; }
+    if (e.reason === "deferred" && e.field.includes(".") && !e.field.startsWith("income.other.") && !e.field.startsWith("protection.inside")) {
+      const v = valueAt(e.field, e.item_id);
+      if (v !== null && v !== undefined && !deferralList.some(df => keyOf(df.field, df.item_id) === k)) ledger.delete(k);
+    }
+  }
+  // Sweeps asked (code-witnessed: the caller passes the ids it substituted).
+  const sweeps = new Set(domains.flags && Array.isArray(domains.flags.sweeps_asked) ? domains.flags.sweeps_asked : []);
+  for (const id of (Array.isArray(sweepsServed) ? sweepsServed : [])) if (SWEEPS[id]) sweeps.add(id);
+  if (ledger.size || sweeps.size || domains.flags) {
+    domains = { ...domains, flags: { ...(domains.flags || {}), to_verify: [...ledger.values()], sweeps_asked: [...sweeps] } };
+  }
+
+  // Refusal records kept for audit (session-tagged, other sessions pruned).
+  const capRefusals = (Array.isArray(capture.refusals) ? capture.refusals : [])
+    .filter(f => typeof f === "string" && FIELD_REGISTRY[f]);
+  const existing = Array.isArray(picture.refusals) ? picture.refusals : [];
+  const kept = existing.filter(r => r && r.field && (!sessionId || r.session_id === sessionId));
+  const keptFields = new Set(kept.map(r => r.field));
+  const added = capRefusals.filter(f => !keptFields.has(f))
+    .map(f => ({ field: f, at: now, session_id: sessionId }));
+  const refusalsOut = (added.length || kept.length !== existing.length) ? [...kept, ...added] : undefined;
+
+  // Goals accumulate: a later, narrower reading never replaces earlier
+  // directions or notes (stand-in run 4: three directions became one).
+  const priorGoals = picture.goals ?? {};
+  const capGoals = capture.goals ?? {};
+  const goals = deepMerge(priorGoals, capGoals);
+  if (Array.isArray(priorGoals.directions) || Array.isArray(capGoals.directions)) {
+    // Walk 2, 24 Sept: "work-optional-at-60" and "work-optional-by-60" both
+    // landed, and "kids-supported" beside "kids-support-uni-or-first-home".
+    // Directions that share their leading words are the same direction.
+    const stem = d => String(d).toLowerCase().replace(/[^a-z0-9]+/g, "-").split("-").filter(w => !["at", "by", "the", "a", "to", "or", "of", "and"].includes(w));
+    const merged = [];
+    for (const d of [...(Array.isArray(priorGoals.directions) ? priorGoals.directions : []), ...(Array.isArray(capGoals.directions) ? capGoals.directions : [])]) {
+      if (typeof d !== "string" || !d.trim()) continue;
+      const w = stem(d);
+      const dupe = merged.find(m => { const mw = stem(m); const n = Math.min(mw.length, w.length); return n >= 2 && mw.slice(0, n).join("-") === w.slice(0, n).join("-"); });
+      if (!dupe) merged.push(d);
+      else if (String(d).length > String(dupe).length) merged[merged.indexOf(dupe)] = d;
+    }
+    goals.directions = merged;
+  }
+  if (typeof priorGoals.notes === "string" && priorGoals.notes && typeof capGoals.notes === "string" && capGoals.notes) {
+    const norm = t => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const words = t => new Set(norm(t).split(" ").filter(w => w.length > 2));
+    const a = words(priorGoals.notes), b = words(capGoals.notes);
+    const overlap = [...b].filter(w => a.has(w)).length / Math.max(1, Math.min(a.size, b.size));
+    if (norm(priorGoals.notes).includes(norm(capGoals.notes))) goals.notes = priorGoals.notes;
+    else if (norm(capGoals.notes).includes(norm(priorGoals.notes))) goals.notes = capGoals.notes;
+    // Mostly the same words: a re-reading, not a new goal. Keep the longer.
+    else if (overlap >= 0.6) goals.notes = capGoals.notes.length >= priorGoals.notes.length ? capGoals.notes : priorGoals.notes;
+    else goals.notes = priorGoals.notes.replace(/\s*$/, "") + (/[.!?]$/.test(priorGoals.notes.trim()) ? " " : ". ") + capGoals.notes;
+  }
+
+  // CODE decides coverage (the model's completed_domains is advisory).
+  const plan = buildPlan(domains, goals);
+  const completedDomains = AREAS.filter(a => plan.covered.includes(a));
+  const claimedDone = Array.isArray(capture.completed_domains) ? capture.completed_domains : [];
+  const overclaimed = claimedDone.filter(a => AREAS.includes(a) && !plan.covered.includes(a));
+  if (overclaimed.length) anomalies.push("model claimed areas code does not count as covered: " + overclaimed.join(", "));
+
+  // session_complete only when every area is covered and the close frame
+  // has walked the open items.
+  let sessionComplete = false, sessionCompleteRefused = false;
+  if (capture.session_complete === true) {
+    if (plan.can_close && closeServed === true) sessionComplete = true;
+    else {
+      sessionCompleteRefused = true;
+      anomalies.push("session_complete refused: " + (!plan.can_close
+        ? plan.missing.length + " missing, sweeps pending [" + plan.sweeps_pending.join(",") + "]"
+        : "close frame not served"));
+    }
+  }
+
+  return { status: "applied", domains, goals, completedDomains, refusalsOut, anomalies, errors, dropped, plan, sessionComplete, sessionCompleteRefused };
+}
+
+export {
+  V2_ENUMS, V2_SCHEMA, validateDomainsV2, isV2Domains,
+  translateLegacyDomains, migrateIncomeShape, deepMerge,
+};

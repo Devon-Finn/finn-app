@@ -1,0 +1,232 @@
+/* Finn component library — component-spec.md Parts Two and Three.
+   Every component exists once, here, and is used everywhere (panels,
+   calm state, who-to-see). Uses the app's design tokens with fallbacks so
+   the pieces render identically on any page that loads them.
+
+   Colour meanings are LOCKED (component-spec Part One): copper is the gap
+   card, forest is primary, and no colour ever signals severity. Nothing in
+   this file may vary with the magnitude of a value. */
+
+.fc {
+  --fc-forest: var(--accent, #2a4a3a);
+  --fc-forest-deep: var(--accent-deep, #213b2e);
+  --fc-forest-light: var(--accent-light, #f0f4f1);
+  --fc-copper: var(--warm, #c4956a);
+  --fc-copper-deep: var(--warm-deep, #a8703f);
+  --fc-copper-light: var(--warm-light, #fdf6ee);
+  --fc-steel: var(--steel, #c2d4de);
+  --fc-dark: var(--dark, #1c1917);
+  --fc-mid: var(--mid, #5c5a55);
+  --fc-light: var(--light, #9a9a94);
+  --fc-rule: var(--rule, #e6e0d6);
+  --fc-rule-soft: var(--rule-soft, #efeae1);
+  --fc-surface: var(--surface, #ffffff);
+  --fc-shadow: var(--shadow, 0 1px 2px rgba(28,25,23,.04), 0 8px 24px rgba(28,25,23,.05));
+}
+
+/* ── 2.1 Calc block ─────────────────────────────────────────────────── */
+.fc-calc { display: grid; grid-template-columns: 1fr 22px auto; gap: 4px 10px; font-size: 13.5px; align-items: baseline; }
+.fc-calc .cl { color: var(--fc-mid); }
+.fc-calc .co { color: var(--fc-light); text-align: center; font-variant-numeric: tabular-nums; }
+.fc-calc .cv { font-variant-numeric: tabular-nums; text-align: right; color: var(--fc-dark); }
+.fc-calc .cv.missing { color: var(--fc-light); font-weight: 400; }
+.fc-calc .crule { grid-column: 1 / -1; border-bottom: 1px solid var(--fc-rule); margin: 4px 0; }
+.fc-calc .result .cl, .fc-calc .result .cv { color: var(--fc-forest); font-weight: 600; font-size: 15px; }
+/* Subtotal (ledger): the same arithmetic grammar with NO colour and NO
+   emphasis — a subtotal is arithmetic, not an evaluation. */
+.fc-calc .subtotal .cl, .fc-calc .subtotal .cv { color: var(--fc-dark); font-weight: 400; font-size: 13.5px; }
+.fc-calc .indent .cl { padding-left: 16px; }
+/* grid children wrappers: rows are display:contents so the grid governs */
+.fc-calc .crow { display: contents; }
+
+/* ── 2.2 Handover line ──────────────────────────────────────────────── */
+.fc-handover { border-top: 1px dashed var(--fc-rule); margin-top: 10px; padding-top: 9px; font-size: 13px; line-height: 1.55; color: var(--fc-mid); }
+.fc-handover .fc-term, .fc-handover b { color: var(--fc-forest); font-weight: 600; }
+
+/* ── 2.3 Term affordance ────────────────────────────────────────────── */
+button.fc-term { font: inherit; color: var(--fc-forest); font-weight: 600; background: none; border: none; padding: 0; cursor: pointer; border-bottom: 1px dotted var(--fc-forest); }
+button.fc-term:focus-visible { outline: 2px solid var(--fc-forest); outline-offset: 2px; }
+
+/* ── 2.4 Proportion bar ─────────────────────────────────────────────── */
+.fc-propbar { display: flex; gap: 2px; height: 26px; border-radius: 6px; overflow: hidden; margin-top: 10px; }
+.fc-propbar .seg { display: flex; align-items: center; padding: 0 8px; font-size: 11.5px; white-space: nowrap; overflow: hidden; }
+.fc-propbar .seg.a { background: var(--fc-forest); color: #fff; }
+.fc-propbar .seg.b { background: var(--fc-forest-light); color: var(--fc-forest-deep); }
+
+/* ── 2.7 Item row (ledger) ── hairline-separated, never boxed
+   individually, never striped. Chip right-aligned, factual only. ──── */
+.fc-itemrow { display: flex; align-items: baseline; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--fc-rule-soft); }
+.fc-itemrow:last-child { border-bottom: none; }
+.fc-itemrow .irmain { flex: 1; min-width: 0; }
+.fc-itemrow .irname { font-size: 13.5px; font-weight: 600; color: var(--fc-dark); }
+.fc-itemrow .irline { font-size: 12.5px; color: var(--fc-mid); margin-top: 1px; }
+.fc-itemrow .irfigs { display: flex; gap: 16px; flex-shrink: 0; }
+.fc-itemrow .irfig { display: flex; flex-direction: column; align-items: flex-end; }
+.fc-itemrow .irfl { font-size: 10.5px; color: var(--fc-light); }
+.fc-itemrow .irfv { font-size: 13.5px; color: var(--fc-dark); font-variant-numeric: tabular-nums; }
+.fc-itemrow .irfv.missing { color: var(--fc-light); }
+.fc-itemrow .irchip { flex-shrink: 0; align-self: center; font-size: 11px; color: var(--fc-mid); border: 1px solid var(--fc-rule); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+
+/* ── 2.8 Item group (ledger) ── rows of one kind under a quiet label,
+   closed by a subtotal in the calc grammar. ─────────────────────────── */
+.fc-group { margin-top: 6px; }
+.fc-group .iglabel { font-size: 11.5px; letter-spacing: .04em; color: var(--fc-light); margin-bottom: 2px; }
+.fc-group .igrows { border-top: 1px solid var(--fc-rule-soft); }
+.fc-group .igsub { margin-top: 6px; }
+.fc-group + .fc-group { margin-top: 16px; }
+
+/* ── 2.5 Reference block ────────────────────────────────────────────── */
+.fc-ref { border: 1px solid var(--fc-rule); border-radius: 10px; background: var(--fc-surface); }
+.fc-ref summary { cursor: pointer; padding: 11px 14px; font-size: 13px; color: var(--fc-mid); list-style: none; display: flex; justify-content: space-between; gap: 10px; }
+.fc-ref summary::-webkit-details-marker { display: none; }
+.fc-ref summary .cnt { color: var(--fc-light); }
+.fc-ref[open] summary { border-bottom: 1px solid var(--fc-rule-soft); }
+.fc-ref .refbody { padding: 6px 14px 10px; }
+
+/* ── 2.6 Cost pill and line ─────────────────────────────────────────── */
+.fc-pill { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--fc-forest-deep); background: var(--fc-forest-light); border-radius: 20px; padding: 3px 10px; }
+.fc-costline { font-size: 12.5px; line-height: 1.55; color: var(--fc-mid); }
+
+/* ── 3.1 Figure hero ────────────────────────────────────────────────── */
+.fc-hero { margin-bottom: 4px; }
+.fc-hero .num { font-size: 34px; font-weight: 700; letter-spacing: -.02em; color: var(--fc-dark); font-variant-numeric: tabular-nums; }
+.fc-hero .cap { font-size: 14.5px; color: var(--fc-mid); line-height: 1.5; margin-top: 2px; }
+.fc-hero .cap .fr, .fc-hero .cap em { font-family: 'Fraunces', serif; font-style: italic; font-weight: 400; color: var(--fc-dark); }
+
+/* ── 3.2 Gap card — extends the snapshot gap-card language ──────────── */
+.fc-gap { background: var(--fc-copper-light); border: 1.5px solid var(--fc-copper); border-left: 5px solid var(--fc-copper); border-radius: 8px; }
+.fc-gap summary { cursor: pointer; list-style: none; padding: 14px 16px; }
+.fc-gap summary::-webkit-details-marker { display: none; }
+.fc-gap .gh { color: var(--fc-copper-deep); font-weight: 600; font-size: 15px; line-height: 1.35; }
+.fc-gap .ghook { font-size: 13px; color: var(--fc-dark); margin-top: 3px; line-height: 1.5; }
+.fc-gap .gchip { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11.5px; font-weight: 600; color: var(--fc-copper-deep); background: rgba(255,255,255,.65); border: 1px solid var(--fc-copper); border-radius: 20px; padding: 3px 10px; }
+.fc-gap .gbody { padding: 2px 16px 16px; }
+.fc-gap .gbody p { font-size: 13.5px; line-height: 1.6; color: var(--fc-dark); margin: 6px 0; }
+
+/* Education blocks inside a gap card; the knowledge block is the ONLY
+   place emphasis is spent. */
+.fc-edu { margin-top: 12px; }
+.fc-edu .eh { font-size: 12.5px; font-weight: 600; color: var(--fc-dark); margin-bottom: 3px; }
+.fc-edu.knowledge { background: var(--fc-surface); border-radius: 8px; padding: 12px 14px; }
+.fc-edu.knowledge .eh { color: var(--fc-forest); }
+
+/* ── 3.3 Step rail ──────────────────────────────────────────────────── */
+.fc-rail { display: flex; flex-direction: column; gap: 14px; position: relative; padding-left: 60px; }
+.fc-rail::before { content: ''; position: absolute; left: 21px; top: 22px; bottom: 22px; width: 2px; background: var(--fc-rule); }
+.fc-rail .step { position: relative; }
+.fc-rail .step .marker { position: absolute; left: -60px; top: 0; width: 44px; height: 44px; border-radius: 50%; background: var(--fc-forest); color: #fff; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+@media (max-width: 600px) {
+  .fc-rail { padding-left: 50px; }
+  .fc-rail::before { left: 17px; }
+  .fc-rail .step .marker { left: -50px; width: 36px; height: 36px; font-size: 14px; }
+}
+
+/* ── 3.4 Promise block ──────────────────────────────────────────────── */
+.fc-promise { background: var(--fc-surface); border-radius: 10px; padding: 13px 15px; font-size: 13.5px; line-height: 1.6; color: var(--fc-mid); box-shadow: var(--fc-shadow); }
+.fc-promise b { color: var(--fc-dark); }
+
+/* ── 3.5 Action zone ────────────────────────────────────────────────── */
+.fc-action { margin-top: 14px; }
+.fc-action .btn { display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 13.5px; font-weight: 600; color: #fff; background: var(--fc-forest); border: none; border-radius: 6px; padding: 10px 16px; cursor: pointer; }
+.fc-action .btn:hover { background: var(--fc-forest-deep); }
+.fc-action .btn svg { width: 15px; height: 15px; }
+.fc-action .vetting { font-size: 11.5px; color: var(--fc-light); line-height: 1.5; margin-top: 8px; }
+
+/* ── 3.6 Calm block ─────────────────────────────────────────────────── */
+.fc-calm { background: var(--fc-forest-light); border-radius: 12px; padding: 16px 18px; }
+.fc-calm .cstate { font-size: 15px; font-weight: 600; color: var(--fc-forest-deep); }
+.fc-calm .cwhy { font-size: 13.5px; line-height: 1.6; color: var(--fc-mid); margin-top: 8px; }
+.fc-calm .cwch { margin: 10px 0 0; padding: 0 0 0 18px; }
+.fc-calm .cwch li { font-size: 13.5px; line-height: 1.7; color: var(--fc-dark); }
+.fc-calm .cclose { font-size: 13.5px; line-height: 1.6; color: var(--fc-mid); margin-top: 10px; }
+
+/* ── 3.7 Repeating item card + aggregate ────────────────────────────── */
+.fc-items { display: flex; flex-direction: column; gap: 12px; }
+.fc-items .item { background: var(--fc-surface); border: 1px solid var(--fc-rule); border-radius: 10px; padding: 12px 14px; }
+.fc-items .item .it { font-size: 13.5px; font-weight: 600; color: var(--fc-dark); margin-bottom: 6px; }
+.fc-items .aggregate { border-top: 2px solid var(--fc-rule); padding-top: 12px; }
+
+/* ── 3.8 Professional card ──────────────────────────────────────────── */
+.fc-pro { background: var(--fc-surface); border: 1px solid var(--fc-rule); border-radius: 12px; padding: 16px 18px; box-shadow: var(--fc-shadow); }
+.fc-pro .ph { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.fc-pro .pn { font-size: 16px; font-weight: 600; color: var(--fc-dark); }
+.fc-pro .pcount { font-size: 11px; font-weight: 700; color: var(--fc-forest-deep); background: var(--fc-forest-light); border-radius: 20px; padding: 3px 9px; }
+.fc-pro .prole { font-size: 13px; line-height: 1.55; color: var(--fc-mid); margin-top: 3px; }
+.fc-pro .pitems { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.fc-pro .pitem { border-top: 1px solid var(--fc-rule-soft); padding-top: 8px; font-size: 13.5px; color: var(--fc-dark); }
+.fc-pro .palso { font-size: 12px; color: var(--fc-light); margin-top: 2px; }
+.fc-pro .pcost { margin-top: 12px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+
+/* ── Panel layer (finn-panels.js, component-spec 4.1) ─────────────────
+      Teaching calcs get real headings in ink at 16px, as plain questions,
+      never small grey uppercase category labels. */
+.fp-teach { margin-top: 20px; }
+/* Density (ledger): section B behind a quiet affordance. Sentence case,
+   no marker triangle, rule colour only. */
+details.fp-b > summary.fp-howthis { cursor: pointer; list-style: none; font-size: 12.5px; color: var(--fc-mid, #5c5a55); }
+details.fp-b > summary.fp-howthis::-webkit-details-marker { display: none; }
+details.fp-b > summary.fp-howthis::after { content: ''; display: inline-block; width: 7px; height: 7px; margin-left: 7px; border-right: 1.5px solid var(--fc-rule, #e6e0d6); border-bottom: 1.5px solid var(--fc-rule, #e6e0d6); transform: rotate(45deg) translateY(-2px); }
+details.fp-b[open] > summary.fp-howthis::after { transform: rotate(225deg) translateY(-1px); }
+details.fp-b[open] > summary.fp-howthis { margin-bottom: 8px; }
+.fp-calchead { font-size: 16px; font-weight: 600; color: var(--fc-dark, #1c1917); margin: 0 0 8px; }
+.fp-section { margin-top: 20px; }
+.fp-b p { font-size: 13.5px; line-height: 1.6; color: var(--fc-mid, #5c5a55); margin: 0; }
+.fp-status { background: var(--fc-surface, #fff); border: 1px solid var(--fc-rule, #e6e0d6); border-radius: 10px; padding: 4px 14px; }
+.fp-status .fp-row { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--fc-rule-soft, #efeae1); font-size: 13.5px; }
+.fp-status .fp-row:last-child { border-bottom: none; }
+.fp-status .fp-label { color: var(--fc-mid, #5c5a55); }
+.fp-status .fp-value { color: var(--fc-dark, #1c1917); text-align: right; }
+.fp-status .fp-value strong { font-weight: 600; color: var(--fc-light, #9a9a94); }
+.fp-intro { font-size: 13.5px; line-height: 1.6; color: var(--fc-mid, #5c5a55); font-style: italic; margin: 6px 0; }
+.fp-tile .fc-ref { margin-top: 14px; }
+.fp-insights .fc-gap { margin-top: 10px; }
+.fp-dashboard { display: grid; gap: 18px; }
+
+/* ── Who to see (finn-panels renderWhoToSee, component-spec 4.3) ── */
+.fp-who { display: flex; flex-direction: column; gap: 14px; }
+.fp-who .fc-pro { margin: 0; }
+.fp-who-empty { background: var(--fc-surface, #fff); border: 1px dashed var(--fc-rule, #e6e0d6); border-radius: 10px; padding: 14px 16px; font-size: 13.5px; color: var(--fc-mid, #5c5a55); }
+.fp-howworks p { font-size: 13px; line-height: 1.6; color: var(--fc-mid, #5c5a55); margin: 8px 0 0; }
+.fp-cost { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+
+/* ── Term popover (finn-terms.js) — glossary then why, never the
+      handover sentence ── */
+.fc-termpop { position: absolute; z-index: 60; background: var(--fc-surface, #fff); border: 1px solid var(--fc-rule, #e6e0d6); border-radius: 10px; padding: 12px 14px; box-shadow: var(--fc-shadow, 0 8px 24px rgba(28,25,23,.12)); font-size: 12.5px; line-height: 1.55; }
+.fc-termpop .g { color: var(--fc-dark, #1c1917); }
+.fc-termpop .w { color: var(--fc-mid, #5c5a55); margin-top: 6px; }
+
+/* ── 3.9 Trust banner ───────────────────────────────────────────────── */
+.fc-trust { background: var(--fc-forest); color: #e7efe9; border-radius: 12px; padding: 18px 20px; font-size: 13.5px; line-height: 1.65; }
+.fc-trust b { color: #fff; }
+.fc-trust .steel { color: var(--fc-steel); }
+
+/* ── Questions and where-it-goes (16 Sept 2026) ── */
+.fp-range { font-size: 13px; line-height: 1.55; color: var(--fc-mid); margin: 10px 0 0; }
+.fp-question { display: flex; flex-direction: column; gap: 3px; background: var(--fc-copper-light); border-radius: 10px; padding: 10px 13px; margin: 2px 0 12px; }
+.fp-question .fp-qlabel { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; color: var(--fc-copper-deep); }
+.fp-question .fp-qtext { font-size: 14px; line-height: 1.5; color: var(--fc-dark); font-weight: 500; }
+.fp-qlist { list-style: none; margin: 0; padding: 4px 14px; background: var(--fc-surface); border: 1px solid var(--fc-rule); border-radius: 10px; }
+.fp-qlist li { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--fc-rule-soft); }
+.fp-qlist li:last-child { border-bottom: none; }
+.fp-qlist .fp-qtext { font-size: 13.5px; line-height: 1.5; color: var(--fc-dark); }
+.fp-qlist .fp-qpro { flex: 0 0 auto; font-size: 11.5px; color: var(--fc-light); white-space: nowrap; }
+.fp-spend { background: var(--fc-surface); border: 1px solid var(--fc-rule); border-radius: 10px; padding: 6px 14px; }
+.fp-srow { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(60px, 1fr) 118px; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--fc-rule-soft); font-size: 13.5px; }
+.fp-srow:last-child { border-bottom: none; }
+.fp-slabel { color: var(--fc-mid); min-width: 0; }
+.fp-sbar { height: 6px; background: var(--fc-rule-soft); border-radius: 4px; overflow: hidden; }
+.fp-sbar span { display: block; height: 100%; background: var(--fc-steel); border-radius: 4px; }
+.fp-sval { text-align: right; font-variant-numeric: tabular-nums; color: var(--fc-dark); font-weight: 600; white-space: nowrap; }
+.fp-sval .u { font-weight: 400; color: var(--fc-light); font-size: 11.5px; }
+@media (max-width: 560px) { .fp-srow { grid-template-columns: 1fr auto; } .fp-sbar { grid-column: 1 / -1; order: 3; } .fp-qlist li { flex-direction: column; gap: 2px; } }
+
+/* The household context header: the frame the tiles sit inside (15 Oct).
+   Deliberately quiet - no card, no border, no status colour. It states who
+   the picture is about and never flags anything. */
+.fp-context { margin: 0 0 18px; }
+.fp-contextline {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--fc-ink-soft, #4a5568);
+}

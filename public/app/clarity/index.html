@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/shared/finn-components.css">
 <style>
   :root{
     --parch:#f6f2ec; --parch-deep:#efe9dd; --canvas:#e7e0d3; --surface:#ffffff; --surface-warm:#faf7f2;
@@ -64,6 +65,9 @@
   .msg.finn .who{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); font-weight:600; margin-bottom:6px;}
   .msg.finn p{margin-bottom:9px;} .msg.finn p:last-child{margin-bottom:0;}
   .msg.user{align-self:flex-end; background:var(--accent); color:#fff; padding:11px 16px; border-radius:15px 15px 4px 15px; font-size:14.5px; line-height:1.5; box-shadow:var(--shadow);}
+  /* System notice — a refused save is surfaced, never silent. Visually
+     distinct from Finn: this is the app speaking, not the conversation. */
+  .msg.sys-note{align-self:center; background:var(--warm-light); border:1px solid #ecd9c4; color:#8a6038; border-radius:12px; padding:10px 14px; font-size:12.5px; line-height:1.55; max-width:88%; text-align:center;}
   .typing{display:flex; gap:5px; padding:4px 0;}
   .typing .td{width:7px;height:7px;border-radius:50%;background:var(--steel-deep);animation:tdp 1.2s ease infinite;}
   .typing .td:nth-child(2){animation-delay:.15s;} .typing .td:nth-child(3){animation-delay:.3s;}
@@ -96,14 +100,104 @@
   .prog-track{height:6px; background:rgba(255,255,255,.18); border-radius:6px; overflow:hidden;}
   .prog-fill{height:100%; width:0%; background:var(--steel); border-radius:6px; transition:width .5s;}
   .prog-label{font-size:12px; color:var(--steel); margin-top:8px;}
-  .areas{display:flex; flex-direction:column; gap:8px;}
-  .area{display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:13px 15px; box-shadow:var(--shadow); font-size:14px; font-weight:500; color:var(--mid);}
-  .area .tick{width:22px; height:22px; border-radius:50%; border:1.5px solid var(--rule); display:flex; align-items:center; justify-content:center; flex-shrink:0; color:transparent; transition:all .3s;}
-  .area.done{color:var(--dark);}
-  .area.done .tick{background:var(--accent); border-color:var(--accent); color:#fff;}
-  .area .tick svg{width:12px; height:12px;}
+  /* ===== INSIGHT TILES (3b — Layer 2, per the locked v10 mockup) =====
+     The badge says where the GATHERING is (Complete / Still gathering),
+     never a verdict (Devon, 16 Sept 2026: no "Nothing flagged", no "In good
+     shape"). Edge colours are unchanged: warm = there are questions for this
+     household's situation, forest = complete, neutral = still gathering.
+     Every tile carries a questions pointer. No red, no traffic-light, no
+     grading of any number. */
+  .tiles{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  @media(max-width:1180px){.tiles{grid-template-columns:1fr;}}
+  .tile{background:var(--surface); border:1px solid var(--rule); border-radius:13px; padding:15px 15px 14px; cursor:pointer; transition:all .18s; box-shadow:var(--shadow); position:relative; overflow:hidden;}
+  .tile::before{content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--none, #c9c4ba);}
+  .tile.s-calm::before{background:var(--accent);}
+  .tile.s-flag::before{background:var(--warm);}
+  .tile.s-building::before{background:#c9c4ba;}
+  .tile:hover{border-color:var(--accent); box-shadow:var(--shadow-lift);}
+  .tile .status-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;}
+  .badge{display:inline-flex; align-items:center; gap:5px; font-size:10px; text-transform:uppercase; letter-spacing:.06em; font-weight:600; padding:3px 8px; border-radius:20px;}
+  .badge.calm{background:var(--accent-light); color:var(--accent);}
+  .badge.flag{background:var(--warm-light); color:var(--warm-deep);}
+  .badge.building{background:#f0eee9; color:var(--light);}
+  .badge .d{width:6px;height:6px;border-radius:50%;}
+  .badge.calm .d{background:var(--accent);} .badge.flag .d{background:var(--warm);} .badge.building .d{background:#c9c4ba;}
+  .tile .ico{color:var(--steel-deep); display:inline-flex;}
+  .tile .ico svg{width:13px; height:13px;}
+  .tile .name{font-size:14.5px; font-weight:600; margin-bottom:6px;}
+  .tile .metric{font-size:20px; font-weight:600; letter-spacing:-.01em; color:var(--accent); line-height:1.15;}
+  .tile .metric.empty{color:var(--light); font-size:15px; font-weight:500;}
+  /* Subtext is three distinct elements, never one run-on line:
+     unit (what the number is) · facts (supporting figures) · route (why
+     it's a conversation — visually distinct, warm, never alarming). */
+  .tile .unit{font-size:12px; color:var(--light); font-weight:500;}
+  .tile .facts{font-size:11.5px; color:var(--light); font-weight:500; margin-top:5px; line-height:1.45;}
+  .tile .route{display:flex; align-items:flex-start; gap:6px; margin-top:8px; font-size:11.5px; font-weight:600; color:var(--warm-deep); line-height:1.4;}
+  .tile .route svg{width:11px; height:11px; flex-shrink:0; margin-top:2px;}
+  .tile .route.neutral{color:var(--steel-deep); font-weight:500;}
+  .tile .ctx{display:block; font-size:11.5px; color:var(--light); font-weight:500; margin-top:4px; line-height:1.4;}
+  .tile .complete{margin-top:11px; height:3px; background:var(--rule-soft); border-radius:4px; overflow:hidden;}
+  .tile .complete .cf{height:100%; background:var(--steel-deep); border-radius:4px; transition:width .5s;}
+  .tile.done .complete{display:none;}
   .dash-note{margin-top:14px; background:var(--accent-light); border-radius:12px; padding:13px 15px; font-size:12.5px; line-height:1.55; color:var(--mid);}
   .dash-note b{color:var(--accent);}
+
+  /* ===== DETAIL PANEL (3c — click a tile to expand; spans both panes,
+     header + nav stay visible; the v10 locked pattern) ===== */
+  .detail-panel{position:absolute; inset:0; background:var(--canvas); z-index:30; display:none; flex-direction:column; animation:slideIn .28s cubic-bezier(.4,0,.2,1);}
+  .detail-panel.on{display:flex;}
+  @keyframes slideIn{from{opacity:0;transform:translateX(18px);}to{opacity:1;transform:translateX(0);}}
+  .dp-head{display:flex; align-items:center; gap:12px; padding:20px 26px 16px; border-bottom:1px solid var(--rule-cool); flex-wrap:wrap; flex-shrink:0;}
+  .dp-back{font-family:inherit; font-size:13px; font-weight:500; color:var(--accent); background:var(--surface); border:1px solid var(--rule); border-radius:9px; padding:8px 13px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all .16s;}
+  .dp-back:hover{border-color:var(--accent); background:var(--accent-light);}
+  .dp-title{font-size:19px; font-weight:600; letter-spacing:-.01em;}
+  .dp-badge{margin-left:auto;}
+  .dp-body{flex:1; overflow-y:auto; padding:26px 40px 36px;}
+  .dp-body::-webkit-scrollbar{width:7px;} .dp-body::-webkit-scrollbar-thumb{background:var(--rule);border-radius:8px;}
+  .dp-inner{max-width:920px; margin:0 auto;}
+  .dp-hero-num{font-size:32px; font-weight:600; letter-spacing:-.02em; color:var(--accent); line-height:1.1;}
+  .dp-hero-num .u{font-size:15px; color:var(--light); font-weight:500;}
+  .dp-context{font-size:14px; color:var(--mid); margin-top:8px; line-height:1.5;}
+  .dp-section{margin-top:22px;}
+  .dp-section .lbl{font-size:10.5px; text-transform:uppercase; letter-spacing:.1em; color:var(--steel-deep); font-weight:600; margin-bottom:9px;}
+  .dp-read{font-size:14.5px; line-height:1.6; color:var(--dark);}
+  .dp-grid{display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:22px;}
+  .dp-grid .dp-section{margin-top:0;}
+  @media(max-width:900px){.dp-grid{grid-template-columns:1fr;}}
+  .dp-figures{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:6px 16px; box-shadow:var(--shadow);}
+  /* Figure rows: the label may wrap; the value never crushes to
+     one-word-per-line. Grid children get min-width:0 so columns can't
+     collide or overlap. */
+  .dp-grid > .dp-section{min-width:0;}
+  .dp-figrow{display:flex; justify-content:space-between; align-items:baseline; gap:16px; padding:11px 0; border-bottom:1px solid var(--rule-soft); font-size:13.5px;}
+  .dp-figrow:last-child{border-bottom:none;}
+  .dp-figrow .k{color:var(--mid); flex:1 1 auto; min-width:0; line-height:1.45;}
+  .dp-figrow .v{font-weight:600; text-align:right; flex:0 0 auto; max-width:55%; line-height:1.45;}
+  .dp-figrow .v.na{color:var(--light); font-weight:500;}
+  /* "Why this is worth a conversation" — the education layer's structure.
+     Content is Devon-written; placeholders are visually unmistakable. */
+  .dp-edu{display:flex; flex-direction:column; gap:9px;}
+  .dp-edu-block{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:13px 15px; box-shadow:var(--shadow);}
+  .dp-edu-block .eh{font-size:12.5px; font-weight:600; color:var(--dark); margin-bottom:6px;}
+  .edu-placeholder{border:1.5px dashed var(--steel-deep); border-radius:9px; padding:9px 12px; font-size:12.5px; color:var(--steel-deep); font-style:italic; line-height:1.5; background:rgba(194,212,222,.12);}
+  .dp-terms{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:4px 16px; box-shadow:var(--shadow);}
+  .dp-term{padding:10px 0; border-bottom:1px solid var(--rule-soft); font-size:13px; line-height:1.5; color:var(--mid);}
+  .dp-term:last-child{border-bottom:none;}
+  .dp-term b{color:var(--dark); font-weight:600;}
+  .dp-pros{display:flex; flex-direction:column; gap:8px;}
+  .dp-pro{display:flex; align-items:flex-start; gap:11px; background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:13px 15px; box-shadow:var(--shadow);}
+  .dp-pro .ic{width:30px;height:30px;border-radius:8px;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .dp-pro .ic svg{width:15px;height:15px;}
+  .dp-pro .txt{font-size:13.5px; line-height:1.5; color:var(--mid);}
+  .dp-pro .txt b{color:var(--dark); font-weight:600;}
+  .dp-goalnote{background:var(--parch-deep); border-radius:12px; padding:12px 15px; font-size:13px; line-height:1.55; color:var(--mid); margin-top:10px;}
+  /* Referral card — warm invitation, never alarm, never salesy */
+  .ref-card{margin-top:22px; background:var(--warm-light); border:1px solid var(--warm); border-radius:14px; padding:17px 18px; box-shadow:var(--shadow);}
+  .ref-card .rc-tag{font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--warm-deep); font-weight:700; margin-bottom:8px;}
+  .ref-card .rc-body{font-size:14px; line-height:1.6; color:var(--dark);}
+  .ref-card .rc-body b{color:var(--warm-deep);}
+  .ref-card .rc-foot{margin-top:11px; font-size:11.5px; color:#9a7550; line-height:1.5;}
+  .dp-building{background:var(--surface); border:1px dashed var(--rule-cool); border-radius:12px; padding:14px 16px; font-size:13.5px; color:var(--mid); line-height:1.55;}
 
   .loading-veil{position:fixed; inset:0; background:var(--canvas); z-index:50; display:flex; align-items:center; justify-content:center; transition:opacity .3s;}
   .loading-veil.gone{opacity:0; pointer-events:none;}
@@ -135,6 +229,17 @@
     .mobile-tabs button.on{background:var(--accent); color:#fff; border-color:var(--accent);}
   }
   *:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+
+  /* ── Dashboard tabs: Your picture | Who to see (component-spec 4.3) ── */
+  .dash-tabs{display:flex; gap:8px; margin-bottom:16px;}
+  .dash-tabs button{font-family:inherit; font-size:13px; font-weight:600; padding:8px 14px; border-radius:20px; border:1px solid var(--rule); background:var(--surface); color:var(--mid); cursor:pointer;}
+  .dash-tabs button.on{background:var(--accent); border-color:var(--accent); color:#fff;}
+
+  /* ── Panel sections inside the detail panel (styles live in
+        finn-components.css; only page-specific integration here) ── */
+  .fp-tile{background:transparent;}
+  .fp-tile > h3{display:none;} /* the dp-head already carries the title */
+  .fp-b{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:13px 16px; box-shadow:var(--shadow);}
 </style>
 </head>
 <body class="tab-chat">
@@ -177,22 +282,37 @@
             <button class="send" id="sendBtn" aria-label="Send">↑</button>
           </div>
         </div>
-        <input type="file" id="fileInput" accept="application/pdf,image/png,image/jpeg,image/webp" style="display:none">
+        <input type="file" id="fileInput" multiple accept="application/pdf,image/png,image/jpeg,image/webp,text/csv,.csv" style="display:none">
       </div>
 
       <div class="dash">
         <div class="dash-inner">
+          <div class="dash-tabs" role="tablist">
+            <button id="dtPicture" class="on" role="tab" aria-selected="true" onclick="setDashView('picture')">Your picture</button>
+            <button id="dtWho" role="tab" aria-selected="false" onclick="setDashView('who')">Who to see</button>
+          </div>
           <div class="hero">
             <div class="lead">Your Clarity Session</div>
             <div class="headline" id="heroLine">Your picture's <span class="fr">being built</span>.</div>
             <div class="prog-wrap">
               <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
-              <div class="prog-label" id="progLabel">0 of 8 areas built</div>
             </div>
           </div>
-          <div class="areas" id="areasList"></div>
-          <div class="dash-note"><b>Your figures are being captured as you talk.</b> When the picture's complete, this pane becomes your full dashboard, every area opened up with your real numbers.</div>
+          <div id="contextHeader"></div>
+          <div class="tiles" id="tilesGrid"></div>
+          <div class="dash-note" id="dashNote"><b>Built from your real figures as you talk.</b> Every tile has questions worth taking to the right professional. Where your own figures raise one, the tile says so. It's never a judgment of your numbers. Tap any tile for the full detail.</div>
+          <div id="whoView" class="fc" style="display:none"></div>
         </div>
+      </div>
+
+      <!-- Detail panel — spans both panes; header + nav stay visible (3c) -->
+      <div class="detail-panel" id="detailPanel">
+        <div class="dp-head">
+          <button class="dp-back" id="dpBack">‹ Back to your picture</button>
+          <span class="dp-title" id="dpTitle"></span>
+          <span class="dp-badge badge building" id="dpBadge"></span>
+        </div>
+        <div class="dp-body" id="dpBody"></div>
       </div>
     </div>
   </div>
@@ -205,6 +325,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/app/shared/finn-supabase.js"></script>
+<script type="module" src="/app/shared/finn-derived.js"></script>
+<script src="/app/shared/finn-triggers.js"></script>
+<script src="/app/shared/finn-panels.js"></script>
+<script src="/app/shared/finn-components.js"></script>
+<script src="/app/shared/finn-terms.js"></script>
+<script src="/app/shared/finn-transactions.js"></script>
 <script>
 'use strict';
 /* Clarity Session conversation (build 3a — Layer 1: collection).
@@ -212,17 +338,8 @@
    SERVER-SIDE in the clarity-chat edge function. This page renders the
    stream (minus the [CAPTURE] machine block) and shows build progress. */
 
-const AREAS = [
-  ['income', 'Income and cashflow'],
-  ['assets', 'Assets'],
-  ['liabilities', 'Debts and loans'],
-  ['buffer', 'Emergency buffer'],
-  ['protection', 'Protection'],
-  ['estate', 'Estate basics'],
-  ['super', 'Super'],
-  ['goals', 'Goals and direction']
-];
-const TICK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+const VALID_AREAS = ['income', 'assets', 'liabilities', 'buffer', 'protection', 'estate', 'super', 'goals'];
+const CHEV = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
 const messagesEl = document.getElementById('messages');
 const inputEl = document.getElementById('composerInput');
@@ -231,15 +348,32 @@ const sendBtn = document.getElementById('sendBtn');
 let session = null;
 let history = [];      // visible conversation, sent to the edge function
 let busy = false;
+// Conversation id: scopes path_served events and refusal validity on the
+// server (capture-conduct). One per page load; a new visit is a new
+// session, so expired refusals get the path offered once more.
+const conversationId = crypto.randomUUID();
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function scrollChat() { messagesEl.scrollTop = messagesEl.scrollHeight; }
 
-// Strip the machine block from display. The capture is applied server-side;
-// the visible reply ends where [CAPTURE] begins.
+// Strip the machine blocks from display. [RESOLVE] lines are removed
+// wherever they appear (the model sometimes talks on after one), and the
+// visible reply ends where [CAPTURE] begins.
 function visibleText(fullText) {
-  const idx = fullText.indexOf('[CAPTURE]');
-  return (idx === -1 ? fullText : fullText.slice(0, idx)).trim();
+  const noResolves = fullText.replace(/^\[RESOLVE\][^\n]*$/gm, '').replace(/\n{3,}/g, '\n\n');
+  const idx = noResolves.indexOf('[CAPTURE]');
+  return (idx === -1 ? noResolves : noResolves.slice(0, idx)).trim();
+}
+
+// Pull [RESOLVE] {json} blocks (outlier classifications) out of a reply.
+function extractResolves(fullText) {
+  const out = {};
+  const re = /\[RESOLVE\]\s*(\{[^\n]*\})/g;
+  let m;
+  while ((m = re.exec(fullText)) !== null) {
+    try { Object.assign(out, JSON.parse(m[1])); } catch {}
+  }
+  return out;
 }
 
 function renderFinn(el, text) {
@@ -277,11 +411,41 @@ const fileInput = document.getElementById('fileInput');
 const attachChip = document.getElementById('attachChip');
 
 attachBtn.addEventListener('click', () => fileInput.click());
-fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); fileInput.value = ''; });
+// Several bank exports at once (run 10: only the first of two CSVs was kept).
+fileInput.addEventListener('change', () => { for (const f of [...fileInput.files]) handleFile(f); fileInput.value = ''; });
 document.getElementById('attachRemove').addEventListener('click', clearAttachment);
+
+// Paste a screenshot straight into the chat — Finn's ask literally says
+// "paste it in", so the composer honours it. A clipboard image becomes the
+// pending attachment through the same read-and-discard path as the picker.
+document.addEventListener('paste', e => {
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.kind === 'file' && FILE_TYPES.includes(item.type)) {
+      const f = item.getAsFile();
+      if (f) {
+        e.preventDefault();
+        handleFile(new File([f], f.name && f.name !== 'image.png' ? f.name : 'pasted screenshot.png', { type: f.type }));
+      }
+      return;
+    }
+  }
+});
+
+// Drag-and-drop onto the conversation — "drop the file here" is in the ask
+// copy too. Same single-file, same types, same path.
+const convoEl = document.querySelector('.convo');
+['dragover', 'dragenter'].forEach(ev => convoEl.addEventListener(ev, e => { e.preventDefault(); }));
+convoEl.addEventListener('drop', e => {
+  e.preventDefault();
+  const fs = e.dataTransfer && e.dataTransfer.files ? [...e.dataTransfer.files] : [];
+  for (const f of fs) handleFile(f);
+});
 
 function clearAttachment() {
   pendingFile = null;
+  pendingCsvs = [];
   attachChip.classList.remove('on');
 }
 
@@ -293,9 +457,56 @@ function attachNote(text) {
   scrollChat();
 }
 
+/* ── CSV transaction imports (living costs) ──
+   CSVs never go inline to the model: they go to /api/import-transactions,
+   where CODE parses and totals deterministically, and only the SUMMARY
+   reaches the conversation. Files accumulate for the session (a later
+   batch re-runs the whole computation with every file, per the spec) and
+   live only in memory — read and discarded, never stored. */
+let pendingCsvs = [];   // attached, not yet sent
+let sessionCsvs = [];   // all csvs sent this session, for whole-set recompute
+let lastTxSummary = null;
+let txResolutions = {};
+let txResultSent = false;
+
+function isCsvFile(f) {
+  return f.type === 'text/csv' || /\.csv$/i.test(f.name || '');
+}
+
+function updateAttachChip() {
+  if (pendingCsvs.length) {
+    document.getElementById('attachName').textContent =
+      pendingCsvs.length === 1 ? pendingCsvs[0].name : pendingCsvs.length + ' statements';
+    attachChip.classList.add('on');
+  } else if (pendingFile) {
+    document.getElementById('attachName').textContent = pendingFile.name;
+    attachChip.classList.add('on');
+  } else {
+    attachChip.classList.remove('on');
+  }
+}
+
 function handleFile(f) {
+  if (isCsvFile(f)) {
+    if (f.size > MAX_FILE_BYTES) {
+      attachNote('That file is a bit big for me (over 8 MB). Try exporting a shorter date range and sending it in pieces.');
+      return;
+    }
+    if (pendingCsvs.length + sessionCsvs.length >= 6) {
+      attachNote('That\'s the most statements I can take in one go (6). Send these through first and we can add more after.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      pendingCsvs.push({ name: f.name, csv_text: String(reader.result) });
+      updateAttachChip();
+      inputEl.focus();
+    };
+    reader.readAsText(f);
+    return;
+  }
   if (!FILE_TYPES.includes(f.type)) {
-    attachNote('I can read a PDF or an image (PNG or JPG) — a statement or a screenshot works perfectly.');
+    attachNote('I can read a PDF, an image (PNG or JPG), or a CSV export of transactions — a statement or a screenshot works perfectly.');
     return;
   }
   if (f.size > MAX_FILE_BYTES) {
@@ -305,8 +516,7 @@ function handleFile(f) {
   const reader = new FileReader();
   reader.onload = () => {
     pendingFile = { name: f.name, media_type: f.type, data: String(reader.result).split(',')[1] };
-    document.getElementById('attachName').textContent = f.name;
-    attachChip.classList.add('on');
+    updateAttachChip();
     inputEl.focus();
   };
   reader.readAsDataURL(f);
@@ -321,44 +531,232 @@ function addTyping() {
   return div;
 }
 
-/* ── progress pane ── */
-function renderAreas(completed) {
-  const list = document.getElementById('areasList');
-  list.innerHTML = '';
-  AREAS.forEach(([key, label]) => {
-    const done = completed.includes(key);
-    const row = document.createElement('div');
-    row.className = 'area' + (done ? ' done' : '');
-    row.innerHTML = '<span class="tick">' + TICK + '</span>' + label;
-    list.appendChild(row);
-  });
-  const n = completed.filter(k => AREAS.some(([key]) => key === k)).length;
-  document.getElementById('progLabel').textContent = n + ' of 8 areas built';
+/* ══════════ THE DETERMINISTIC DASHBOARD (Step 6 — wired) ══════════
+   Layers 2 and 3 are now the locked chain from field-spec.md:
+   the model turned conversation into data (3a, server-side) → code turns
+   data into display (finn-derived.js + finn-triggers.js, pure functions) →
+   finn-library.json supplies the words (Devon/Charlie's signed-off copy,
+   rendered by finn-panels.js by slot substitution only). No model call and
+   no judgment anywhere in this path; the page never writes to picture.
+
+   Display rules carried through from the education library: a missing value
+   is "none recorded", never zero; no colour verdicts, no benchmarks, no
+   scores with denominators. Display is broader than triggering — a visible
+   tile with no questions for the situation shows its figures only. A tile
+   whose domain the conversation never reached is "Still gathering": no
+   insight fires on a domain that was never reached.
+
+   Referral cards (the old 3c layer) are intentionally NOT wired here; they
+   return after Devon's end-to-end walk, rebuilt against the trigger engine. */
+
+let FINN_LIBRARY = null;
+
+function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
+function fmt$(n) { const r = Math.round(n); return (r < 0 ? '-$' + Math.abs(r).toLocaleString('en-AU') : '$' + r.toLocaleString('en-AU')); }
+
+// The tile grid's badge, question pointer and headline live in
+// finn-panels.js, where the suites cover them (run 11: tile 5 read "Still
+// gathering" with the data complete, because this code was never tested).
+const badgeLabel = c => window.finnPanels.badgeLabel(c);
+const tileComplete = (n, picture) => window.finnPanels.tileComplete(n, picture);
+const questionPointer = n => window.finnPanels.questionPointer(n);
+const tileReached = (n, d) => window.finnPanels.tileReached(n, d);
+const tileHeadline = (n, d, der) => window.finnPanels.tileHeadline(n, d, der);
+
+let lastTriggers = null;
+// The member's own first name, for the context header. Not a picture field.
+let ownerFirstName = null;
+
+function renderTiles(picture) {
+  const grid = document.getElementById('tilesGrid');
+  const d = picture.domains || {};
+  const derived = window.finnDerived.derive(d);
+  const triggers = window.finnTriggers.evaluate(d, { derived });
+  lastTriggers = triggers;
+  grid.innerHTML = '';
+  // The frame the tiles sit inside. Built in finn-panels.js, never here.
+  const ctxEl = document.getElementById('contextHeader');
+  if (ctxEl) ctxEl.innerHTML = window.finnPanels.contextHeader(d, { ownerName: ownerFirstName, library: FINN_LIBRARY });
+  const ROUTE_ARROW = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  for (const t of triggers.tiles) {
+    if (!t.visible) continue;
+    const reached = tileReached(t.tile, d);
+    const complete = tileComplete(t.tile, picture);
+    const state = t.insights.length ? 'flag' : (complete ? 'calm' : 'building');
+    const head = tileHeadline(t.tile, d, derived);
+    const title = FINN_LIBRARY && FINN_LIBRARY.tiles[String(t.tile)] ? FINN_LIBRARY.tiles[String(t.tile)].title : 'Tile ' + t.tile;
+    const pointer = questionPointer(t.insights.length);
+    const el = document.createElement('div');
+    el.className = 'tile s-' + state + (complete ? ' done' : '');
+    el.setAttribute('data-tile', t.tile);
+    el.onclick = () => openDetail(t.tile);
+    el.innerHTML =
+      '<div class="status-row"><span class="badge ' + state + '"><span class="d"></span>' + badgeLabel(complete) + '</span><span class="ico">' + CHEV + '</span></div>' +
+      '<div class="name">' + esc(title) + '</div>' +
+      (head
+        ? '<div class="metric">' + esc(head.metric) + (head.unit ? ' <span class="unit">' + esc(head.unit) + '</span>' : '') + '</div>' +
+          (head.facts ? '<div class="facts">' + esc(head.facts) + '</div>' : '')
+        : '<div class="metric empty">Still gathering<span class="ctx">fills in as you talk with Finn</span></div>') +
+      '<div class="' + pointer.cls + '"><span>' + esc(pointer.text) + '</span>' + ROUTE_ARROW + '</div>' +
+      '<div class="complete"><div class="cf" style="width:' + (complete ? 100 : (reached ? 50 : 0)) + '%"></div></div>';
+    grid.appendChild(el);
+  }
+}
+
+function renderHero(completed) {
+  const n = completed.filter(k => VALID_AREAS.includes(k)).length;
   document.getElementById('progFill').style.width = (n / 8 * 100) + '%';
   if (n === 8) {
-    document.getElementById('heroLine').innerHTML = 'Your picture’s <span class="fr">complete</span>.';
+    document.getElementById('heroLine').innerHTML = 'Every area’s <span class="fr">covered</span>.';
     document.getElementById('hdrT').textContent = 'Your picture, captured';
   }
 }
 
-async function refreshProgress() {
-  const { data } = await finnSupabase.from('picture').select('completed_domains').limit(1);
-  const completed = (data && data[0] && Array.isArray(data[0].completed_domains)) ? data[0].completed_domains : [];
-  renderAreas(completed);
+let lastPicture = { domains: {}, goals: {}, completed_domains: [] };
+
+// THE MERGE LANDS AFTER THE RESPONSE CLOSES (walk 4, 15 Oct). The capture,
+// recorder and merge chain runs in the function's waitUntil, which by
+// definition outlives the stream, so the reply cannot carry a
+// "merge complete" marker: by the time the merge finishes there is nothing
+// left to write it to. The only honest signal is the picture row itself.
+//
+// We wait for the row's OWN updated_at to change rather than comparing it
+// against a client timestamp: the two clocks are not the same clock, and a
+// few seconds of skew would either return stale tiles or never fire.
+async function waitForMerge(beforeUpdatedAt) {
+  const DELAYS = [250, 400, 600, 900, 1300, 1800, 2500];
+  for (const ms of DELAYS) {
+    await new Promise(r => setTimeout(r, ms));
+    const { data } = await finnSupabase.from('picture').select('updated_at, last_write_status').limit(1);
+    const row = data && data[0];
+    if (!row) continue;
+    if (row.updated_at !== beforeUpdatedAt) return true;
+    // A refused write bumps last_write_status without touching the picture.
+    const st = row.last_write_status;
+    if (st && st.ok === false && st.at && st.at !== lastNoticedFailure) return true;
+  }
+  return false;
 }
 
+async function refreshProgress() {
+  const { data } = await finnSupabase.from('picture').select('domains, goals, completed_domains, last_write_status, updated_at').limit(1);
+  const picture = (data && data[0]) ? data[0] : { domains: {}, goals: {}, completed_domains: [] };
+  lastPicture = picture;
+  const completed = Array.isArray(picture.completed_domains) ? picture.completed_domains : [];
+  renderHero(completed);
+  renderTiles(picture);
+  renderWhoView();
+}
+
+/* ── Who to see: a second lens on the same data, peer to the tile grid ── */
+function renderWhoView() {
+  if (!FINN_LIBRARY || !lastTriggers) return;
+  document.getElementById('whoView').innerHTML =
+    window.finnPanels.renderWhoToSee(lastTriggers, FINN_LIBRARY);
+}
+
+function setDashView(v) {
+  const who = v === 'who';
+  document.getElementById('dtPicture').classList.toggle('on', !who);
+  document.getElementById('dtPicture').setAttribute('aria-selected', String(!who));
+  document.getElementById('dtWho').classList.toggle('on', who);
+  document.getElementById('dtWho').setAttribute('aria-selected', String(who));
+  document.querySelector('.hero').style.display = who ? 'none' : '';
+  document.getElementById('tilesGrid').style.display = who ? 'none' : '';
+  document.getElementById('dashNote').style.display = who ? 'none' : '';
+  document.getElementById('whoView').style.display = who ? '' : 'none';
+  if (who) renderWhoView();
+}
+
+/* ══════════ DETAIL PANEL (sections A/B/C from the library) ══════════ */
+
+// Density (ledger, Sept 2026): section B is open by default only on a
+// tile's FIRST visit, remembered per household in household_ui_state.
+// Never driven by what any number is — only by whether they've been here.
+let sectionBSeen = {};
+let uiHouseholdId = null;
+function markSectionBSeen(tileNo) {
+  if (sectionBSeen[String(tileNo)]) return;
+  sectionBSeen[String(tileNo)] = true;
+  if (!uiHouseholdId) return;
+  finnSupabase.from('household_ui_state')
+    .upsert({ household_id: uiHouseholdId, section_b_seen: sectionBSeen, updated_at: new Date().toISOString() })
+    .then(() => {}, err => console.error('[Finn ui] section B state save failed (harmless: it opens again next visit):', err));
+}
+
+function openDetail(tileNo) {
+  if (!FINN_LIBRARY || !lastTriggers) return;
+  const d = lastPicture.domains || {};
+  const derived = window.finnDerived.derive(d);
+  const tileResult = lastTriggers.tiles.find(x => x.tile === tileNo);
+  if (!tileResult) return;
+  const reached = tileReached(tileNo, d);
+  const complete = tileComplete(tileNo, lastPicture);
+  const state = tileResult.insights.length ? 'flag' : (complete ? 'calm' : 'building');
+  const tileMeta = FINN_LIBRARY.tiles[String(tileNo)];
+
+  document.getElementById('dpTitle').textContent = tileMeta ? tileMeta.title : 'Tile ' + tileNo;
+  const badge = document.getElementById('dpBadge');
+  badge.className = 'dp-badge badge ' + state;
+  badge.innerHTML = '<span class="d"></span>' + badgeLabel(complete);
+
+  const firstVisit = !sectionBSeen[String(tileNo)];
+  let html = '<div class="dp-inner">' +
+    window.finnPanels.renderTile(tileNo, d, derived, tileResult, FINN_LIBRARY, { terms: window.finnTerms, sectionBOpen: firstVisit });
+  if (tileMeta && typeof tileMeta.section_b === 'string' && !tileMeta.section_b.startsWith('[Not provided')) {
+    markSectionBSeen(tileNo);
+  }
+  if (!complete) {
+    html += '<div class="dp-section"><div class="dp-building">This area is still being gathered. The figures fill in as the conversation covers it.</div></div>';
+  }
+  html += '</div>';
+  document.getElementById('dpBody').innerHTML = html;
+  // First-encounter term handovers: whichever tile they open first that
+  // uses a term carries its handover sentence.
+  finnTerms.processContainer(document.getElementById('dpBody'));
+  document.getElementById('detailPanel').classList.add('on');
+}
+
+function closeDetail() { document.getElementById('detailPanel').classList.remove('on'); }
+document.getElementById('dpBack').addEventListener('click', closeDetail);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+
 /* ── conversation ── */
-async function talk(userText, hidden, file) {
+// A turn that could not be saved at all must never pass silently in a paid
+// session. After each turn we re-read last_write_status; a fresh total
+// failure surfaces as a quiet notice. It never asks the person to repeat
+// themselves (15 Sept walk).
+let lastNoticedFailure = null;
+function checkWriteStatus(turnStartedAt) {
+  const s = lastPicture && lastPicture.last_write_status;
+  if (!s || s.ok !== false || !s.at) return;
+  const t = new Date(s.at).getTime();
+  if (isNaN(t) || t < turnStartedAt - 15000 || s.at === lastNoticedFailure) return;
+  lastNoticedFailure = s.at;
+  const div = document.createElement('div');
+  div.className = 'msg sys-note';
+  // Shown only when a whole turn could not be saved (a partial save is
+  // handled by Finn re-asking in its own words). Finn owns the slip.
+  div.textContent = 'I didn’t manage to note that last part properly. I’ll pick it up again with you in a moment, so there’s no need to do anything differently.';
+  messagesEl.appendChild(div);
+  scrollChat();
+}
+
+async function talk(userText, hidden, file, machineBlock, displayLabel) {
+  const turnStartedAt = Date.now();
+  // What the picture looked like before this turn, for the merge wait below.
+  const beforeUpdatedAt = (lastPicture && lastPicture.updated_at) || null;
   busy = true;
   sendBtn.disabled = true;
-  if (!hidden) addUser(userText, file && file.name);
+  if (!hidden) addUser(userText, displayLabel || (file && file.name));
 
-  let content = userText;
+  const sentText = machineBlock ? (userText ? userText + '\n\n' : '') + machineBlock : userText;
+  let content = sentText;
   if (file) {
     const block = file.media_type === 'application/pdf'
       ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: file.data } }
       : { type: 'image', source: { type: 'base64', media_type: file.media_type, data: file.data } };
-    content = [block, { type: 'text', text: userText || "Here you go, I've attached it." }];
+    content = [block, { type: 'text', text: sentText || "Here you go, I've attached it." }];
   }
   history.push({ role: 'user', content });
 
@@ -373,7 +771,7 @@ async function talk(userText, hidden, file) {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + s.access_token
       },
-      body: JSON.stringify({ messages: history })
+      body: JSON.stringify({ messages: history, session_id: conversationId })
     });
     if (!res.ok) throw new Error('clarity-chat ' + res.status);
 
@@ -425,17 +823,77 @@ async function talk(userText, hidden, file) {
   }
   busy = false;
   sendBtn.disabled = false;
-  // Server has merged this turn's capture; give it a beat, then refresh.
-  setTimeout(refreshProgress, 900);
+  // Server has merged (or refused) this turn's capture; give it a beat,
+  // refresh, then surface any refusal to the person.
+  // Refresh on the signal, not a timer: the merge can land well after any
+  // fixed delay (walk 4: the home estimate showed the old figure until a
+  // reload). We know what the picture looked like before this turn, so we
+  // wait for it to change.
+  (async () => {
+    const landed = await waitForMerge(beforeUpdatedAt);
+    if (!landed) console.warn('[Finn] merge not observed within the wait cap; refreshing anyway');
+    await refreshProgress();
+    checkWriteStatus(turnStartedAt);
+  })();
+
+  // CSV outlier classifications: the model emits [RESOLVE] blocks as the
+  // person answers. When every outlier is resolved, CODE computes the
+  // final figure (finn-transactions.js — the model never does the
+  // division) and hands the result back as a machine turn for the
+  // composition statement and the capture.
+  if (lastTxSummary && !txResultSent) {
+    Object.assign(txResolutions, extractResolves(fullText));
+    const outstanding = lastTxSummary.outliers.filter(o => !txResolutions[o.id]);
+    if (!outstanding.length) {
+      const result = window.finnTransactions.applyResolutions(lastTxSummary, txResolutions);
+      if (!result.error) {
+        txResultSent = true;
+        talk('', true, null, '[TRANSACTION RESULT] ' + JSON.stringify(result));
+      }
+    }
+  }
 }
 
-function handleSend() {
+async function handleSend() {
   const text = inputEl.value.trim();
-  if ((!text && !pendingFile) || busy) return;
+  if ((!text && !pendingFile && !pendingCsvs.length) || busy) return;
   const file = pendingFile;
+  const csvs = pendingCsvs;
   clearAttachment();
   inputEl.value = '';
   inputEl.style.height = 'auto';
+
+  if (csvs.length) {
+    // Whole-set recompute: every CSV from this session goes back through
+    // the deterministic endpoint together, so the figure is always built
+    // from one pass (transfer and card dedupe need the full set).
+    const allCsvs = sessionCsvs.concat(csvs);
+    busy = true; sendBtn.disabled = true;
+    const label = csvs.length === 1 ? csvs[0].name : csvs.length + ' statements';
+    try {
+      const { data: { session: s } } = await finnSupabase.auth.getSession();
+      const res = await fetch('/api/import-transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + s.access_token },
+        body: JSON.stringify({ files: allCsvs }),
+      });
+      const body = await res.json();
+      busy = false; sendBtn.disabled = false;
+      if (!res.ok) {
+        attachNote('I couldn\'t read that export: ' + (body.detail || body.error) + '. A fresh CSV export from the bank usually fixes it.');
+        return;
+      }
+      sessionCsvs = allCsvs;
+      lastTxSummary = body.summary;
+      txResolutions = {};
+      txResultSent = false;
+      talk(text, false, null, '[TRANSACTION SUMMARY] ' + JSON.stringify(body.summary), label);
+    } catch (err) {
+      busy = false; sendBtn.disabled = false;
+      attachNote('The import didn\'t go through just then. Mind trying that send again?');
+    }
+    return;
+  }
   talk(text, false, file);
 }
 sendBtn.addEventListener('click', handleSend);
@@ -471,6 +929,36 @@ async function main() {
   if (!s) { window.location.replace('/app/login/'); return; }
   session = s;
 
+  // The locked library — Devon/Charlie's copy as data. Loaded once; the
+  // dashboard renders nothing insight-shaped without it.
+  FINN_LIBRARY = await (await fetch('/app/shared/finn-library.json')).json();
+
+  // Term registry + handed-over state. Handovers persist against the
+  // HOUSEHOLD (term-registry Part Four): learned words stay learned across
+  // visits and devices. A failed load or save is harmless by design — the
+  // worst case is a handover shown again, never a cold acronym.
+  try {
+    const termsData = await (await fetch('/app/shared/finn-terms.json')).json();
+    const [{ data: hh }, { data: ui }] = await Promise.all([
+      finnSupabase.from('households').select('id').limit(1),
+      finnSupabase.from('household_ui_state').select('terms_handed,section_b_seen').limit(1),
+    ]);
+    const householdId = hh && hh[0] && hh[0].id;
+    uiHouseholdId = householdId || null;
+    sectionBSeen = (ui && ui[0] && ui[0].section_b_seen) || {};
+    finnTerms.init({
+      terms: termsData.terms,
+      handed: (ui && ui[0] && ui[0].terms_handed) || {},
+      onHandover: householdId
+        ? updated => finnSupabase.from('household_ui_state')
+            .upsert({ household_id: householdId, terms_handed: updated, updated_at: new Date().toISOString() })
+        : null,
+    });
+  } catch (err) {
+    console.error('[Finn terms] init failed (affordances degrade to plain text):', err);
+    finnTerms.init({ terms: {}, handed: {} });
+  }
+
   const [{ data: me }, { data: households }, { data: access }] = await Promise.all([
     finnSupabase.from('members').select('display_name, email').eq('id', s.user.id).maybeSingle(),
     finnSupabase.from('households').select('display_name').limit(1),
@@ -483,6 +971,7 @@ async function main() {
   }
 
   const famName = (households && households[0] && households[0].display_name) || 'Your household';
+  ownerFirstName = (me && me.display_name) ? String(me.display_name).trim().split(/\s+/)[0] : null;
   document.getElementById('famName').childNodes[0].textContent = famName;
   document.getElementById('famSub').textContent = (me && me.email) || '';
   document.getElementById('famAvatar').textContent = initials(famName);
