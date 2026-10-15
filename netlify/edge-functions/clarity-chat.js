@@ -405,6 +405,21 @@ const STOP_WORDS_PLAN = new Set(["whether", "inside", "that", "this", "with", "f
 
 // THE ABSOLUTE LIST: the only things code stops. Each entry says what the
 // model is told when its reply is handed back.
+/* ── the finishing claim ── (walk 4, widened 15 Oct)
+   ONE pattern governs both paths. It used to live inside compose(), which
+   only ever ran when the model emitted [FRAME: close], so a reply that
+   claimed the session was finished WITHOUT a frame was never caught: the
+   old wrapping_up test knew six phrasings and "that's actually everything
+   we set out to cover" was not among them. Measured on the live module: no
+   absolute failure, no retry, claim served verbatim.
+
+   FALSE POSITIVES DO NOT APPLY HERE, so do not narrow this on that worry.
+   wrapping_up is evaluated ONLY when ctx.canClose === false, i.e. only
+   while areas of the picture are still open. A household that genuinely
+   can close is never tested against this pattern, so a legitimate ending
+   cannot trip it however it is worded. */
+const FINISHING_CLAIM = /\b(that'?s (?:actually )?(?:everything|all|it)|everything we set out to cover|all we need|nothing (?:else|more) (?:we need|to cover)|we'?re (?:all )?(?:done|finished|set)|wrapping up|wrap (?:things )?up|you now have the complete picture|covered everything)\b/i;
+
 const ABSOLUTE = [
   {
     id: "verdict",
@@ -428,7 +443,7 @@ const ABSOLUTE = [
   },
   {
     id: "wrapping_up",
-    test: /\b(wrapping up|wrap (?:things )?up|that's everything we need|we're (?:all )?done|we're finished|you now have the complete picture)\b/i,
+    test: FINISHING_CLAIM,
     when: ctx => ctx.canClose === false,
     why: "You talked about finishing while areas of the picture are still open. Keep going: the working notes list what is still missing.",
   },
@@ -496,10 +511,9 @@ function emDashScrubStream(onDone, ctx = {}) {
   // code's "we're not finished yet" landed underneath it. One reply, two
   // contradictory claims, and nothing to answer. The claim goes with the
   // frame, and the replacement carries the next open ask.
-  const FINISHING = /\b(that'?s (?:actually )?(?:everything|all|it)|everything we set out to cover|all we need|nothing (?:else|more) (?:we need|to cover)|we'?re (?:all )?(?:done|finished|set)|wrapping up|wrap (?:things )?up|you now have the complete picture|covered everything)\b/i;
   function dropFinishingClaims(before) {
     const paras = before.split(/\n{2,}/).map(x => x.trim()).filter(Boolean);
-    const kept = paras.filter(p => !FINISHING.test(p));
+    const kept = paras.filter(p => !FINISHING_CLAIM.test(p));
     if (kept.length !== paras.length) console.error(`[Finn clarity] close refused: dropped ${paras.length - kept.length} finishing claim(s) rather than leaving them above the correction`);
     return kept.join("\n\n");
   }

@@ -942,55 +942,79 @@
     return html;
   }
 
-  const COUNT_WORDS = { 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six' };
   const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 
-  /* ── the household context header ── (flagged August, built 15 Oct)
+  /* ── the household context header ── (flagged August, built 15 Oct;
+     copy moved into finn-library.json 15 Oct)
      The FRAME the nine tiles sit inside, not a tenth tile. It carries no
      badge, no status, no routing and no "questions to ask": it never flags
-     anything. Every clause comes from a template with slots filled from
-     captured fields, the same build constraint as the insight position
-     lines: nothing here is model-composed. It renders what is known and
-     says nothing at all about what is not, so a thin picture reads as a
-     short sentence rather than a list of gaps.
+     anything. EVERY WORD COMES FROM THE LIBRARY, like the insight position
+     lines: this function chooses which clauses apply and fills their slots,
+     and composes nothing. Without the library there is no approved copy, so
+     it renders nothing rather than improvising.
 
      Names are NOT picture fields (the registry holds no name), so a caller
      that has them from the household record may pass
-     { ownerName, partnerName }; without them the header says "You". */
+     { ownerName, partnerName }; without them the library default is used. */
+  function fillClause(clause, slots) {
+    if (!clause || !clause.template) return null;
+    let ok = true;
+    const out = clause.template.replace(/\{(\w+)\}/g, (_, name) => {
+      const v = slots[name];
+      if (v === null || v === undefined || v === '') { ok = false; return ''; }
+      return String(v);
+    });
+    return ok ? out : null;
+  }
+
   function contextHeader(domains, opts) {
     const o = opts || {};
+    const lib = (o.library && o.library.context) || null;
+    if (!lib || !lib.clauses) {
+      console.error('[Finn panels] finn-library.json has no "context" copy: the header renders nothing rather than improvising words.');
+      return '';
+    }
+    const C = lib.clauses;
+    const D = lib.defaults || {};
+    const joiner = lib.ages_joiner || { separator: ', ', final: ' and ' };
     const c = (domains || {}).context || {};
-    const age = v => num(v);
     const parts = [];
+    const push = s => { if (s) parts.push(s); };
 
     // Who, with ages where they are known.
-    const owner = text(o.ownerName) || 'You';
-    const partner = text(o.partnerName);
-    const ownerAge = age(c.owner_age);
-    const partnerAge = age(c.partner_age);
+    const ownerName = text(o.ownerName) || D.owner;
+    const partnerName = text(o.partnerName);
+    const ownerAge = num(c.owner_age);
+    const partnerAge = num(c.partner_age);
     const adults = num(c.adults);
-    const person = (name, yrs) => yrs !== null ? name + ', ' + yrs : name;
-    if (partner || (adults !== null && adults > 1) || partnerAge !== null) {
-      const them = partner || 'your partner';
-      parts.push(person(owner, ownerAge) + ', and ' + person(them, partnerAge) + '.');
+    const person = (name, yrs) => yrs !== null
+      ? fillClause(C.person_with_age, { name, age: yrs })
+      : fillClause(C.person_without_age, { name });
+    if (partnerName || (adults !== null && adults > 1) || partnerAge !== null) {
+      push(fillClause(C.two_people, {
+        first: person(ownerName, ownerAge),
+        second: person(partnerName || D.partner, partnerAge),
+      }));
     } else if (ownerAge !== null || text(o.ownerName)) {
-      parts.push(person(owner, ownerAge) + '.');
+      push(fillClause(C.one_person, { first: person(ownerName, ownerAge) }));
     }
 
     // Children, by age, only where an age is recorded.
-    const kids = Array.isArray(c.children) ? c.children.map(k => age(k && k.age)).filter(a => a !== null) : [];
-    if (kids.length === 1) parts.push('One child, ' + kids[0] + '.');
+    const kids = Array.isArray(c.children) ? c.children.map(k => num(k && k.age)).filter(a => a !== null) : [];
+    if (kids.length === 1) push(fillClause(C.one_child, { age: kids[0] }));
     else if (kids.length > 1) {
-      const last = kids[kids.length - 1];
-      parts.push(COUNT_WORDS[kids.length] ? COUNT_WORDS[kids.length] + ' children, ' : kids.length + ' children, ');
-      parts[parts.length - 1] += kids.slice(0, -1).join(', ') + ' and ' + last + '.';
+      const counts = lib.counts || {};
+      push(fillClause(C.several_children, {
+        count: counts[String(kids.length)] || kids.length,
+        ages: kids.slice(0, -1).join(joiner.separator) + joiner.final + kids[kids.length - 1],
+      }));
     }
 
     // Work, and the timeframe they think in, in their own terms.
     const intent = text(c.work_intent);
-    if (intent) parts.push(/[.!?]$/.test(intent) ? cap(intent) : cap(intent) + '.');
+    if (intent) push(/[.!?]$/.test(intent) ? cap(intent) : fillClause(C.work_intent, { intent: cap(intent) }));
     const horizon = num(c.horizon_years);
-    if (horizon !== null) parts.push('Thinking about the next ' + horizon + ' years.');
+    if (horizon !== null) push(fillClause(C.horizon, { years: horizon }));
 
     if (!parts.length) return '';
     return '<div class="fp-context"><p class="fp-contextline">' + esc(parts.join(' ')) + '</p></div>';

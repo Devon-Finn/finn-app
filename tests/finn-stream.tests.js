@@ -214,5 +214,48 @@ export async function runStreamTests(chat, tokens) {
   t('the-correction-carries-something-to-answer', /\?/.test(refused.visible) && /income protection monthly benefit/i.test(refused.visible));
   t('nothing-after-the-close-frame-survives', !/picture is saved/i.test(refused.visible));
 
-  return { pass: failures.length === 0, total: 39, failures };
+
+  /* ── 12. the finishing claim, framed or not (hole closed 15 Oct) ──
+     One pattern governs both paths now. The walk-4 phrasing with no close
+     frame used to pass untouched: compose() never ran without a frame, and
+     the old wrapping_up test knew six phrasings that did not include it.
+     All four cases below are canClose false except the last, which is the
+     control: wrapping_up is only ever evaluated while areas are open, so a
+     household that can genuinely close is never tested against it. */
+  const CLAIM = "That’s actually everything we set out to cover.";
+  const unframed = {};
+  const u = await run(f, [CLAIM + "\n\nIs there anything else on your mind?\n\n[CAPTURE]{}"], {
+    result: unframed, canClose: false, saidIt: () => true,
+    retry: async () => ({ text: "What's in the offset?\n\n[CAPTURE]{}" }),
+  });
+  t('an-unframed-finishing-claim-is-handed-back',
+    unframed.absoluteFailures.includes('wrapping_up') && unframed.retried === true
+    && !/everything we set out to cover/i.test(u.visible));
+  const knownPhrase = {};
+  await run(f, ["That's everything we need.\n\nAnything else?\n\n[CAPTURE]{}"], {
+    result: knownPhrase, canClose: false, saidIt: () => true,
+    retry: async () => ({ text: "What's the card balance?\n\n[CAPTURE]{}" }),
+  });
+  t('the-phrasing-the-rule-already-knew-still-trips',
+    knownPhrase.absoluteFailures.includes('wrapping_up') && knownPhrase.retried === true);
+  const framed = {};
+  const fr = await run(f, [CLAIM + "\n\nThe benefit figure is in the Hostplus insurance page.\n\n[FRAME: close]\n\nSaved.\n\n[CAPTURE]{}"], {
+    result: framed, canClose: false, saidIt: () => true,
+    nextAsk: { kind: 'item', text: 'Next on the list is the income protection benefit. What can you tell me about that?' },
+    retry: async () => ({ text: "x\n\n[CAPTURE]{}" }),
+  });
+  t('a-framed-claim-still-behaves-as-it-did',
+    !/everything we set out to cover/i.test(fr.visible) && fr.visible.includes(FRAMES.not_yet)
+    && /Hostplus/.test(fr.visible) && /income protection benefit/i.test(fr.visible));
+  // THE CONTROL: a household that can close is never tested, so the real
+  // close is untouched however it is worded.
+  const canCloseNow = {};
+  await run(f, [CLAIM + "\n\nWhat else is on your mind?\n\n[CAPTURE]{}"], {
+    result: canCloseNow, canClose: true, saidIt: () => true,
+    retry: async () => ({ text: 'should not be called\n\n[CAPTURE]{}' }),
+  });
+  t('a-finishing-claim-is-allowed-once-the-picture-can-close',
+    !canCloseNow.absoluteFailures.includes('wrapping_up') && !canCloseNow.retried);
+
+  return { pass: failures.length === 0, total: 43, failures };
 }

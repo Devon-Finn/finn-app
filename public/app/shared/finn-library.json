@@ -493,5 +493,25 @@
       },
       "action_label": "About the National Debt Helpline"
     }
-  ]
+  ],
+  "context": {
+    "_note": [
+      "The household context header: the frame the nine tiles sit inside, not a tenth tile. Slot substitution ONLY, exactly like insights[].position_line - the renderer chooses which clauses apply and fills their slots, and never composes, rewords or summarises them.",
+      "It carries no badge, no status, no routing and no questions. It states what is known and stays silent about what is not.",
+      "Names are not picture fields. A caller may supply the owner's and partner's names from the household record; the defaults below are used when it cannot."
+    ],
+    "clauses": {
+      "person_with_age": { "template": "{name}, {age}", "fields": ["context.owner_age", "context.partner_age"] },
+      "person_without_age": { "template": "{name}", "fields": [] },
+      "two_people": { "template": "{first}, and {second}.", "fields": ["context.adults", "context.partner_age"] },
+      "one_person": { "template": "{first}.", "fields": ["context.owner_age"] },
+      "one_child": { "template": "One child, {age}.", "fields": ["context.children[].age"] },
+      "several_children": { "template": "{count} children, {ages}.", "fields": ["context.children[].age"] },
+      "work_intent": { "template": "{intent}.", "fields": ["context.work_intent"] },
+      "horizon": { "template": "Thinking about the next {years} years.", "fields": ["context.horizon_years"] }
+    },
+    "defaults": { "owner": "You", "partner": "your partner" },
+    "counts": { "2": "Two", "3": "Three", "4": "Four", "5": "Five", "6": "Six" },
+    "ages_joiner": { "separator": ", ", "final": " and " }
+  }
 }

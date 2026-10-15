@@ -598,7 +598,7 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
      The frame the tiles sit inside: facts from a template, no badge, no
      status, no routing, and silent about what is not known. */
   {
-    const ch = panels.contextHeader(D, { ownerName: 'Sam', partnerName: 'Jess' });
+    const ch = panels.contextHeader(D, { ownerName: 'Sam', partnerName: 'Jess', library });
     t('context-header-renders-the-people', /Sam, 41/.test(ch) && /Jess, 39/.test(ch));
     t('context-header-carries-the-work-intent', /both continuing/i.test(ch));
     t('context-header-never-flags-anything',
@@ -606,11 +606,15 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
     // Quiet about what is not known: this household recorded no children.
     t('context-header-silent-on-what-is-absent', !/child/i.test(ch));
     // An entirely absent context must not throw and must render nothing.
-    t('context-header-survives-an-empty-picture', panels.contextHeader({}, {}) === '');
+    t('context-header-survives-an-empty-picture', panels.contextHeader({}, { library }) === '');
     t('context-header-survives-no-arguments-at-all', panels.contextHeader() === '');
-    const kids = panels.contextHeader({ context: { adults: 2, owner_age: 42, partner_age: 40, children: [{ age: 9 }, { age: 6 }] } }, {});
+    // Every word comes from the library, like the position lines. Without
+    // it there is no signed-off copy, so the header renders nothing.
+    t('context-header-copy-comes-from-the-library', !!(library.context && library.context.clauses && library.context.clauses.two_people.template));
+    t('context-header-renders-nothing-without-the-library', panels.contextHeader(D, { ownerName: 'Sam' }) === '');
+    const kids = panels.contextHeader({ context: { adults: 2, owner_age: 42, partner_age: 40, children: [{ age: 9 }, { age: 6 }] } }, { library });
     t('context-header-lists-children-by-age', /Two children, 9 and 6\./.test(kids));
-    const horizon = panels.contextHeader({ context: { owner_age: 51, horizon_years: 10 } }, { ownerName: 'Dana' });
+    const horizon = panels.contextHeader({ context: { owner_age: 51, horizon_years: 10 } }, { ownerName: 'Dana', library });
     t('context-header-carries-the-horizon', /Dana, 51\./.test(horizon) && /next 10 years/.test(horizon));
   }
 
@@ -649,7 +653,7 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
 
   return {
     pass: failures.length === 0,
-    total: 145,
+    total: 147,
     failures,
     hand_computed: {
       home_equity: 320000, lvr_percent: 66.3, surplus_monthly: 3450, buffer_months: 2.7,
