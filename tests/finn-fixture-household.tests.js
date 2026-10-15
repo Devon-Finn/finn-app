@@ -112,7 +112,7 @@ function makeSession(pipeline, pathsMod, sessionId, startPicture) {
   return { reply, replyWithoutCapture, rows: () => rows, picture: () => picture };
 }
 
-export function runFixtureHousehold({ pipeline, registry, paths, linter, derive, evaluate, panels, library, plan }) {
+export function runFixtureHousehold({ pipeline, registry, paths, linter, derive, evaluate, panels, library, plan, chat, browserDerive }) {
   const failures = [];
   const t = (name, cond) => { if (!cond) failures.push(name); };
   const lint = (rows, picture) => linter.runConductLinter({
@@ -592,9 +592,40 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
       && panels.questionPointer(3).text === '3 questions for your situation');
   }
 
+
+  /* ── the derived figures reach the model (walk 4, 15 Oct) ──
+     The defect: asked for an equity position, the model did its own
+     arithmetic (home value minus mortgage) and missed the $60,000 split
+     secured on the home, so the conversation contradicted the tile. The
+     cure is that it never does arithmetic: derive() runs in the edge
+     function and the finished figures go into the prompt to be quoted.
+     These three checks hold that shut. */
+  if (chat && typeof chat.__derivedPromptSectionForTests === "function") {
+    const block = chat.__derivedPromptSectionForTests(D);
+    t('context-block-labels-the-figures-as-code-computed',
+      /QUOTE THESE VERBATIM/.test(block) && /never derive a figure yourself/i.test(block));
+    // The household's real figures, not arithmetic over the raw picture:
+    // a home value of 950000 less a 540000 mortgage AND the 90000 split.
+    t('context-block-carries-home-equity-320000', /home_equity: 320000\b/.test(block));
+    t('context-block-carries-lvr-66.3', /lvr_percent: 66\.3\b/.test(block));
+    t('context-block-never-shows-the-naive-equity', !/home_equity: 410000\b/.test(block));
+    t('context-block-names-what-is-missing-rather-than-filling-it',
+      /not yet derivable/.test(chat.__derivedPromptSectionForTests({})));
+  }
+
+  /* One implementation, two importers: the figures the edge function puts
+     in the prompt and the figures the browser puts in the tiles come from
+     the same derive(), so they cannot drift. */
+  if (browserDerive) {
+    const a = derive(D);
+    const b = browserDerive(D);
+    t('edge-and-browser-derive-are-the-same-function', derive === browserDerive);
+    t('edge-and-browser-derive-agree-on-the-fixture', JSON.stringify(a) === JSON.stringify(b));
+  }
+
   return {
     pass: failures.length === 0,
-    total: 130,
+    total: 137,
     failures,
     hand_computed: {
       home_equity: 320000, lvr_percent: 66.3, surplus_monthly: 3450, buffer_months: 2.7,

@@ -16,7 +16,7 @@
    income_unreconciled non-empty means the income total is NOT complete:
    the panel names the open producer rather than showing a total that
    omits it. */
-(function () {
+const __finnDerived = (function () {
   const num = v => (typeof v === 'number' && isFinite(v)) ? v : null;
 
   function sumKnown(values) {
@@ -231,5 +231,10 @@
     return { housing_monthly, personal_minimums_monthly, home_equity, lvr_percent, surplus_monthly, buffer_months, super_total, income_total_annual, income_costs_annual, income_total_bases, income_unreconciled, property_equity, debts_total, debts_total_by_entity };
   }
 
-  window.finnDerived = { derive };
+  // One implementation, two importers: the edge function imports derive()
+  // below; the browser keeps window.finnDerived. Guarded so the module can
+  // load where there is no window (Netlify Edge / Deno).
+  if (typeof window !== "undefined") window.finnDerived = { derive };
+  return { derive };
 })();
+export const derive = __finnDerived.derive;

@@ -942,9 +942,18 @@
     return html;
   }
 
+  // A missing finn-derived.js used to render an empty dashboard in silence,
+  // which reads as "nothing recorded" rather than as a fault. The fallback
+  // stays, but a load-order regression now says so plainly. (15 Oct)
+  function deriveOrWarn(domains) {
+    if (window.finnDerived && typeof window.finnDerived.derive === 'function') return window.finnDerived.derive(domains);
+    console.error('[Finn panels] window.finnDerived is missing: finn-derived.js must load before the dashboard renders. Rendering with no derived figures.');
+    return {};
+  }
+
   function renderDashboard(domains, opts) {
     const o = opts || {};
-    const derived = o.derived || (window.finnDerived ? window.finnDerived.derive(domains) : {});
+    const derived = o.derived || deriveOrWarn(domains);
     const triggers = o.triggers || (window.finnTriggers ? window.finnTriggers.evaluate(domains, { yearNow: o.yearNow, derived }) : { tiles: [] });
     let html = '<div class="fp-dashboard">';
     for (const t of triggers.tiles) {

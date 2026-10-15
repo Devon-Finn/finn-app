@@ -5,6 +5,7 @@ import { buildPlan, planPromptSection, closeListText, SWEEPS } from "./lib/finn-
 import { FIELD_REGISTRY, CONFIDENCE_RANK, PRODUCERS } from "./lib/finn-field-registry.js";
 import { applyCaptureCore } from "./lib/finn-capture-pipeline.js";
 import { runConductLinter } from "./lib/finn-conduct-linter.js";
+import { derive } from "../../public/app/shared/finn-derived.js";
 
 // Startup invariant (Devon, Sept 2026): required implies a servable path.
 // A required field whose path is missing or unresolvable is a data bug
@@ -293,6 +294,7 @@ When a user turn contains [TRANSACTION SUMMARY] {json}, code has already parsed 
 - If the summary has coverage_short true, say plainly the export covered less than a year and the figure will be an estimate until a fuller export sharpens it.
 WHEN THEY ASK YOU SOMETHING, ANSWER IT. A person who asks "what is an SMSF?", "why do you need that?", "what does that mean?" or "is that good?" gets a plain answer first, in two or three sentences, before anything else. Explain the mechanism, never what they should do about it. Then carry on with one question. Never skip past what they asked, and never make them ask twice.
 
+WHEN THEY ASK YOU FOR A FIGURE, IT COMES FROM THE "Figures computed by code" BLOCK OR IT IS NOT GIVEN. Equity, LVR, surplus, buffer months, super total, debts total and property equity are all computed for you and listed there: quote the number as it stands. Never reach for the picture and work one out — an equity position is not a home value minus a mortgage, because lending secured on the home can include a split or a second loan, and only the computed figure accounts for it. If a figure they asked for is not in that block, or is marked "not yet derivable", tell them plainly what is missing and ask for it. Never offer your own arithmetic in its place.
 NEVER CALCULATE ONE OF THEIR FIGURES FROM ANOTHER. A minimum repayment, a rate, an interest amount, a balance and a repayment are separate facts, each read off a screen or a statement. When the person updates one of them, change that one and leave the rest exactly as they are; if a related figure has moved too, ask for it. The only figures you convert are pay periods the person stated (a fortnightly net pay to a monthly one), and even then you keep what they said.
 
 When a user turn contains [TRANSACTION RESULT] {json}, code has applied their answers and done the division. State the composition plainly, two facts, no adjustment, no verdict, in this shape: "That works out at $X a month across the year. About $Y a month of that was one-off spending — <the one-off labels in plain words> — so a typical month is quieter than that, and a year has things like them in it." (Where one_off_monthly is 0, just state the monthly figure.) Code records the result itself (the monthly figure, includes_housing false, any housing figure, where the money goes by category, the once-a-year bills, the months covered and the confidence), so you capture nothing from it and never recompute it; you don't list categories and you never describe any category as high, low, a lot or too much. You may say the spending tile now shows where it goes. Where coverage_months is under 11, say plainly that a shorter stretch can miss once-a-year costs and that the rest of the year would firm the figure up.`;
@@ -964,6 +966,35 @@ async function waitForInFlight(householdId, sessionId) {
   return rows[0] || null;
 }
 
+/* ── the derived figures, for quoting ── (walk 4, 15 Oct)
+   The model is given no means to work a figure out: it gets the finished
+   numbers from the SAME derive() the dashboard tiles use, so an answer in
+   the conversation and the tile can never disagree. Nothing is
+   reimplemented here; a figure missing from the picture stays missing,
+   and the model is told to say so rather than fill the gap. */
+const DERIVED_FOR_PROMPT = ["home_equity", "lvr_percent", "surplus_monthly", "buffer_months", "super_total", "debts_total", "property_equity"];
+
+function derivedPromptSection(domains) {
+  let der;
+  try { der = derive(domains || {}) || {}; } catch (err) {
+    console.error("[Finn clarity] derive() threw; no derived block this turn:", err);
+    return "";
+  }
+  const lines = [];
+  for (const key of DERIVED_FOR_PROMPT) {
+    const v = der[key];
+    if (v === undefined || v === null) { lines.push(`${key}: not yet derivable`); continue; }
+    if (Array.isArray(v)) {
+      lines.push(`${key}: ${v.length ? JSON.stringify(v) : "none recorded"}`);
+      continue;
+    }
+    lines.push(`${key}: ${v}`);
+  }
+  return `\nFigures computed by code (QUOTE THESE VERBATIM; never derive a figure yourself):\n` +
+    lines.map(l => "  " + l).join("\n") +
+    `\nA figure marked "not yet derivable" is missing an input: name what is missing, never work it out.`;
+}
+
 export default async function handler(request, context) {
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders() });
@@ -1070,6 +1101,11 @@ export default async function handler(request, context) {
     `Areas covered (decided by code): ${JSON.stringify(plan.covered)}\n` +
     `Snapshot answers (warm start — never re-ask these): ${snapshotAnswers ? JSON.stringify(snapshotAnswers) : "(no linked snapshot)"}\n` +
     `Note: the marker "[Session start]" is a system marker, not from the person.` +
+    // WALK 4, 15 Oct: asked for an equity position the model did its own
+    // arithmetic ($880,000 - $412,000) and missed the split secured on the
+    // home, contradicting the tile. The figures are computed HERE, by the
+    // same derive() the dashboard uses, and quoted rather than worked out.
+    derivedPromptSection(picture.domains ?? {}) +
     planPromptSection(plan, { unsaved, servedPaths }) +
     "\n\nBEFORE YOU REPLY: any recap repeats only what the person actually said. \"Jess is a teacher\" does not tell you she is PAYE, employed by a school, or has super paid. If they didn't say it, don't state it; ask it, on its own turn.";
 
@@ -1358,4 +1394,4 @@ export default async function handler(request, context) {
 }
 
 // Exposed for the local stream test only (tests/finn-stream.tests.js).
-export { emDashScrubStream as __streamForTests, ABSOLUTE as __absoluteForTests, SWEEPS as __sweepsForTests };
+export { emDashScrubStream as __streamForTests, ABSOLUTE as __absoluteForTests, SWEEPS as __sweepsForTests, derivedPromptSection as __derivedPromptSectionForTests };

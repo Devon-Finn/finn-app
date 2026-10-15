@@ -44,11 +44,19 @@
     return doc.in_place === false || doc.in_place === 'unsure';
   }
 
+  // Same guard as the panels: an absent finn-derived.js must not look like
+  // a household with nothing in it. The fallback stays; the fault is loud.
+  function deriveOrWarn(d) {
+    if (window.finnDerived && typeof window.finnDerived.derive === 'function') return window.finnDerived.derive(d);
+    console.error('[Finn triggers] window.finnDerived is missing: finn-derived.js must load before evaluate(). Evaluating with no derived figures.');
+    return {};
+  }
+
   function evaluate(domains, opts) {
     const d = domains || {};
     const o = opts || {};
     const yearNow = num(o.yearNow) !== null ? o.yearNow : new Date().getFullYear();
-    const derived = o.derived || (window.finnDerived ? window.finnDerived.derive(d) : {});
+    const derived = o.derived || deriveOrWarn(d);
 
     const home = d.home || {};
     const inc = d.income || {};
