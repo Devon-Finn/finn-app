@@ -260,5 +260,28 @@ export async function runStreamTests(chat, tokens) {
   t('a-finishing-claim-is-allowed-once-the-picture-can-close',
     !canCloseNow.absoluteFailures.includes('wrapping_up') && !canCloseNow.retried);
 
-  return { pass: failures.length === 0, total: ran, declared: 44, failures };
+
+  /* ── 13. a nudge cannot land under another item's question (16 Oct) ──
+     Observed on production: Devon deferred a document, Finn accepted and
+     moved on, and the deferred item's nudge appended beneath the NEW
+     question, reading as an offer to skip the will it had just asked about. */
+  const orphan = await run(f, [
+    "Of course. We'll come back to it.\n\n" +
+    "Let's move to estate planning. Do you have a will in place?\n\n" +
+    "[NUDGE: first]\n\n[CAPTURE]{}",
+  ], {});
+  t('a-nudge-after-a-new-question-is-dropped', !orphan.visible.includes(NUDGES.first));
+  t('the-new-question-survives-the-drop',
+    /Do you have a will in place\?/.test(orphan.visible) && /come back to it/.test(orphan.visible));
+  t('the-reply-still-ends-on-something-to-answer', /\?\s*$/.test(orphan.visible.trim()));
+  // Dropped after a served ask token too: the person is looking at that ask.
+  const orphanToken = await run(f, ["Noted.\n\n[SWEEP: other_debts]\n\n[NUDGE: first]\n\n[CAPTURE]{}"], {});
+  t('a-nudge-after-a-served-ask-is-dropped', !orphanToken.visible.includes(NUDGES.first));
+  // The legitimate case is untouched: the nudge IS the turn's one question.
+  const properNudge = await run(f, ["Noted.\n\n[NUDGE: first]\n\n[CAPTURE]{}"], {});
+  t('a-nudge-on-its-own-still-goes-out', properNudge.visible.includes(NUDGES.first));
+  const properAccept = await run(f, ["Noted.\n\n[NUDGE: first]\n\n[CAPTURE]{}"], { alreadyNudged: true });
+  t('the-acceptance-still-goes-out-on-its-own', properAccept.visible.includes(NUDGES.accept));
+
+  return { pass: failures.length === 0, total: ran, declared: 50, failures };
 }

@@ -519,8 +519,31 @@ function emDashScrubStream(onDone, ctx = {}) {
     if (kept.length !== paras.length) console.error(`[Finn clarity] close refused: dropped ${paras.length - kept.length} finishing claim(s) rather than leaving them above the correction`);
     return kept.join("\n\n");
   }
+  // A NUDGE CANNOT LAND UNDER A DIFFERENT ITEM'S QUESTION (16 Oct, observed
+  // on production). Devon deferred a document, Finn accepted and moved on,
+  // and the nudge for the DEFERRED item appended beneath the NEW question:
+  //
+  //   "Of course. We'll come back to it.
+  //    Let's move to estate planning. Do you have a will in place?
+  //    We can leave that for now. It's usually the kind of detail that..."
+  //
+  // which reads as an offer to skip the will it has just asked about. The
+  // nudge is code's own copy, so withholding it is code's call: once the
+  // reply has asked something else, or served another item's ask token, the
+  // nudge is about an item the person is no longer looking at and goes.
+  function dropOrphanNudge(text) {
+    const paras = text.split(/\n{2,}/).map(x => x.trim()).filter(Boolean);
+    const nudgeIx = paras.findIndex(p => /\[NUDGE:\s*\w+\s*\]/.test(p));
+    if (nudgeIx === -1) return text;
+    const movedOn = paras.slice(0, nudgeIx).some(p =>
+      /\?/.test(p) || /\[(ASK|SWEEP):\s*[a-z_]+\s*\]/.test(p));
+    if (!movedOn) return text;
+    console.error("[Finn clarity] nudge dropped: the reply had already moved to another item, so the nudge would have read as an offer to skip the new question");
+    return paras.filter((p, i) => i !== nudgeIx).join("\n\n");
+  }
+
   function compose(raw) {
-    let text = dropDuplicateAsk(raw);
+    let text = dropOrphanNudge(dropDuplicateAsk(raw));
     if (ctx.canClose === false && /\[FRAME:\s*close\s*\]/.test(text)) {
       closeRefused = true;
       const before = dropFinishingClaims(text.split(/\[FRAME:\s*close\s*\]/)[0].trimEnd());

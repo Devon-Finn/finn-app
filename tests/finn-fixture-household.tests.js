@@ -583,7 +583,35 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
     D5b.protection.covers.push({ id: 'c4', owner: 'partner', type: 'tpd', held: true, amount: 200000, inside_super: true });
     const h5b = panels.tileHeadline(5, D5b, derive(D5b));
     t('tile5-headline-lists-both-when-both-hold', /you: life/.test(h5b.facts) && /Jess: TPD/.test(h5b.facts));
-    t('tile6-headline-counts-each-fund', /in place/.test(heads[6].metric) && /not in place/.test(heads[6].facts));
+    /* ── the estate tile names its items, it never scores them (16 Oct) ──
+       It used to sum the three documents together with one entry per super
+       fund carrying a nomination, so three documents in place and three
+       funds with nominations read "6 in place". Two different kinds of fact
+       in one figure, and more accounts scoring higher. */
+    const edoc = (v) => ({ in_place: v, last_updated: '10 years ago' });
+    const efund = (name, v) => v === undefined ? { fund: name } : { fund: name, nomination: { in_place: v } };
+    const walk6 = { estate: { will: edoc(true), poa: edoc(true), guardianship: edoc(true) },
+      super: { funds: [efund('AustralianSuper', true), efund('Hostplus', true), efund('Rest', true)] } };
+    const h6walk = panels.tileHeadline(6, walk6, {});
+    // (a) no combined count anywhere in the headline.
+    t('estate-headline-has-no-combined-count', !/\b6\b/.test(JSON.stringify(h6walk)) && !/\d+ in place/.test(JSON.stringify(h6walk)));
+    t('estate-headline-has-no-denominator', !/ of (three|3) /.test(h6walk.metric) && !/\//.test(h6walk.metric));
+    // (b) the documents line and the nominations line are separate.
+    t('estate-documents-are-named-individually',
+      /Will in place/.test(h6walk.metric) && /enduring power of attorney in place/.test(h6walk.metric) && /guardianship in place/.test(h6walk.metric));
+    t('estate-nominations-are-a-separate-line',
+      h6walk.facts === 'Super nominations: all three accounts have one' && !/nomination/i.test(h6walk.metric));
+    // (c) held:false renders "not in place"; an absent field "not recorded".
+    const h6partial = panels.tileHeadline(6, { estate: { will: edoc(true), poa: edoc(false) },
+      super: { funds: [efund('A', true), efund('B', true), efund('C')] } }, {});
+    t('estate-false-is-not-in-place-and-absent-is-not-recorded',
+      /enduring power of attorney not in place/.test(h6partial.metric) && /guardianship not recorded/.test(h6partial.metric));
+    t('estate-nominations-count-against-the-funds-in-the-picture',
+      h6partial.facts === 'Super nominations: two of your three accounts have one');
+    t('estate-nominations-none-recorded-when-no-fund-has-one',
+      panels.tileHeadline(6, { estate: { will: edoc(true) }, super: { funds: [efund('A'), efund('B')] } }, {}).facts === 'Super nominations: none recorded');
+    t('estate-nominations-singular-for-one-account',
+      panels.tileHeadline(6, { estate: { will: edoc(true) }, super: { funds: [efund('A', true)] } }, {}).facts === 'Super nominations: your account has one');
     t('tile-headline-null-before-anything-said', panels.tileHeadline(5, {}, {}) === null && panels.tileHeadline(6, {}, {}) === null);
     // The badge reports the gathering, never the money.
     t('badge-complete-only-from-completed-domains',
@@ -635,6 +663,36 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
     t('context-header-still-accepts-a-real-first-name',
       /Devon, 42/.test(panels.contextHeader({ context: { owner_age: 42 } }, { ownerName: 'Devon Soutar', library })));
     t('context-header-carries-the-horizon', /Dana, 51\./.test(horizon) && /next 10 years/.test(horizon));
+  }
+
+
+  /* ── a tile is not Complete over a figure it cannot compute (16 Oct) ──
+     Production carried a Complete badge on "What's left over each month"
+     while the body read "Still gathering": TILE_AREAS maps tile 2 to the
+     INCOME area, but its figure needs expenses as well, and the household
+     had given income and no spending. */
+  {
+    const incomeOnly = {
+      context: { adults: 2, _confidence: 'stated' },
+      income: { structure: 'paye', salary_net_monthly: 7100, partner_salary_net_monthly: 5400, _confidence: 'document' },
+    };
+    const picIncomeDone = { completed_domains: ['income'] };
+    const derIncomeOnly = derive(incomeOnly);
+    t('surplus-is-not-computable-without-expenses', derIncomeOnly.surplus_monthly === null);
+    t('tile-2-has-no-headline-without-expenses', panels.tileHeadline(2, incomeOnly, derIncomeOnly) === null);
+    t('tile-2-is-not-complete-over-a-figure-it-cannot-compute',
+      panels.tileComplete(2, picIncomeDone, incomeOnly, derIncomeOnly) === false);
+    t('the-badge-and-the-body-now-agree',
+      panels.badgeLabel(panels.tileComplete(2, picIncomeDone, incomeOnly, derIncomeOnly)) === 'Still gathering');
+    // With spending given, the same tile completes.
+    const withSpend = { ...incomeOnly, expenses: { living_monthly: 5200, includes_housing: false, _confidence: 'document' },
+      home: { owns_home: true, mortgage_balance: 540000, repayment_monthly: 3300, _confidence: 'document' } };
+    const derWithSpend = derive(withSpend);
+    t('tile-2-completes-once-the-figure-exists',
+      derWithSpend.surplus_monthly !== null && panels.tileComplete(2, picIncomeDone, withSpend, derWithSpend) === true);
+    // The fixture household, fully captured, keeps every badge it had.
+    t('the-fixture-household-still-completes-its-covered-tiles',
+      panels.tileComplete(2, P.picture ? P.picture : { completed_domains: ['income'] }, D, der) === true);
   }
 
   /* ── the derived figures reach the model (walk 4, 15 Oct) ──
@@ -762,7 +820,7 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
   return {
     pass: failures.length === 0,
     total: ran,
-    declared: 187,
+    declared: 200,
     failures,
     hand_computed: {
       home_equity: 320000, lvr_percent: 66.3, surplus_monthly: 3450, buffer_months: 2.7,

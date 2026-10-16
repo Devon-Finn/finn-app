@@ -1143,10 +1143,24 @@
   // that something was said (live walk, 17 Sept 2026: "both employed" made
   // the income tile read Complete with no figures).
   const TILE_AREAS = { 1: ['assets', 'liabilities'], 2: ['income'], 3: ['buffer'], 4: ['super'], 5: ['protection'], 6: ['estate'], 7: ['assets'], 8: ['liabilities'], 9: ['income'] };
-  function tileComplete(tileNo, picture) {
+  /* A tile is COMPLETE only when its areas are covered AND the figure the
+     tile exists to show can actually be computed. (16 Oct, Devon's walk on
+     production: "What's left over each month" carried a Complete badge over
+     a body reading "Still gathering", because TILE_AREAS maps tile 2 to the
+     INCOME area while its figure, surplus_monthly, needs expenses too. The
+     household had given income and no spending, so the areas were covered
+     and the figure was not computable.)
+
+     Keying the badge off the same headline the body renders means the two
+     can no longer disagree: no headline, no Complete. */
+  function tileComplete(tileNo, picture, domains, derived) {
     const done = Array.isArray(picture && picture.completed_domains) ? picture.completed_domains : [];
     const need = TILE_AREAS[tileNo] || [];
-    return need.length > 0 && need.every(a => done.includes(a));
+    if (!(need.length > 0 && need.every(a => done.includes(a)))) return false;
+    // Called without the picture's figures (older callers, and the badge
+    // tests): fall back to the areas alone rather than reporting false.
+    if (domains === undefined && derived === undefined) return true;
+    return tileHeadline(tileNo, domains || {}, derived || {}) !== null;
   }
   function questionPointer(count) {
     return count > 0
@@ -1206,22 +1220,49 @@
       return { metric: held.length + ' cover' + (held.length === 1 ? '' : 's') + ' in place', unit: owners.length > 1 ? 'across both of you' : '', facts };
     }
     if (tileNo === 6) {
-      // A nomination belongs to its fund (Devon, 17 Sept); the household-level
-      // one is still read for pictures written before that.
+      /* NO COUNT, NO DENOMINATOR, NO SCORE (Devon, 16 Oct). This used to sum
+         the three documents together with one entry per super fund carrying a
+         nomination, so a household with three documents in place and three
+         funds with nominations read "6 in place": two different kinds of fact
+         added into one figure, and more super accounts scoring higher on what
+         reads as estate documents. The documents are now named individually
+         with their own state, and nominations are a separate line counted
+         against the funds in the picture rather than any Finn-set target. */
+      const docState = (doc) => {
+        if (!doc || typeof doc !== 'object' || doc.in_place === null || doc.in_place === undefined) return 'not recorded';
+        if (doc.in_place === true) return 'in place';
+        if (doc.in_place === false) return 'not in place';
+        if (doc.in_place === 'unsure') return 'not sure';
+        if (doc.in_place === 'na') return 'not applicable';
+        return 'not recorded';
+      };
+      const NAMED = [['Will', est.will], ['enduring power of attorney', est.poa], ['guardianship', est.guardianship]];
+      const docLine = NAMED.map(([label, doc]) => label + ' ' + docState(doc)).join(' · ');
+
+      // Nominations, against the accounts actually in the picture.
+      const WORD = { 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five', 6: 'six' };
       const funds = Array.isArray(sup.funds) ? sup.funds.filter(f => f && typeof f === 'object') : [];
-      const noms = funds.some(f => f.nomination)
-        ? funds.filter(f => f.nomination).map(f => [(f.fund || 'a fund') + ' nomination', f.nomination])
-        : [['super nomination', est.super_nomination]];
-      const docs = [['will', est.will], ['power of attorney', est.poa], ['guardianship', est.guardianship]].concat(noms);
-      let inPlace = 0, gaps = 0; const gapNames = [];
-      for (const [label, doc] of docs) {
-        if (!doc || typeof doc !== 'object' || doc.in_place === null || doc.in_place === undefined) continue;
-        if (doc.in_place === true) inPlace++;
-        else if (doc.in_place === 'na') continue;
-        else { gaps++; gapNames.push(label + (doc.in_place === 'unsure' ? '?' : '')); }
+      const withNom = funds.filter(f => f.nomination && f.nomination.in_place === true).length;
+      let nomLine = '';
+      if (funds.length === 0) {
+        // No accounts in the picture: the household-level field is all there is.
+        const hh = docState(est.super_nomination);
+        nomLine = hh === 'not recorded' ? '' : 'Super nomination: ' + hh;
+      } else if (withNom === 0) {
+        nomLine = 'Super nominations: none recorded';
+      } else if (withNom === funds.length) {
+        nomLine = funds.length === 1
+          ? 'Super nominations: your account has one'
+          : 'Super nominations: all ' + (WORD[funds.length] || funds.length) + ' accounts have one';
+      } else {
+        nomLine = 'Super nominations: ' + (WORD[withNom] || withNom) + ' of your ' +
+          (WORD[funds.length] || funds.length) + ' accounts have one';
       }
-      if (!inPlace && !gaps) return null;
-      return { metric: inPlace + ' in place' + (gaps ? ' · ' + gaps + ' not in place' : ''), unit: '', facts: gapNames.length ? 'not in place: ' + gapNames.join(', ') : '' };
+
+      // Nothing asked at all: the tile says it is still gathering.
+      const anyDoc = NAMED.some(([, doc]) => docState(doc) !== 'not recorded');
+      if (!anyDoc && !nomLine) return null;
+      return { metric: docLine, unit: '', facts: nomLine };
     }
     if (tileNo === 7) {
       const props = Array.isArray(inv.properties) ? inv.properties : [];
