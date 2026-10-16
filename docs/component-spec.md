@@ -160,7 +160,7 @@ Sets fee expectation. One per professional.
 
 | Pill | Used for |
 |---|---|
-| `Usually free` | Mortgage broker, insurance specialist |
+| `Usually free` | Mortgage broker |
 | `Varies` | Financial planner, mixed routes |
 | `Fixed price` | Estate lawyer |
 | `Free` | Financial counsellor |
@@ -321,7 +321,7 @@ How someone gets on the list
 
 **A second tab at dashboard level, peer to the tile grid.** Not a stage at the end — a lens on the same data, and they will come back to it. It is also the natural home for the referral flow and the Advice-Ready Pack, both currently homeless.
 
-**Professional order is fixed by first appearance across tiles 1 to 9.** Broker, planner, insurance specialist, estate lawyer, accountant. **Never sorted by count.**
+**Professional order is FIXED BY A HARDCODED CONSTANT, not by first appearance and never by count.** `PRO_ORDER` in finn-panels.js is `['mortgage_broker', 'financial_planner', 'accountant', 'estate_lawyer']`, identical for every household whatever fired. The financial counsellor is deliberately not in that array: it is free, it sits outside the paid ordering, and it renders after it. Items inside a block run in ascending tile order, 1 to 9. (Reworked 16 Oct; the previous rule was first appearance across tiles 1 to 9, which let the household's own data decide the order.)
 
 **No total anywhere.** Per-professional counts are facts. A grand total of things-to-sort is a verdict on their whole position, which is the one thing locked out.
 

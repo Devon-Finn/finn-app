@@ -390,7 +390,7 @@ A visible tile with no firing insight is a valid and intended state. It shows th
 | 3.2a | Where it sits — has offset | `has_offset = true` AND `buffer.linked_to_loan = false` AND `(accessible_savings + other_cash) > 0` | `accessible_savings`, `other_cash`, `offset_balance` | Mortgage broker |
 | 3.2b | Where it sits — no offset | `owns_home = true` AND `has_offset = false` AND `accessible_savings > 0` | `accessible_savings` | Mortgage broker |
 | 4.1 | More than one super account | `count(super.funds) > 1` for the same owner **OR** `super.multiple_accounts = true` | `funds[]`, `multiple_accounts`, `has_insurance` | Planner |
-| 5.1 | Household cover | Any field in `protection` is non-null, i.e. the domain was actually reached | `protection.*`, `context`, `mortgage_balance` | Risk specialist / planner |
+| 5.1 | Household cover | Any field in `protection` is non-null, i.e. the domain was actually reached | `protection.*`, `context`, `mortgage_balance` | Financial planner |
 | 6.1 | Will and legal basics | Any of the four `in_place = false`, OR `will.last_updated` older than 5 years | `estate.*`, `context.children` | Estate lawyer |
 | 7.1 | Investment property | `investments.properties[]` non-empty | property fields, `rental_income_annual` | Broker / planner / accountant |
 | 7.2 | Investments and how they fit | `shares_value > 0` OR `managed_funds_value > 0` | `shares_value`, `held_in` | Planner |

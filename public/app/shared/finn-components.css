@@ -230,3 +230,12 @@ details.fp-b[open] > summary.fp-howthis { margin-bottom: 8px; }
   line-height: 1.5;
   color: var(--fc-ink-soft, #4a5568);
 }
+
+/* Conversation-layer additions (16 Oct): the why-line, the source tile on
+   an item, and the education beneath it. Quiet by design - nothing here
+   carries a state colour, because none of it is a verdict. */
+.fc-pro .pwhy { margin: 2px 0 10px; font-size: 13.5px; line-height: 1.5; color: var(--fc-ink-soft, #4a5568); }
+.fc-pro .pitem .psrc { font-size: 11.5px; letter-spacing: .02em; text-transform: uppercase; color: var(--fc-ink-soft, #4a5568); margin-bottom: 3px; }
+.fc-pro .pitem .pedu { margin-top: 6px; font-size: 13.5px; line-height: 1.6; }
+.fc-pro .pitem .pedu p { margin: 0 0 8px; }
+.fc-pro .pitem .pedu p:last-child { margin-bottom: 0; }

@@ -801,8 +801,8 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
     const ASYM = { context: { adults: 2 }, protection: { covers: [cover('you', 'income_protection', true), cover('partner', 'income_protection', false)] } };
     t('conditional-fires-where-one-holds-income-protection-and-the-other-does-not',
       cq(ASYM).length === 1 && /the one of us without that cover/.test(cq(ASYM)[0]));
-    t('the-conditional-question-routes-to-the-insurance-specialist',
-      panels.conditionalQuestions(5, ASYM, library)[0].pro === 'insurance_specialist');
+    t('the-conditional-question-routes-to-the-financial-planner',
+      panels.conditionalQuestions(5, ASYM, library)[0].pro === 'financial_planner');
     t('conditional-silent-where-both-hold-it',
       cq({ context: { adults: 2 }, protection: { covers: [cover('you', 'income_protection', true), cover('partner', 'income_protection', true)] } }).length === 0);
     t('conditional-silent-where-neither-holds-it',
@@ -817,10 +817,106 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
       !(library.insights || []).some(i => /the one of us without that cover/.test(i.question || '')));
   }
 
+
+  /* ── the two-layer dashboard: routing out of tiles, conversations below ──
+     (16 Oct). Nine findings became three conversations. The order of the
+     professional blocks is the part most likely to be got wrong, so it is
+     asserted against the constant across fixtures with different insight
+     sets, never against whatever happened to fire. */
+  {
+    const PRO_ORDER = ['mortgage_broker', 'financial_planner', 'accountant', 'estate_lawyer'];
+    const NAME_TO_ID = {};
+    for (const id of Object.keys(library.professionals)) NAME_TO_ID[library.professionals[id].name] = id;
+    // The block order as actually rendered, read back out of the HTML.
+    const blockOrder = (html) => (html.match(/<span class="pn">[^<]*<\/span>/g) || [])
+      .map(s => s.replace(/<[^>]*>/g, '')).map(n => NAME_TO_ID[n] || n);
+    const who = (domains, yearNow) => panels.renderWhoToSee(evaluate(domains, { yearNow: yearNow || 2026 }), library);
+
+    // Three households with deliberately different insight sets.
+    const fx1 = { context: { adults: 2, children: [], _confidence: 'stated' },
+      income: { structure: 'paye', salary_net_monthly: 7100, _confidence: 'document' },
+      expenses: { living_monthly: 3000, includes_housing: false, _confidence: 'document' },
+      home: { owns_home: true, value_estimate: 950000, mortgage_balance: 540000, repayment_monthly: 3300, rate_percent: 6.1, rate_type: 'variable', lender: 'CBA', has_offset: true, offset_balance: 0, _confidence: 'document' },
+      buffer: { accessible_savings: 24000, linked_to_loan: false, _confidence: 'document' } };
+    const fx2 = { context: { adults: 1, children: [], _confidence: 'stated' },
+      income: { structure: 'sole_trader', salary_net_monthly: 5000, business_income_annual: 90000, _confidence: 'document' },
+      estate: { will: { in_place: false }, poa: { in_place: false }, _confidence: 'stated' } };
+    const fx3 = { context: { adults: 2, children: [], _confidence: 'stated' },
+      income: { structure: 'paye', salary_net_monthly: 4000, _confidence: 'document' },
+      expenses: { living_monthly: 3800, includes_housing: true, _confidence: 'document' },
+      debts: { items: [{ id: 'd1', type: 'credit_card', purpose: 'consumer', borrower: 'you', balance: 9000, minimum_monthly: 250 }], _confidence: 'stated' },
+      flags: { hardship: true } };
+
+    for (const [label, dom] of [['fx1', fx1], ['fx2', fx2], ['fx3', fx3]]) {
+      const order = blockOrder(who(dom));
+      const paid = order.filter(x => x !== 'financial_counsellor');
+      const expected = PRO_ORDER.filter(id => paid.includes(id));
+      t('conversation-blocks-render-in-the-fixed-constant-order: ' + label,
+        JSON.stringify(paid) === JSON.stringify(expected));
+      // The counsellor is outside the paid ordering and never before it.
+      t('the-counsellor-when-present-renders-first: ' + label,
+        !order.includes('financial_counsellor') || order[0] === 'financial_counsellor');
+    }
+
+    // Items inside a block run in ascending tile order.
+    const h1 = who(fx1);
+    const srcOrder = (h1.match(/<div class="psrc">[^<]*<\/div>/g) || []).map(s => s.replace(/<[^>]*>/g, ''));
+    const titleToTile = {};
+    for (const k of Object.keys(library.tiles)) titleToTile[library.tiles[k].title] = Number(k);
+    const firstBlockTiles = srcOrder.map(s => titleToTile[s]).filter(n => !isNaN(n));
+    t('items-within-a-block-run-in-ascending-tile-order',
+      firstBlockTiles.length > 1 && firstBlockTiles.slice(0, 3).every((n, i, a) => i === 0 || a[i - 1] <= n));
+
+    // Zero fired insights: no section at all. No heading, no message.
+    const nothing = who({ context: { adults: 1, _confidence: 'stated' } });
+    t('nothing-routing-renders-no-section-at-all', nothing === '');
+    t('nothing-routing-renders-no-empty-state',
+      !/fp-who|Nothing routes|fills in as your picture/i.test(nothing));
+
+    // Tile 5 routes to the planner, and the insurance specialist is gone.
+    t('tile-5-routes-to-the-financial-planner',
+      library.insights.find(i => i.id === '5.1').route_primary === 'financial_planner');
+    t('no-insurance-specialist-anywhere-in-the-library',
+      !JSON.stringify(library).includes('insurance_specialist') && !library.professionals.insurance_specialist);
+    t('no-insurance-specialist-in-any-rendered-output',
+      [who(fx1), who(fx2), who(fx3)].every(h => !/insurance specialist/i.test(h)));
+
+    // The 5.1 education must not claim the conversation costs nothing. That
+    // was true of a risk specialist paid by the insurer; a planner handling
+    // five items bills for the other four (Devon, 16 Oct).
+    const hp51 = library.insights.find(i => i.id === '5.1').blocks.how_professional;
+    t('the-5.1-education-makes-no-claim-that-the-conversation-costs-nothing',
+      !/costs nothing|at no cost|free of charge|no charge/i.test(hp51)
+      && /worth asking how the whole conversation is charged/.test(hp51));
+
+    // The broker cost line renders once per block, not once per item.
+    const brokerItems = (h1.match(/<div class="psrc">/g) || []).length;
+    const paidByLender = (h1.match(/paid a commission by the lender/gi) || []).length;
+    t('the-paid-by-the-lender-note-renders-once-per-block',
+      brokerItems >= 3 && paidByLender === 1);
+    t('one-action-per-block-not-one-per-item',
+      (h1.match(/fc-action|actionZone/g) || []).length <= blockOrder(h1).length);
+
+    // Hardship: the counsellor replaces the broker's debt items.
+    const h3 = who(fx3);
+    t('hardship-produces-a-financial-counsellor-block', /Financial counsellor/.test(h3));
+    t('hardship-removes-the-debt-items-from-the-broker-block',
+      !/Other debts/i.test((h3.split('Financial counsellor')[0] || '')));
+    t('the-counsellor-block-is-the-first-block-in-the-output',
+      blockOrder(h3)[0] === 'financial_counsellor');
+
+    // No tile renders a route as an action.
+    const tileHtml = panels.renderTile(1, D, der, ev.tiles.find(x => x.tile === 1), library, {});
+    t('no-tile-detail-panel-contains-an-action-to-a-professional',
+      !/fc-action/.test(tileHtml) && !/Find a mortgage broker/i.test(tileHtml));
+    t('the-tile-chip-is-a-label-not-a-cost',
+      !/usually free|usually no cost|Varies|Fixed price/i.test(tileHtml));
+  }
+
   return {
     pass: failures.length === 0,
     total: ran,
-    declared: 200,
+    declared: 220,
     failures,
     hand_computed: {
       home_equity: 320000, lvr_percent: 66.3, surplus_monthly: 3450, buffer_months: 2.7,

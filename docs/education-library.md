@@ -600,7 +600,7 @@ Life cover pays a lump sum if you die. Total and permanent disability cover pays
 
 ---
 
-### 5.1 — The cover that protects your household → risk specialist / financial planner
+### 5.1 — The cover that protects your household → financial planner
 
 **Why this is worth a conversation**
 Protection is the cover that steps in if something serious happens, if you couldn't work for a long stretch, or if you weren't around anymore. For a household with a mortgage and people who depend on that income, it's what stands between a hard situation and a much harder one. It's also one of the most commonly skipped corners of a household's finances, not because people don't care, but because it's uncomfortable to think about and easy to leave for another day.
@@ -618,12 +618,12 @@ The second is that it can switch off. If no contributions go into a super accoun
 There's also a cost that's easy to miss. Premiums for cover held in super come out of your super balance, so it isn't free, it's just paid from somewhere you never look.
 
 **How the professional works**
-A risk specialist or financial planner works out what cover you actually hold, what it would pay and when, and where the gaps sit for a household like yours. They're generally paid by the insurer rather than by you, so understanding what you've got usually costs nothing. A first conversation is about your situation, not pressure.
+A financial planner works out what cover you actually hold, what it would pay and when, and where the gaps sit for a household like yours. A first conversation is about your situation, not pressure. The cover part of this conversation is often funded by the insurer rather than billed to you. The rest of what a planner does is usually billed, so it is worth asking how the whole conversation is charged.
 
 **There's nothing you need to know or prepare**
 This is a heavy one to sit with, which is exactly why people avoid it for years. You don't need to have thought it through, or know what cover you have, or have the answers. Finn has laid out where you stand, and can pass it on, so the conversation starts from something real instead of a blank and daunting page.
 
-→ *Find an insurance specialist*
+→ *Find a financial planner*
 
 > **Build note.** "Financial catastrophe" and "a gap that would matter a great deal at the worst possible moment" are both removed. Fear-selling is off-brand for a product built on calm, and the second phrasing edged toward characterising their exposure.
 
@@ -966,11 +966,6 @@ Cost belongs to the professional, not the insight, so it renders once on the who
 - **role** — Helps you work out what you're aiming at and how the pieces fit together, based on what matters to you.
 - **cost_pill** — Varies
 - **cost_line** — Usually a first conversation at no cost to see whether it's a fit. If you go ahead there's a fee for the written advice, and often an ongoing fee if you keep them on. The amounts vary a lot, and they tell you before anything is agreed.
-
-### insurance_specialist
-- **role** — Works out what cover you actually hold, what it would pay and when, and where the gaps sit for a household like yours.
-- **cost_pill** — Usually free
-- **cost_line** — Generally paid a commission by the insurer rather than a fee by you. Some charge a fee instead, and will say so upfront.
 
 ### estate_lawyer
 - **role** — Prepares the documents that decide what happens to what you own, and who looks after the children, so they actually do what you intend.

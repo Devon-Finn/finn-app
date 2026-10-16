@@ -207,16 +207,24 @@
     let html = '<div class="fc fc-pro"><div class="ph"><span class="pn">' + esc(opts.name) + '</span>' +
       (opts.count ? '<span class="pcount">' + esc(String(opts.count)) + '</span>' : '') + '</div>' +
       '<div class="prole">' + esc(opts.role) + '</div>';
+    // Why these sit together. Library copy, count-agnostic, never composed.
+    if (opts.why) html += '<div class="pwhy">' + esc(opts.why) + '</div>';
     if (opts.itemsHtml) html += '<div class="pitems">' + opts.itemsHtml + '</div>';
     html += '<div class="pcost">' + costPill(opts.cost_pill) + costLine(opts.cost_line) + '</div>' +
       (opts.actionHtml || '') + '</div>';
     return html;
   }
-  function professionalItem(text, alsoNames) {
-    return '<div class="pitem">' + renderCopyInline(text) +
-      (alsoNames && alsoNames.length ? '<div class="palso">also: ' + alsoNames.map(esc).join(', ') + '</div>' : '') + '</div>';
+  // opts: { tileName, eduHtml } — the tile the item came from, and the
+  // existing education for it, rendered unchanged beneath the sentence.
+  function professionalItem(text, alsoNames, opts) {
+    const o = opts || {};
+    return '<div class="pitem">' +
+      (o.tileName ? '<div class="psrc">' + esc(o.tileName) + '</div>' : '') +
+      renderCopyInline(text) +
+      (alsoNames && alsoNames.length ? '<div class="palso">also: ' + alsoNames.map(esc).join(', ') + '</div>' : '') +
+      (o.eduHtml ? '<div class="pedu">' + o.eduHtml + '</div>' : '') +
+      '</div>';
   }
-
   /* ── 3.9 Trust banner ── the disclosure lives inside the trust claim,
         said plainly and first. The one legitimate use of steel on forest. */
   function trustBanner(html) {

@@ -840,17 +840,21 @@
         body += '<div class="fp-teach">' + C().promiseBlock(C().renderCopy(promise)) + '</div>';
       }
     }
-    if (entry.action_label && !entry.no_referral) {
-      body += C().actionZone(entry.action_label,
-        "Finn is paid by the professionals on our list. What they can't do is buy their way onto it. We meet everyone first, and if we wouldn't send our own family to them, they're not there.");
-    }
 
+    // PART A (16 Oct): NO ROUTE AS AN ACTION INSIDE A TILE. The tile shows
+    // figures; the conversation layer below does the routing. An action here
+    // produced one referral per insight, so a household with nine findings
+    // got nine buttons. The action, the cost pill and the cost line now live
+    // once per professional block in renderWhoToSee, not once per item.
     const pro = entry.route_primary && library.professionals && library.professionals[entry.route_primary];
     return C().gapCard({
       id: entry.id,
       headline: entry.question || entry.title || '',
       hook: pos || '',
-      chip: pro ? pro.name + ' · ' + pro.cost_pill.toLowerCase() : '',
+      // A LABEL, NOT A LINK: the professional's name alone, so the person can
+      // see which conversation below this tile feeds. No cost here; cost is
+      // said once per block rather than twice.
+      chip: pro ? pro.name : '',
       bodyHtml: body,
     });
   }
@@ -872,81 +876,131 @@
   function insightsSection(tileResult, domains, derived, library) {
     if (!tileResult || !tileResult.insights.length) return '';
     const all = [].concat(arr(library && library.insights), arr(library && library.overrides));
-    const costShown = new Set(); // once per professional per TILE
+    // PART A: no cost pill and no cost line inside a tile. Both now render
+    // once per professional block in the conversation layer, so cost is
+    // stated once rather than on every tile that happens to route there.
     const cards = tileResult.insights
       .map(ins => {
         const entry = all.find(e => e.id === ins.id);
         if (!entry) return '';
-        let costHtml = '';
-        const pro = entry.route_primary && !entry.no_referral && library.professionals && library.professionals[entry.route_primary];
-        if (pro && !costShown.has(entry.route_primary)) {
-          costShown.add(entry.route_primary);
-          costHtml = C().costPill(pro.cost_pill) + ' ' + C().costLine(pro.cost_line);
-        }
-        return gapCardFor(ins, entry, domains, derived, library, costHtml);
+        return gapCardFor(ins, entry, domains, derived, library, '');
       })
       .filter(Boolean);
     return '<div class="fp-section fp-insights"><h4 class="fp-calchead">Questions for your situation</h4>' +
       C().stepRail(cards) + '</div>';
   }
 
-  /* ══════════ who to see — component-spec 4.3 ══════════
-     A second tab at dashboard level, peer to the tile grid. Professional
-     order is fixed by first appearance across tiles 1 to 9, NEVER sorted
-     by count. An insight appears once, under its route_primary, with
-     route_also named inline beneath the item, never duplicated. A
-     professional who only ever appears as a secondary gets no card.
-     no_referral insights (2.2, 8.1b) appear on no card at all. No total
-     anywhere: per-professional counts are facts, a grand total is a
-     verdict on the whole position. */
+  /* ══════════ THE CONVERSATION LAYER ══════════ (reworked 16 Oct)
+     One section below the tile grid. Every insight that fired for this
+     household, grouped by the professional they would be talking to, so
+     nine findings become three conversations instead of nine buttons.
+
+     THE RULES, AS RULES:
+
+     1. ORDER IS FIXED, NOT SCORED. PRO_ORDER below is a hardcoded array,
+        identical for every household whatever fired. It is never sorted by
+        severity, size, urgency, confidence, item count, or anything else
+        derived from the household's data. A relevance ranking is a
+        statement about what matters most in this person's situation, and
+        that is a judgment Finn does not make (field-spec 3.5).
+     2. Items inside a block run in ascending TILE order, 1 to 9.
+     3. A professional with zero items renders NOTHING. No empty state.
+     4. WHEN NOTHING ROUTES, THE WHOLE SECTION IS ABSENT. No heading, no
+        message, no placeholder. A sentence saying nothing needs attention
+        is an overall verdict on the household's position, and Finn never
+        gives one (locked, June 2026). Absence is not a verdict; a
+        reassuring sentence is.
+     5. The cost line and the action render ONCE PER BLOCK, never per item.
+        That is what moved out of the tiles.
+     6. HARDSHIP IS NEVER MONETISED. Where flags.hardship is true the
+        financial counsellor replaces the broker block's debt items and
+        renders as its own block, ABOVE every paid block. The counsellor is
+        deliberately NOT in PRO_ORDER: it is free, it is not part of the paid
+        ordering, and free help does not sit underneath two paid referrals. */
+  const PRO_ORDER = ['mortgage_broker', 'financial_planner', 'accountant', 'estate_lawyer'];
+  const THINGS = { 1: 'One thing', 2: 'Two things', 3: 'Three things', 4: 'Four things', 5: 'Five things', 6: 'Six things', 7: 'Seven things', 8: 'Eight things', 9: 'Nine things' };
+  // A count of items, never a score and never a denominator.
+  const thingsWord = (n) => THINGS[n] || (n + ' things');
+  const DEBT_TILE = 8;
 
   function renderWhoToSee(triggersResult, library) {
     const all = [].concat(arr(library && library.insights), arr(library && library.overrides));
     const pros = (library && library.professionals) || {};
+    const tiles = (library && library.tiles) || {};
+    const hardship = !!(triggersResult && triggersResult.hardship);
 
-    // Fired entries in fixed tile/insight order.
+    // Everything that fired, carrying the tile it came from.
     const fired = [];
     for (const t of arr(triggersResult && triggersResult.tiles)) {
       if (!t.visible) continue;
-      for (const ins of t.insights) {
+      for (const ins of arr(t.insights)) {
         const entry = all.find(e => e.id === ins.id);
-        if (entry) fired.push(entry);
+        if (entry) fired.push({ entry, tile: t.tile });
       }
     }
 
-    // Group under route_primary; order = first appearance.
-    const order = [];
+    // Group by the professional. no_referral entries route nowhere.
     const byPro = {};
-    for (const entry of fired) {
-      if (entry.no_referral || !entry.route_primary) continue;
-      if (!byPro[entry.route_primary]) { byPro[entry.route_primary] = []; order.push(entry.route_primary); }
-      byPro[entry.route_primary].push(entry);
+    for (const f of fired) {
+      const e = f.entry;
+      if (e.no_referral || !e.route_primary) continue;
+      if (!byPro[e.route_primary]) byPro[e.route_primary] = [];
+      byPro[e.route_primary].push(f);
     }
 
-    // Trust banner: the disclosure first, then vetting, then the promise —
-    // all verbatim library-adjacent copy from the education library.
+    // RULE 6. The trigger engine already suppresses 8.1a/8.1b under
+    // hardship; this makes the rule explicit here too, so it holds however
+    // the engine changes and so it reads as a rule.
+    if (hardship && byPro.mortgage_broker) {
+      byPro.mortgage_broker = byPro.mortgage_broker.filter(f => f.tile !== DEBT_TILE);
+      if (!byPro.mortgage_broker.length) delete byPro.mortgage_broker;
+    }
+
+    // RULE 2.
+    for (const k of Object.keys(byPro)) byPro[k].sort((a, b) => a.tile - b.tile);
+
+    // RULES 1 and 3: the fixed array decides order; empty blocks never appear.
+    const blocks = [];
+    for (const id of PRO_ORDER) {
+      if (byPro[id] && byPro[id].length) blocks.push([id, byPro[id]]);
+    }
+    // RULE 6, second half: THE COUNSELLOR GOES FIRST. Free help for someone
+    // in hardship does not sit underneath two paid referrals. This is a
+    // fixed rule, not a score: it applies identically to every household
+    // carrying the flag and is derived from no figure.
+    if (byPro.financial_counsellor && byPro.financial_counsellor.length) {
+      blocks.unshift(['financial_counsellor', byPro.financial_counsellor]);
+    }
+
+    // RULE 4.
+    if (!blocks.length) return '';
+
     let html = '<div class="fc fp-who">';
     html += C().trustBanner(
       "<b>Finn is paid by the professionals on our list.</b> What they can't do is buy their way onto it. We meet everyone first, and if we wouldn't send our own family to them, they're not there. " +
       "There's nothing you need to prepare. Finn sends your whole picture ahead, so you're not sitting there trying to explain a situation you've never had laid out before. " +
       '<span class="steel">Whoever you see, you turn up understood.</span>');
 
-    if (!order.length) {
-      html += '<div class="fp-who-empty">Nothing routes to a professional yet. This view fills in as your picture builds.</div>';
-    }
-    for (const proId of order) {
+    for (const [proId, items] of blocks) {
       const pro = pros[proId];
       if (!pro) continue;
-      const entries = byPro[proId];
-      const itemsHtml = entries.map(entry => {
+      const itemsHtml = items.map(({ entry, tile }) => {
         const alsoNames = arr(entry.route_also).map(id => pros[id] && pros[id].name).filter(Boolean);
-        return C().professionalItem(entry.title || entry.id, alsoNames);
+        const tileMeta = tiles[String(tile)];
+        // The education is the library's own, rendered unchanged.
+        const edu = entry.blocks && entry.blocks.why && !isPlaceholder(entry.blocks.why)
+          ? C().renderCopy(entry.blocks.why) : '';
+        return C().professionalItem(entry.question || entry.title || entry.id, alsoNames, {
+          tileName: tileMeta ? tileMeta.title : '',
+          eduHtml: edu,
+        });
       }).join('');
-      const action = entries.find(e => e.action_label);
+      const action = items.map(i => i.entry).find(e => e.action_label);
       html += C().professionalCard({
         name: pro.name,
         role: pro.role,
-        count: entries.length,
+        count: thingsWord(items.length),
+        why: pro.why_together,
         itemsHtml,
         cost_pill: pro.cost_pill,
         cost_line: pro.cost_line,
@@ -954,8 +1008,6 @@
       });
     }
 
-    // How this works — the full referral disclosure, verbatim
-    // (education-library Part Four).
     html += '<div class="fp-section fp-howworks"><h4 class="fp-calchead">How this works</h4>' +
       "<p>When you connect with someone through Finn, that professional usually pays Finn. It's fair you know that before you click anything.</p>" +
       "<p>What that payment doesn't do is decide who's on the list. Nobody buys their way onto it, and nobody moves up it by paying more. People get on the list because they're good at what they do, because they're straight with people, and because they understand households like yours rather than only chasing the big end of town. We meet them first, and we keep an eye on how people find them afterwards.</p>" +
@@ -965,7 +1017,6 @@
     html += '</div>';
     return html;
   }
-
   /* ══════════ assembly — component-spec 4.1 order ══════════ */
 
   function renderTile(tileNo, domains, derived, tileResult, library, opts) {
