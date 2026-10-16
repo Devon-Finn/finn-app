@@ -228,7 +228,9 @@ const __finnDerived = (function () {
     // figures were built from.
     const housing_monthly = monthlyHousing();
     const personal_minimums_monthly = personalMinimums;
-    return { housing_monthly, personal_minimums_monthly, home_equity, lvr_percent, surplus_monthly, buffer_months, super_total, income_total_annual, income_costs_annual, income_total_bases, income_unreconciled, property_equity, debts_total, debts_total_by_entity };
+    // home_secured is returned so the tile-1 chart can draw its third
+    // segment without re-deriving it. One implementation, two importers.
+    return { housing_monthly, personal_minimums_monthly, home_equity, home_secured: homeSecured, lvr_percent, surplus_monthly, buffer_months, super_total, income_total_annual, income_costs_annual, income_total_bases, income_unreconciled, property_equity, debts_total, debts_total_by_entity };
   }
 
   // One implementation, two importers: the edge function imports derive()

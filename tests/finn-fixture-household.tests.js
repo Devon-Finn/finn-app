@@ -564,8 +564,13 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
     const der5 = derive(D5);
     const ev5 = evaluate(D5, { derived: der5 });
     const html5 = panels.renderTile(5, D5, der5, ev5.tiles.find(x => x.tile === 5), library, {});
-    t('tile5-a-row-each', html5.includes('The cover you hold') && html5.includes("Jess's cover"));
-    t('tile5-partner-gap-visible', /Jess's cover[\s\S]{0,400}none held/.test(html5));
+    // The matrix replaced the per-owner lists (Part D): the columns name the
+    // people and the rows name the covers, so one person's gap is a cell
+    // rather than a separate list.
+    t('tile5-names-both-people-as-columns',
+      /<th scope="col">You<\/th>/.test(html5) && /<th scope="col">Jess<\/th>/.test(html5));
+    t('tile5-partner-gap-visible-as-a-cell',
+      /class="fc-cell fc-none_held"/.test(html5) && /class="fc-word">none held</.test(html5));
     const pos5 = panels.fillPositionLine(library.insights.find(i => i.id === '5.1').position_line, D5, der5);
     t('tile5-position-line-names-both', typeof pos5 === 'string' && pos5.includes('you:') && pos5.includes('Jess:'));
     const html6 = panels.renderTile(6, D5, der5, ev5.tiles.find(x => x.tile === 6), library, {});
@@ -711,9 +716,9 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
       && !/\bcode\b/i.test(block.split("\n")[1] || ""));
     // The household's real figures, not arithmetic over the raw picture:
     // a home value of 950000 less a 540000 mortgage AND the 90000 split.
-    t('context-block-carries-home-equity-320000', /home_equity: 320000\b/.test(block));
-    t('context-block-carries-lvr-66.3', /lvr_percent: 66\.3\b/.test(block));
-    t('context-block-never-shows-the-naive-equity', !/home_equity: 410000\b/.test(block));
+    t('context-block-carries-home-equity-320000', /equity in the home: 320000\b/.test(block));
+    t('context-block-carries-lvr-66.3', /as a percentage of its value: 66\.3\b/.test(block));
+    t('context-block-never-shows-the-naive-equity', !/equity in the home: 410000\b/.test(block));
     t('context-block-names-what-is-missing-rather-than-filling-it',
       /not yet derivable/.test(chat.__derivedPromptSectionForTests({})));
   }
@@ -913,10 +918,133 @@ export function runFixtureHousehold({ pipeline, registry, paths, linter, derive,
       !/usually free|usually no cost|Varies|Fixed price/i.test(tileHtml));
   }
 
+
+  /* ── Part C and D: the tile detail panels (16 Oct) ──
+     A chart where the thing is a QUANTITY, a state where the thing is a
+     STATE. Tiles 1, 2, 4 and 7 chart; tiles 5 and 6 do not. */
+  {
+    const RAMP = ['var(--fc-fill-1)', 'var(--fc-fill-2)', 'var(--fc-fill-3)'];
+    const panelFor = (n, dom, dr) => panels.renderTile(n, dom, dr, evaluate(dom, { derived: dr }).tiles.find(x => x.tile === n), library, {});
+    const strip = (s) => s.replace(/<[^>]*>/g, ' ');
+    const charted = [1, 2, 4, 7].map(n => ({ n, html: panelFor(n, D, der) }));
+
+    t('every-chart-has-a-table-view', charted.every(function (c) {
+      const charts = (c.html.match(/class="fc-chart"/g) || []).length;
+      const tables = (c.html.match(/class="fc-dtable"/g) || []).length;
+      const btns = (c.html.match(/class="fc-tbtn"/g) || []).length;
+      return charts === 0 || (charts === tables && charts === btns);
+    }));
+    t('at-least-one-chart-actually-rendered', charted.some(function (c) { return /class="fc-chart"/.test(c.html); }));
+    t('the-table-is-hidden-by-default-not-display-toggled', charted.every(function (c) {
+      return !/class="fc-dtable"/.test(c.html) || /<table class="fc-dtable" id="[^"]+" hidden>/.test(c.html);
+    }));
+    t('the-toggle-carries-aria-expanded-and-aria-controls', charted.every(function (c) {
+      return !/fc-tbtn/.test(c.html) || /aria-expanded="false" aria-controls="fc-tbl-/.test(c.html);
+    }));
+    t('every-chart-figure-appears-in-its-table', charted.every(function (c) {
+      const bars = (c.html.match(/class="fc-bval">([^<]*)</g) || []).map(function (s) { return s.slice(s.indexOf('>') + 1, -1); });
+      const segs = (c.html.match(/<b>([^<]*)<\/b><span>/g) || []).map(function (s) { return s.slice(3, s.indexOf('</b>')); });
+      const cells = (c.html.match(/<td>([^<]*)</g) || []).map(function (s) { return s.slice(4, -1); });
+      return bars.concat(segs).every(function (v) { return cells.indexOf(v) !== -1; });
+    }));
+    const allPanels = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(function (n) { return panelFor(n, D, der); }).join('');
+    const fills = allPanels.match(/background:\s*var\(--fc-[a-z0-9-]+\)/g) || [];
+    t('no-chart-uses-a-fill-outside-the-three-ramp-tokens', fills.length > 0 && fills.every(function (f) {
+      return RAMP.some(function (r) { return f.indexOf(r) !== -1; });
+    }));
+    t('there-is-no-fourth-fill-token-anywhere', !/--fc-fill-4/.test(allPanels));
+    t('steel-is-never-used-as-a-data-fill', !/background:\s*var\(--fc-steel\)/.test(allPanels));
+
+    // Tile 2's categories render in the FIXED order. This fixture's fixed
+    // order differs from its size order on purpose.
+    const D2c = JSON.parse(JSON.stringify(D));
+    D2c.expenses = { living_monthly: 5200, includes_housing: false, _confidence: 'document',
+      by_category: { groceries: 400, eating_out: 1800, transport: 300, utilities: 1500, insurance: 200, health: 1000 } };
+    const t2 = panelFor(2, D2c, derive(D2c));
+    const labelOrder = (t2.match(/class="fc-blabel">([^<]*)</g) || []).map(function (s) { return s.slice(s.indexOf('>') + 1, -1); });
+    const FIXED = ['Groceries', 'Eating out and takeaway', 'Car and transport', 'Power, water, phone and internet', 'Insurance', 'Health and medical'];
+    const BY_SIZE = ['Eating out and takeaway', 'Power, water, phone and internet', 'Health and medical', 'Groceries', 'Car and transport', 'Insurance'];
+    t('tile-2-categories-render-in-the-fixed-order', JSON.stringify(labelOrder.slice(0, 6)) === JSON.stringify(FIXED));
+    t('tile-2-categories-are-NOT-sorted-by-amount', JSON.stringify(labelOrder.slice(0, 6)) !== JSON.stringify(BY_SIZE));
+    t('tile-2-surplus-sits-below-a-rule-in-the-darkest-fill',
+      /class="fc-brule"/.test(t2) && /background:var\(--fc-fill-1\)/.test(t2));
+    t('tile-2-has-a-net-income-footer', /class="fc-bfoot"/.test(t2) && /Income in, each month/.test(t2));
+
+    // Tile 1's stacked segments sum to the stated total.
+    const t1 = panelFor(1, D, der);
+    const segFigs = (t1.match(/<b>([^<]*)<\/b><span>/g) || []).map(function (s) {
+      return Number(s.slice(3, s.indexOf('</b>')).replace(/[$,]/g, ''));
+    });
+    const tm = t1.match(/class="fc-total"><span>[^<]*<\/span><b>([^<]*)</);
+    const totalFig = tm ? Number(tm[1].replace(/[$,]/g, '')) : null;
+    t('tile-1-stacked-segments-sum-to-the-stated-total',
+      segFigs.length === 3 && totalFig !== null && Math.abs(segFigs.reduce(function (a, b) { return a + b; }, 0) - totalFig) <= 1);
+    t('tile-1-every-segment-carries-its-own-figure', segFigs.length === 3 && segFigs.every(function (v) { return !isNaN(v) && v > 0; }));
+    t('tile-1-has-a-legend-naming-each-segment', (t1.match(/class="fc-lg"/g) || []).length >= 3);
+
+    // More than three segments fold into "other" and LOG, rather than
+    // reaching for a fourth fill. The schema has three kinds and a fourth
+    // cannot arise from a household, so the component contract is
+    // exercised directly rather than inventing an impossible household.
+    const folded = window.finnComponents.stackedBar({
+      money: function (v) { return '$' + v; }, totalLabel: 'Total',
+      segments: [{ label: 'A', value: 100 }, { label: 'B', value: 80 }, { label: 'C', value: 60 }, { label: 'D', value: 40 }, { label: 'E', value: 20 }],
+    });
+    t('more-than-three-segments-fold-into-other',
+      /Other/.test(folded) && (folded.match(/class="fc-seg"/g) || []).length === 3);
+    t('the-fold-keeps-the-total-intact', folded.indexOf('$300') !== -1);
+    t('the-fold-never-introduces-a-fourth-fill', !/--fc-fill-4/.test(folded));
+
+    // Tile 5: all three states, each with a dot AND a word.
+    const cov = function (owner, type, held, extra) {
+      return Object.assign({ id: owner + type, owner: owner, type: type, held: held, amount: null, inside_super: null }, extra || {});
+    };
+    const D5c = { context: { adults: 2, partner_name: 'Jess', _confidence: 'stated' },
+      protection: { covers: [
+        cov('you', 'life', true, { amount: 500000, inside_super: true }),
+        cov('you', 'tpd', false),
+        cov('partner', 'life', false),
+      ], _confidence: 'stated' } };
+    const t5 = panelFor(5, D5c, derive(D5c));
+    t('tile-5-renders-a-state-matrix-not-a-chart', /class="fc-matrix"/.test(t5) && !/class="fc-chart"/.test(t5));
+    t('tile-5-all-three-states-render-distinctly',
+      /fc-in_place/.test(t5) && /fc-none_held/.test(t5) && /fc-not_recorded/.test(t5));
+    t('tile-5-every-state-carries-a-word-not-only-a-dot',
+      /class="fc-word">in place</.test(t5) && /class="fc-word">none held</.test(t5) && /class="fc-word">not recorded</.test(t5));
+    t('tile-5-none-held-and-not-recorded-are-different-strings',
+      t5.indexOf('none held') !== -1 && t5.indexOf('not recorded') !== -1);
+    t('tile-5-the-legend-explains-all-three-states',
+      /class="fc-mlegend"/.test(t5) && /you told Finn it exists/.test(t5)
+      && /you told Finn there is none/.test(t5) && /Finn has not asked yet/.test(t5));
+    t('tile-5-states-each-cover-once-in-the-matrix', (t5.match(/<th scope="row">Life cover<\/th>/g) || []).length === 1);
+
+    // No detail panel contains a grading word. The linter's OWN list,
+    // exported rather than copied: a duplicated regex drifts, which is the
+    // same failure as a declared test count.
+    const APPRAISAL = linter.__appraisalForTests;
+    t('the-appraisal-vocabulary-comes-from-the-linter-not-a-copy', APPRAISAL instanceof RegExp);
+    t('no-tile-detail-panel-contains-a-grading-word',
+      [1, 2, 3, 4, 5, 6, 7, 8, 9].every(function (n) { return !APPRAISAL.test(strip(panelFor(n, D, der))); }));
+
+    // derive() now returns home_secured, and every figure the model reads
+    // out loud carries a human label rather than its key name.
+    const keys = chat.__derivedKeysForTests, labels = chat.__derivedLabelsForTests;
+    const block = chat.__derivedPromptSectionForTests(D);
+    t('home_secured-is-returned-by-derive', typeof der.home_secured === 'number');
+    t('every-derived-figure-in-the-prompt-has-a-human-label',
+      keys.every(function (k) { return typeof labels[k] === 'string' && labels[k].length > 0 && labels[k] !== k; }));
+    t('the-derived-block-never-prints-a-raw-key-name',
+      keys.every(function (k) { return block.indexOf('\n  ' + k + ':') === -1; }));
+    t('the-derived-block-names-the-secured-lending-in-plain-words',
+      block.indexOf('secured against the home:') !== -1 && block.indexOf('home_secured') === -1);
+    t('the-derived-block-still-says-quote-these-and-never-derive',
+      /QUOTE THESE VERBATIM/.test(block) && /never work one out yourself/.test(block));
+  }
+
   return {
     pass: failures.length === 0,
     total: ran,
-    declared: 220,
+    declared: 251,
     failures,
     hand_computed: {
       home_equity: 320000, lvr_percent: 66.3, surplus_monthly: 3450, buffer_months: 2.7,

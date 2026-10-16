@@ -1065,7 +1065,21 @@ function alreadyNudgedFor(plan, domains, messages, nudgeCopy) {
    the conversation and the tile can never disagree. Nothing is
    reimplemented here; a figure missing from the picture stays missing,
    and the model is told to say so rather than fill the gap. */
-const DERIVED_FOR_PROMPT = ["home_equity", "lvr_percent", "surplus_monthly", "buffer_months", "super_total", "debts_total", "property_equity"];
+/* EVERY FIGURE CARRIES A HUMAN LABEL, NEVER ITS KEY NAME (16 Oct). The model
+   reads these labels out loud, so a raw key is how "code" and "sweep" reached
+   a customer in September. The key stays the contract between derive() and
+   this file; the label is what a person can hear. */
+const DERIVED_LABELS = {
+  home_equity: "equity in the home",
+  home_secured: "secured against the home",
+  lvr_percent: "the loan against the home, as a percentage of its value",
+  surplus_monthly: "left over each month",
+  buffer_months: "months the safety net would cover",
+  super_total: "total in super across the household",
+  debts_total: "total of the personal debts",
+  property_equity: "equity in each investment property",
+};
+const DERIVED_FOR_PROMPT = ["home_equity", "home_secured", "lvr_percent", "surplus_monthly", "buffer_months", "super_total", "debts_total", "property_equity"];
 
 function derivedPromptSection(domains) {
   let der;
@@ -1075,13 +1089,14 @@ function derivedPromptSection(domains) {
   }
   const lines = [];
   for (const key of DERIVED_FOR_PROMPT) {
+    const label = DERIVED_LABELS[key] || key;
     const v = der[key];
-    if (v === undefined || v === null) { lines.push(`${key}: not yet derivable`); continue; }
+    if (v === undefined || v === null) { lines.push(`${label}: not yet derivable`); continue; }
     if (Array.isArray(v)) {
-      lines.push(`${key}: ${v.length ? JSON.stringify(v) : "none recorded"}`);
+      lines.push(`${label}: ${v.length ? JSON.stringify(v) : "none recorded"}`);
       continue;
     }
-    lines.push(`${key}: ${v}`);
+    lines.push(`${label}: ${v}`);
   }
   return `\nFigures already calculated for this household (QUOTE THESE VERBATIM; never work one out yourself):\n` +
     lines.map(l => "  " + l).join("\n") +
@@ -1495,4 +1510,4 @@ export default async function handler(request, context) {
 }
 
 // Exposed for the local stream test only (tests/finn-stream.tests.js).
-export { emDashScrubStream as __streamForTests, ABSOLUTE as __absoluteForTests, SWEEPS as __sweepsForTests, derivedPromptSection as __derivedPromptSectionForTests, alreadyNudgedFor as __alreadyNudgedForTests };
+export { emDashScrubStream as __streamForTests, ABSOLUTE as __absoluteForTests, SWEEPS as __sweepsForTests, derivedPromptSection as __derivedPromptSectionForTests, alreadyNudgedFor as __alreadyNudgedForTests, DERIVED_LABELS as __derivedLabelsForTests, DERIVED_FOR_PROMPT as __derivedKeysForTests };

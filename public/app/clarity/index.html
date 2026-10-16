@@ -714,6 +714,8 @@ function openDetail(tileNo) {
   // First-encounter term handovers: whichever tile they open first that
   // uses a term carries its handover sentence.
   finnTerms.processContainer(document.getElementById('dpBody'));
+  // One delegated handler for every chart table toggle on the panel.
+  window.finnComponents.initTables(document.getElementById('dpBody'));
   document.getElementById('detailPanel').classList.add('on');
 }
 

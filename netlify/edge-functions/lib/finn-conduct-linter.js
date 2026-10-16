@@ -511,3 +511,7 @@ export function runConductLinter({ rows, picture, registry, paths, confidenceRan
     summary: { failures, verdict: failures === 0 ? "clean" : `${failures} check${failures === 1 ? "" : "s"} failing` },
   };
 }
+
+// Exposed for the panel tests: a duplicated regex drifts, which is the
+// same failure as a declared test count. Reuse this, never copy it.
+export { APPRAISAL as __appraisalForTests };

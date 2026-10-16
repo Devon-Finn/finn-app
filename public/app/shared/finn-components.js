@@ -225,6 +225,203 @@
       (o.eduHtml ? '<div class="pedu">' + o.eduHtml + '</div>' : '') +
       '</div>';
   }
+
+  /* ══════════ CHARTS (Part C, 16 Oct) ══════════
+     A chart where the thing is a QUANTITY, a state where the thing is a
+     STATE. Four panels chart; two do not.
+
+     Rules enforced here, not left to the caller:
+     - Fills come ONLY from the three ramp tokens. There is no fourth. If a
+       chart seems to need one, the chart is wrong, so the stacked bar folds
+       instead of reaching for a colour.
+     - Every mark is labelled, so nothing is identifiable by colour alone.
+     - Chart text takes its colour from the ink tokens, never the series.
+     - Every chart gets a table view. The lightest ramp step is below 3:1
+       against the surface; visible labels plus the table are the required
+       relief, so the table is not optional.
+     - SVG/chart text font is set by a CSS rule, never by a font-family
+       presentation attribute: as an attribute it silently falls back to a
+       serif face in some rendering paths. */
+  /* WHY THESE ARE HTML AND CSS, NOT SVG. DO NOT "UPGRADE" THEM.
+     For horizontal bars this is the better tool, for three concrete reasons:
+       - Text in normal flow CANNOT CLIP. An SVG label sits at a coordinate
+         inside a fixed viewBox, so the outermost labels clip the moment a
+         figure grows a digit or a category name gets longer. That is a real
+         bug class these components simply do not have.
+       - It REFLOWS at phone width. The rows restack and the bar track moves
+         to its own line by a media query. An SVG would need its viewBox and
+         every coordinate recomputed per breakpoint.
+       - It is READABLE TO ASSISTIVE TECH with no extra work: the labels and
+         figures are ordinary DOM text, and the table view is a real table.
+         The SVG equivalent needs role, aria-label and a text alternative
+         bolted on to reach the same place.
+     The svg text { font-family: inherit } rule in the CSS stays for the day
+     a chart genuinely needs SVG geometry (an area, a line, anything with a
+     path). Setting the font by attribute silently falls back to a serif
+     face in some rendering paths, which is invisible until screenshotted. */
+  // Local helpers: the charts live here, so they do not borrow finn-panels'.
+  const arr = (v) => (Array.isArray(v) ? v : []);
+  const num = (v) => (typeof v === 'number' && isFinite(v)) ? v : null;
+  const FILLS = ['var(--fc-fill-1)', 'var(--fc-fill-2)', 'var(--fc-fill-3)'];
+  let tableSeq = 0;
+  const nextTableId = function () { tableSeq += 1; return 'fc-tbl-' + tableSeq; };
+
+  // ONE toggle pattern, not four. hidden + aria-expanded, never display.
+  function tableToggle(id) {
+    return '<button type="button" class="fc-tbtn" data-fc-table="' + esc(id) +
+      '" aria-expanded="false" aria-controls="' + esc(id) + '">Show as a table</button>';
+  }
+  function dataTable(id, headers, rows) {
+    return '<table class="fc-dtable" id="' + esc(id) + '" hidden><thead><tr>' +
+      headers.map(function (h) { return '<th scope="col">' + esc(h) + '</th>'; }).join('') +
+      '</tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr>' + r.map(function (c, i) {
+          return i === 0 ? '<th scope="row">' + esc(c) + '</th>' : '<td>' + esc(c) + '</td>';
+        }).join('') + '</tr>';
+      }).join('') + '</tbody></table>';
+  }
+  function initTables(root) {
+    var scope = root || document;
+    if (scope.__fcTablesBound) return;
+    scope.__fcTablesBound = true;
+    scope.addEventListener('click', function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest('.fc-tbtn') : null;
+      if (!btn) return;
+      var tbl = scope.querySelector('#' + btn.getAttribute('data-fc-table'));
+      if (!tbl) return;
+      var willShow = tbl.hidden;
+      tbl.hidden = !willShow;
+      btn.setAttribute('aria-expanded', String(willShow));
+      btn.textContent = willShow ? 'Hide the table' : 'Show as a table';
+    });
+  }
+
+  /* ── COMPONENT 1: stacked proportion bar ── one total, split into parts.
+     Max three segments. A fourth FOLDS into "other" and LOGS: defensive
+     code that fires silently is how a fourth fill reaches production. */
+  function stackedBar(opts) {
+    var o = opts || {};
+    var fmt = o.money || function (v) { return String(v); };
+    var segs = arr(o.segments).filter(function (s) { return s && num(s.value) !== null && s.value > 0; });
+    if (!segs.length) return '';
+    if (segs.length > FILLS.length) {
+      var sorted = segs.slice().sort(function (a, b) { return b.value - a.value; });
+      var keep = sorted.slice(0, FILLS.length - 1);
+      var folded = sorted.slice(FILLS.length - 1);
+      var ft = folded.reduce(function (a, s) { return a + s.value; }, 0);
+      console.error('[Finn charts] ' + segs.length + ' segments exceed the three-fill ramp; folded the ' +
+        folded.length + ' smallest (' + folded.map(function (s) { return s.label; }).join(', ') +
+        ') into "other". There is no fourth fill by design.');
+      segs = keep.concat([{ label: 'Other', value: ft, display: fmt(ft) }]);
+    }
+    var total = segs.reduce(function (a, s) { return a + s.value; }, 0);
+    var id = nextTableId();
+    var legend = '<div class="fc-legend">' + segs.map(function (s, i) {
+      return '<span class="fc-lg"><span class="fc-sw" style="background:' + FILLS[i] + '"></span>' + esc(s.label) + '</span>';
+    }).join('') + '</div>';
+    var bar = '<div class="fc-stack" role="img" aria-label="' +
+      esc(segs.map(function (s) { return s.label + ' ' + (s.display || fmt(s.value)); }).join(', ')) + '">' +
+      segs.map(function (s, i) {
+        return '<span class="fc-seg" style="flex:' + s.value + ' 0 0;background:' + FILLS[i] +
+          '" title="' + esc(s.label + ': ' + (s.display || fmt(s.value))) + '"></span>';
+      }).join('') + '</div>';
+    var marks = '<div class="fc-stacklabels">' + segs.map(function (s) {
+      return '<span class="fc-sl" style="flex:' + s.value + ' 0 0"><b>' + esc(s.display || fmt(s.value)) +
+        '</b><span>' + esc(s.label) + '</span></span>';
+    }).join('') + '</div>';
+    var totalDisplay = o.totalDisplay || fmt(total);
+    var totalLabel = o.totalLabel || 'Total';
+    var totalRow = '<div class="fc-total"><span>' + esc(totalLabel) + '</span><b>' + esc(totalDisplay) + '</b></div>';
+    var tRows = segs.map(function (s) { return [s.label, s.display || fmt(s.value)]; });
+    tRows.push([totalLabel, totalDisplay]);
+    return '<div class="fc-chart">' + legend + bar + marks + totalRow +
+      tableToggle(id) + dataTable(id, ['Part', 'Amount'], tRows) + '</div>';
+  }
+
+  /* ── COMPONENT 2: labelled bar rows ── several items of the same kind,
+     compared by size. ONE fill: the labels carry identity and the length
+     carries magnitude, so six categories do not need six colours and a
+     single series needs no legend.
+     ORDER IS THE CALLER'S AND IS NEVER SORTED HERE. A list sorted
+     biggest-first implies the top one is the problem, which is a verdict
+     by arrangement rather than by words. */
+  function barRows(opts) {
+    var o = opts || {};
+    var groups = arr(o.groups).filter(function (g) { return g && arr(g.rows).length; });
+    if (!groups.length) return '';
+    var all = groups.reduce(function (a, g) { return a.concat(arr(g.rows)); }, []);
+    var vals = all.map(function (r) { return num(r.value) || 0; });
+    if (o.rule && num(o.rule.value) !== null) vals.push(num(o.rule.value) || 0);
+    var scale = Math.max.apply(null, vals);
+    if (!(scale > 0)) return '';
+    var id = nextTableId();
+    var row = function (r, fill) {
+      var pct = Math.max(Math.round((num(r.value) || 0) / scale * 100), 1);
+      return '<div class="fc-brow"><span class="fc-blabel">' + esc(r.label) + '</span>' +
+        '<span class="fc-btrack"><span class="fc-bbar" style="width:' + pct + '%;background:' + fill +
+        '" title="' + esc(r.label + ': ' + (r.display || String(r.value))) + '"></span></span>' +
+        '<span class="fc-bval">' + esc(r.display || String(r.value)) + '</span></div>';
+    };
+    var html = '<div class="fc-chart">';
+    groups.forEach(function (g) {
+      if (g.heading) html += '<div class="fc-bgroup">' + esc(g.heading) + '</div>';
+      html += arr(g.rows).map(function (r) { return row(r, FILLS[1]); }).join('');
+    });
+    // The rule row is a different KIND of thing from the rows above it, so
+    // it sits below a dividing rule and takes the darkest fill.
+    if (o.rule && num(o.rule.value) !== null) html += '<div class="fc-brule"></div>' + row(o.rule, FILLS[0]);
+    if (o.footer) html += '<div class="fc-bfoot"><span>' + esc(o.footer.label) + '</span><b>' + esc(o.footer.display) + '</b></div>';
+    var tRows = groups.reduce(function (a, g) {
+      return a.concat(arr(g.rows).map(function (r) {
+        return [(g.heading ? g.heading + ' - ' : '') + r.label, r.display || String(r.value)];
+      }));
+    }, []);
+    if (o.rule) tRows.push([o.rule.label, o.rule.display || String(o.rule.value)]);
+    if (o.footer) tRows.push([o.footer.label, o.footer.display]);
+    html += tableToggle(id) + dataTable(id, ['Item', 'Amount'], tRows) + '</div>';
+    return html;
+  }
+
+  /* ── COMPONENT 3: state matrix ── NOT a chart. Tile 5.
+     THREE STATES, EACH WITH A DOT AND A WORD. Never colour alone.
+       in place     true  - the household said it exists
+       none held    false - the household said there is none
+       not recorded null  - Finn never asked
+     "None held" is a fact about the household. "Not recorded" is a fact
+     about the conversation. Collapsing the third into a blank cell has
+     Finn implying something it was never told. */
+  var STATE_WORDS = { in_place: 'in place', none_held: 'none held', not_recorded: 'not recorded' };
+  function stateCell(state, note) {
+    var s = STATE_WORDS[state] ? state : 'not_recorded';
+    return '<td class="fc-cell fc-' + s + '"><span class="fc-dot" aria-hidden="true"></span>' +
+      '<span class="fc-word">' + esc(STATE_WORDS[s]) + '</span>' +
+      (note ? '<span class="fc-note">' + esc(note) + '</span>' : '') + '</td>';
+  }
+  function stateMatrix(opts) {
+    var o = opts || {};
+    var rows = arr(o.rows);
+    if (!rows.length) return '';
+    var cols = arr(o.colLabels);
+    var html = '<div class="fc-matrix"><table class="fc-mtable"><thead><tr><th scope="col">Cover</th>' +
+      cols.map(function (c) { return '<th scope="col">' + esc(c) + '</th>'; }).join('') +
+      (o.whereLabel ? '<th scope="col">' + esc(o.whereLabel) + '</th>' : '') + '</tr></thead><tbody>';
+    rows.forEach(function (r) {
+      html += '<tr><th scope="row">' + esc(r.label) + '</th>' +
+        arr(r.cells).map(function (c) { return stateCell(c && c.state, c && c.note); }).join('') +
+        (o.whereLabel ? '<td class="fc-where">' + esc(r.where || 'not recorded') + '</td>' : '') + '</tr>';
+    });
+    html += '</tbody></table>';
+    // The legend spells all three out: "not recorded" is unusual enough to
+    // need explaining the first time someone sees it.
+    html += '<div class="fc-mlegend">' +
+      '<span class="fc-lg"><span class="fc-dot fc-in_place" aria-hidden="true"></span>in place, you told Finn it exists</span>' +
+      '<span class="fc-lg"><span class="fc-dot fc-none_held" aria-hidden="true"></span>none held, you told Finn there is none</span>' +
+      '<span class="fc-lg"><span class="fc-dot fc-not_recorded" aria-hidden="true"></span>not recorded, Finn has not asked yet</span>' +
+      '</div></div>';
+    return html;
+  }
+
   /* ── 3.9 Trust banner ── the disclosure lives inside the trust claim,
         said plainly and first. The one legitimate use of steel on forest. */
   function trustBanner(html) {
@@ -234,6 +431,7 @@
   window.finnComponents = {
     renderCopy, renderCopyInline, termAffordance,
     calcBlock, handoverLine, proportionBar, referenceBlock, costPill, costLine,
+    stackedBar, barRows, stateMatrix, tableToggle, dataTable, initTables,
     itemRow, itemGroup,
     figureHero, gapCard, eduBlock, stepRail, promiseBlock, actionZone,
     calmBlock, repeatingItems, professionalCard, professionalItem, trustBanner,

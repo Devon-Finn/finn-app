@@ -296,16 +296,28 @@
     let html = '';
 
     if (tileNo === 1) {
-      // Everything secured on the home, as the equity figure counts it.
-      const securedAll = (num(der.home_equity) !== null && num(home.value_estimate) !== null) ? home.value_estimate - der.home_equity : null;
-      const securedOther = (securedAll !== null && num(home.mortgage_balance) !== null) ? securedAll - home.mortgage_balance : null;
-      if (money(der.home_equity)) {
-        const owed = securedAll !== null ? securedAll : home.mortgage_balance;
-        const bar = C().proportionBar(
-          { label: 'Owed ' + money(owed), value: owed },
-          { label: 'Yours ' + money(der.home_equity), value: der.home_equity },
-          'Lending ' + money(owed) + ' against equity ' + money(der.home_equity));
-        html += C().figureHero(money(der.home_equity), 'is the part of the property you own', 'outright.', bar);
+      // The range display below still needs the total lending secured on
+      // the home. derive() owns home_secured; this is the sum of it and the
+      // mortgage, not a new derivation.
+      // securedOther is derive()'s home_secured: lending on the home that is
+      // not the mortgage itself (a split, a second loan).
+      const securedOther = num(der.home_secured) !== null && der.home_secured > 0 ? der.home_secured : null;
+      const securedAll = (num(home.mortgage_balance) !== null && num(der.home_secured) !== null)
+        ? home.mortgage_balance + der.home_secured : null;
+      // CHART LEADS (Part C). Home value split into equity, the mortgage,
+      // and anything else secured against the home. The third segment comes
+      // from derive()'s home_secured: the panel never works a figure out.
+      if (money(home.value_estimate) && money(der.home_equity)) {
+        html += C().stackedBar({
+          money: money,
+          segments: [
+            { label: 'Equity, the part you own', value: der.home_equity, display: money(der.home_equity) },
+            { label: 'Mortgage', value: home.mortgage_balance, display: money(home.mortgage_balance) },
+            { label: 'Other lending secured on the home', value: der.home_secured, display: money(der.home_secured) },
+          ],
+          totalLabel: 'What the home is worth',
+          totalDisplay: money(home.value_estimate),
+        });
       } else if (money(home.value_estimate)) {
         html += C().figureHero(money(home.value_estimate), 'is what the home is worth, on your', 'estimate.');
       }
@@ -367,7 +379,7 @@
       if (minsTotal) rows.push({ label: 'Minimum payments, other personal debts', op: '−', value: money(minsTotal) });
       rows.push({ label: 'What’s left over', op: '=', value: money(der.surplus_monthly), missing: money(der.surplus_monthly) === null, result: true });
       html += calcSection('What’s left over each month', rows, hand('take_home_pay'));
-      html += whereItGoes(exp);
+      html += whereItGoes(exp, der, inc);
       html += refBlock('The rest of the income details', [
         ['Salary, before tax', money(inc.salary_gross_annual) ? money(inc.salary_gross_annual) + '/year' : null],
         ['Partner salary, before tax', money(inc.partner_salary_gross_annual) ? money(inc.partner_salary_gross_annual) + '/year' : null],
@@ -396,6 +408,26 @@
 
     else if (tileNo === 4) {
       const funds = arr(sup.funds);
+      // CHART LEADS (Part C): one bar per account, grouped by member with
+      // the member named above their group. Fixed order within each member,
+      // and the member groups in a fixed order.
+      const OWNER_ORDER = ['you', 'partner'];
+      const fundsByOwner = OWNER_ORDER
+        .map(function (ow) {
+          return {
+            heading: ow === 'you' ? 'Your accounts'
+              : (text(ctx.partner_name) ? text(ctx.partner_name) + "'s accounts" : "Your partner's accounts"),
+            rows: funds.filter(function (f) { return (f.owner || 'you') === ow && num(f.balance) !== null; })
+              .map(function (f) { return { label: text(f.fund) || 'a super account', value: f.balance, display: money(f.balance) }; }),
+          };
+        })
+        .filter(function (g) { return g.rows.length; });
+      if (fundsByOwner.length) {
+        html += C().barRows({
+          groups: fundsByOwner,
+          footer: money(der.super_total) ? { label: 'Total across the household', display: money(der.super_total) } : null,
+        });
+      }
       // Panel switch: at two or more items the groups lead, so no hero.
       if (funds.length < 2 && money(der.super_total)) {
         html += C().figureHero(money(der.super_total), 'is in super across the', 'household.');
@@ -440,17 +472,54 @@
     }
 
     else if (tileNo === 5) {
-      // A row each, so one person's gap is visible (Devon, 17 Sept).
-      for (const owner of coverOwners(prot, ctx)) {
-        const head = owner === 'you' ? 'The cover you hold'
-          : (text(ctx.partner_name) ? esc(text(ctx.partner_name)) + "'s cover" : "Your partner's cover");
-        html += '<div class="fp-teach"><h4 class="fp-calchead">' + head + '</h4>' + statusList([
-          [conf(prot, 'Life cover'), coverDisplay(coverFor(prot, owner, 'life'))],
-          [conf(prot, 'TPD cover'), coverDisplay(coverFor(prot, owner, 'tpd'))],
-          [conf(prot, 'Income protection'), coverDisplay(coverFor(prot, owner, 'income_protection'))],
-          [conf(prot, 'Trauma cover'), coverDisplay(coverFor(prot, owner, 'trauma'))],
-        ]) + '</div>';
-      }
+      /* THE MATRIX REPLACES THE PER-OWNER LISTS (Part D, 16 Oct). Same
+         information, better shape: rows are cover types, columns are the
+         people, and a fourth column says where the cover sits. Keeping both
+         would state every cover twice.
+
+         THREE STATES, EACH WITH A DOT AND A WORD:
+           in place     held === true   the household said it exists
+           none held    held === false  the household said there is none
+           not recorded null/absent     Finn never asked
+         "None held" is a fact about the household; "not recorded" is a fact
+         about the conversation. A blank cell for the third would have Finn
+         imply something it was never told. */
+      const COVER_ROWS = [['life', 'Life cover'], ['tpd', 'TPD cover'],
+        ['income_protection', 'Income protection'], ['trauma', 'Trauma cover']];
+      const owners = coverOwners(prot, ctx);
+      const stateOf = function (c) {
+        if (!c || typeof c !== 'object' || c.held === null || c.held === undefined) return 'not_recorded';
+        return c.held === true ? 'in_place' : (c.held === false ? 'none_held' : 'not_recorded');
+      };
+      const whereOf = function (type) {
+        const held = owners.map(function (ow) { return coverFor(prot, ow, type); })
+          .filter(function (c) { return c && c.held === true; });
+        if (!held.length) return 'not recorded';
+        const inside = held.filter(function (c) { return c.inside_super === true; }).length;
+        const outside = held.filter(function (c) { return c.inside_super === false; }).length;
+        if (inside && !outside) return 'inside super';
+        if (outside && !inside) return 'outside super';
+        if (inside && outside) return 'some inside super, some outside';
+        return 'not recorded';
+      };
+      html += '<div class="fp-teach"><h4 class="fp-calchead">The cover this household holds</h4>' +
+        C().stateMatrix({
+          colLabels: owners.map(function (ow) {
+            return ow === 'you' ? 'You' : (text(ctx.partner_name) || 'Your partner');
+          }),
+          whereLabel: 'Where it sits',
+          rows: COVER_ROWS.map(function (pair) {
+            const type = pair[0];
+            return {
+              label: pair[1],
+              where: whereOf(type),
+              cells: owners.map(function (ow) {
+                const c = coverFor(prot, ow, type);
+                return { state: stateOf(c), note: (c && c.held === true && money(c.amount)) ? money(c.amount) : '' };
+              }),
+            };
+          }),
+        }) + '</div>';
       const kids = arr(ctx.children);
       const hh = [];
       if (num(ctx.adults) !== null) hh.push(ctx.adults + (ctx.adults === 1 ? ' adult' : ' adults'));
@@ -487,7 +556,21 @@
       const props = arr(inv.properties);
       const invParts = [inv.shares_value, inv.managed_funds_value].filter(v => num(v) !== null);
       const propEquityKnown = (der.property_equity || []).filter(v => num(v) !== null);
-      if (props.length >= 2) {
+      /* CHART LEADS (Part C): the portfolio total split by holding type.
+         The schema carries exactly three kinds (property equity, shares,
+         managed funds), so a fourth cannot arise from a household today.
+         stackedBar folds and logs if one ever does, rather than reaching
+         for a fourth fill: there isn't one by design. */
+      const portfolio = [
+        { label: props.length === 1 ? 'Equity in the investment property' : 'Equity in the investment properties',
+          value: propEquityKnown.reduce(function (a, b) { return a + b; }, 0) },
+        { label: 'Shares and ETFs', value: num(inv.shares_value) },
+        { label: 'Managed funds', value: num(inv.managed_funds_value) },
+      ].filter(function (s) { return num(s.value) !== null && s.value > 0; })
+       .map(function (s) { return { label: s.label, value: s.value, display: money(s.value) }; });
+      if (portfolio.length > 1) {
+        html += C().stackedBar({ money: money, segments: portfolio, totalLabel: 'The portfolio, all together' });
+      } else if (props.length >= 2) {
         // Panel switch: at two or more properties the groups lead, so no hero.
       } else if (propEquityKnown.length) {
         html += C().figureHero(money(propEquityKnown.reduce((a, b) => a + b, 0)), 'is the equity across your investment', props.length === 1 ? 'property.' : 'properties.');
@@ -752,7 +835,12 @@
     ['travel', 'Travel and holidays'], ['other', 'Everything else'],
   ];
   const listWords = xs => xs.length <= 1 ? (xs[0] || '') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1];
-  function whereItGoes(exp) {
+  /* Tile 2's spending rows ARE Component 2 (absorbed 16 Oct, not replaced:
+     finishing the existing component beats building a parallel one). The
+     fill moved from --fc-steel, which is reserved for labels on forest and
+     is not a data fill, to --fc-fill-2. The surplus row and the net-income
+     footer are new; the FIXED category order is unchanged and is the point. */
+  function whereItGoes(exp, der, inc) {
     const cats = exp && exp.by_category && typeof exp.by_category === 'object' ? exp.by_category : null;
     if (!cats) {
       if (money(exp && exp.living_monthly)) {
@@ -761,17 +849,21 @@
       }
       return '';
     }
-    const rows = SPEND_LABELS.filter(([k]) => num(cats[k]) !== null && cats[k] > 0);
-    const total = rows.reduce((a, [k]) => a + cats[k], 0);
-    if (!(total > 0)) return '';
-    let html = '<div class="fp-section fp-where"><h4 class="fp-calchead">Where it goes</h4><div class="fp-spend">';
-    for (const [k, label] of rows) {
-      const pct = Math.round(cats[k] / total * 100);
-      html += '<div class="fp-srow"><span class="fp-slabel">' + esc(label) + '</span>' +
-        '<span class="fp-sbar"><span style="width:' + Math.max(pct, 1) + '%"></span></span>' +
-        '<span class="fp-sval">' + money(cats[k]) + '<span class="u">/month</span></span></div>';
-    }
-    html += '</div>';
+    // SPEND_LABELS order, never sorted by amount.
+    const rows = SPEND_LABELS.filter(([k]) => num(cats[k]) !== null && cats[k] > 0)
+      .map(([k, label]) => ({ label, value: cats[k], display: money(cats[k]) + '/month' }));
+    if (!rows.length) return '';
+    const d = der || {};
+    const netIn = [ (inc || {}).salary_net_monthly, (inc || {}).partner_salary_net_monthly ]
+      .filter(v => num(v) !== null).reduce((a, b) => a + b, 0);
+    const chart = C().barRows({
+      groups: [{ rows }],
+      rule: num(d.surplus_monthly) !== null
+        ? { label: "What's left over", value: Math.max(d.surplus_monthly, 0), display: money(d.surplus_monthly) + '/month' }
+        : null,
+      footer: netIn > 0 ? { label: 'Income in, each month', display: money(netIn) } : null,
+    });
+    let html = '<div class="fp-section fp-where"><h4 class="fp-calchead">Where it goes</h4>' + chart;
     const notes = [];
     if (num(exp.annual_bills_monthly) !== null && exp.annual_bills_monthly > 0) {
       const named = text(exp.annual_bills_note) ? text(exp.annual_bills_note).split('; ').filter(x => x && x !== 'other yearly bills').slice(0, 3) : [];
